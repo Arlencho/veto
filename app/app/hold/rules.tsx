@@ -19,7 +19,7 @@ export default function HoldRules() {
           amountLabel={draft.amountText.trim() || '0'}
           tokenName={session.tokenName}
           walletLabel={session.owner ? shortKey(session.owner.toBase58()) : 'your wallet'}
-          dailyLabel={draft.dailyText}
+          dailyLabel={`${draft.dailyText} ${session.tokenName}`}
           days={draft.days}
           onLower={() => draft.setDailyText(stepWhole(draft.dailyText, -1))}
           onRaise={() => draft.setDailyText(stepWhole(draft.dailyText, 1))}

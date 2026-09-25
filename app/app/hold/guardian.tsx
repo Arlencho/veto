@@ -104,7 +104,7 @@ export default function HoldGuardian() {
             const address = mode === 'phone' ? draft.phoneKey ?? '' : draft.guardianText;
             draft.chooseGuardian(mode, address);
           }}
-          onGuardian={draft.setGuardianText}
+          onGuardian={(address) => draft.chooseGuardian('seeker', address)}
           onSafe={draft.setSafeText}
           onBack={() => router.back()}
           onSign={onSign}

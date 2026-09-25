@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { colors } from '../../components/theme';
@@ -10,6 +10,7 @@ import {
 } from '../../lib/hold';
 
 export type HoldDraft = {
+  onboarding: boolean;
   amountText: string;
   dailyText: string;
   days: HoldDays;
@@ -36,18 +37,21 @@ type DraftApi = HoldDraft & {
 const DraftContext = createContext<DraftApi | null>(null);
 
 function DraftProvider({ children }: { children: ReactNode }) {
+  const params = useLocalSearchParams<{ onboarding?: string; guardian?: string; mode?: string }>();
+  const [onboarding] = useState(params.onboarding === '1');
   const [amountText, setAmountText] = useState(HOLD_SUGGESTED_DEPOSIT);
   const [dailyText, setDailyText] = useState(HOLD_SUGGESTED_DAILY);
   const [days, setDays] = useState<HoldDays>(HOLD_SUGGESTED_DAYS);
-  const [mode, setMode] = useState<'phone' | 'seeker'>('seeker');
-  const [guardianText, setGuardianText] = useState('');
-  const [safeText, setSafeTextState] = useState('');
+  const [mode, setMode] = useState<'phone' | 'seeker'>(params.mode === 'phone' ? 'phone' : 'seeker');
+  const [guardianText, setGuardianText] = useState(params.guardian ?? '');
+  const [safeText, setSafeTextState] = useState(params.guardian ?? '');
   const [safeTouched, setSafeTouched] = useState(false);
   const [phoneKey, setPhoneKey] = useState<string | null>(null);
   const [openedVault, setOpenedVault] = useState<string | null>(null);
 
   const api = useMemo<DraftApi>(
     () => ({
+      onboarding,
       amountText,
       dailyText,
       days,
@@ -74,7 +78,7 @@ function DraftProvider({ children }: { children: ReactNode }) {
         if (!safeTouched) setSafeTextState(address);
       },
     }),
-    [amountText, dailyText, days, mode, guardianText, safeText, safeTouched, phoneKey, openedVault],
+    [onboarding, amountText, dailyText, days, mode, guardianText, safeText, safeTouched, phoneKey, openedVault],
   );
 
   return <DraftContext.Provider value={api}>{children}</DraftContext.Provider>;

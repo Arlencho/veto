@@ -183,7 +183,10 @@ export function FirstRunGuide({ onFinish }: { onFinish: () => void }) {
       rpcUrl={chain.config?.rpcUrl ?? null}
       onStage={setStage}
       onOpened={setOpened}
-      onFinish={onFinish}
+      onFinish={() => {
+        onFinish();
+        router.push('/first-run/protect');
+      }}
     />
   );
 }

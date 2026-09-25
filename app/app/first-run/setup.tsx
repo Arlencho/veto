@@ -24,7 +24,7 @@ export default function SetupRoute() {
         }
         onCopy={() => undefined}
         onAlerts={() => router.push(FIRST_RUN_ROUTES.alerts)}
-        onOverview={() => router.replace('/')}
+        onOverview={() => router.replace('/first-run/protect')}
         view={chain.loading ? 'loading' : mandate ? 'normal' : 'empty'}
       />
     </Screen>

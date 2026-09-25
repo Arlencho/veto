@@ -90,6 +90,8 @@ export const FIRST_RUN_ROUTES = {
   live: '/first-run/live',
   setup: '/first-run/setup',
   alerts: '/first-run/alerts',
+  protect: '/first-run/protect',
+  finish: '/first-run/finish',
 } as const;
 
 export function networkPillLabel(cluster: string | null | undefined): string | null {

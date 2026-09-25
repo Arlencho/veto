@@ -325,7 +325,7 @@ test('a cancelled vault signature arms the hold button again', async () => {
       onBack() {},
       onSign: async () => undefined,
     }),
-    'Sign with your key on this phone',
+    'Hold to sign with your key on this phone',
     'open-vault',
     'onSign',
   );
@@ -368,8 +368,8 @@ test('a held withdrawal shows the chain countdown and Stop as the main action', 
   const buttons = root.root
     .findAll((node) => (node.type as unknown) === 'Pressable')
     .map((node) => String(node.props.accessibilityLabel));
-  const stopAt = buttons.findIndex((label) => label.startsWith('Stop this withdrawal'));
-  const freezeAt = buttons.findIndex((label) => label.startsWith('Freeze the whole vault'));
+  const stopAt = buttons.findIndex((label) => label.startsWith('Hold to stop this withdrawal'));
+  const freezeAt = buttons.findIndex((label) => label.startsWith('Hold to freeze the whole vault'));
   assert.ok(stopAt >= 0 && freezeAt > stopAt);
   assert.match(
     textOf(
@@ -448,7 +448,7 @@ test('a cancelled stop arms Stop again', async () => {
       onStop: async () => undefined,
       onFreeze: async () => undefined,
     }),
-    'Stop this withdrawal',
+    'Hold to stop this withdrawal',
     'stop',
     'onStop',
   );
@@ -580,7 +580,7 @@ test('a cancelled recover arms Recover again', async () => {
       onRecover: async () => undefined,
       onUnfreeze() {},
     }),
-    'Recover: move all 1,000 to your safe address',
+    'Hold to recover: move all 1,000 to your safe address',
     'recover',
     'onRecover',
   );
@@ -605,7 +605,7 @@ test('skip with both keys says one key cannot skip and shows a waiting signature
         onPayload() {},
         onBack() {},
         onSign: async () => undefined,
-        signLabel: 'Sign with your key on this phone',
+        signLabel: 'Hold to sign with your key on this phone',
         signHint: 'Each signature uses Seed Vault.',
         onCancel() {},
       }),

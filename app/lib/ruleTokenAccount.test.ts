@@ -889,7 +889,7 @@ test('the rule screen shows each rule balance, where it lives, and close when th
   const branchStart = src.indexOf('!isActive(mandate, nowSec)');
   assert.ok(branchStart !== -1);
   const branch = src.slice(branchStart, src.indexOf(': null}', branchStart));
-  assert.match(branch, /Close this rule/);
+  assert.match(branch, /Hold to close this rule/);
   assert.match(branch, /closeNote\(/);
   assert.match(src, /chain\.close\(/);
   assert.match(chain, /closeMandate\(/);
@@ -1003,7 +1003,7 @@ test('before revoke or close, a legacy rule names the other rule whose delegate 
   const src = read('app/rule/[address].tsx');
   const warnAt = src.indexOf('otherDelegateWarning(funds.otherRule)');
   const revokeAt = src.indexOf('Revoke this rule');
-  const closeAt = src.indexOf('Close this rule');
+  const closeAt = src.indexOf('Hold to close this rule');
   assert.ok(warnAt !== -1 && revokeAt !== -1 && closeAt !== -1);
   assert.ok(warnAt < revokeAt && warnAt < closeAt);
   assert.match(src, /revokeNote\(\)/);

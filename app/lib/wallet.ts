@@ -153,7 +153,6 @@ function isStoredSession(value: unknown): value is StoredSession {
   const rec = value as Record<string, unknown>;
   return (
     typeof rec.authToken === 'string' &&
-    rec.authToken.length > 0 &&
     typeof rec.ownerPublicKey === 'string' &&
     rec.ownerPublicKey.length > 0
   );
@@ -205,6 +204,17 @@ export async function persistSession(
 
 export async function clearSession(store: WalletStore): Promise<void> {
   await store.deleteItem(SESSION_STORE_KEY);
+}
+
+/**
+ * Forgets the auth_token the wallet refused but keeps the owner and wallet,
+ * so the app stays connected and the next authorize starts fresh.
+ */
+export async function clearSessionToken(store: WalletStore): Promise<void> {
+  const stored = await loadSession(store);
+  if (stored) {
+    await persistSession(store, { ...stored, authToken: '' });
+  }
 }
 
 function readFailed(detail: string): Error {
@@ -494,16 +504,62 @@ async function confirmSignatures(
   }
 }
 
+export type AuthorizeResult = Awaited<ReturnType<MwaWallet['authorize']>>;
+
+/**
+ * True when the wallet refused an authorize call that carried an auth_token
+ * and the refusal was not the owner declining. A wallet answers a token it no
+ * longer honours (after a reinstall, for example) with code -1 and
+ * "authorization request failed" within the same moment, before the owner can
+ * act, so this is read as a stale token rather than a decision.
+ */
+export function isStaleAuthTokenError(error: unknown): boolean {
+  if (numericCode(error) !== -1) {
+    return false;
+  }
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return !(message.includes('declin') || message.includes('cancel') || message.includes('reject'));
+}
+
+/**
+ * The one place every authorize call goes through. A stored token the wallet
+ * refuses is cleared and a fresh authorize is asked once, in the same wallet
+ * session. A decline, or a failure of the fresh authorize, is thrown as is.
+ */
+export async function authorizeAccounts(
+  wallet: MwaWallet,
+  storedAuthToken?: string,
+  store?: WalletStore,
+): Promise<AuthorizeResult> {
+  const chain = walletChainForCluster(await clusterForWallet());
+  const request = (authToken?: string) =>
+    wallet.authorize({
+      identity: APP_IDENTITY,
+      chain,
+      ...(authToken ? { auth_token: authToken } : {}),
+    });
+  if (!storedAuthToken) {
+    return request();
+  }
+  try {
+    return await request(storedAuthToken);
+  } catch (err) {
+    if (!isStaleAuthTokenError(err)) {
+      throw err;
+    }
+    if (store) {
+      await clearSessionToken(store);
+    }
+    return request();
+  }
+}
+
 export async function authorize(
   wallet: MwaWallet,
   storedAuthToken?: string,
+  store?: WalletStore,
 ): Promise<StoredSession> {
-  const chain = walletChainForCluster(await clusterForWallet());
-  const result = await wallet.authorize({
-    identity: APP_IDENTITY,
-    chain,
-    ...(storedAuthToken ? { auth_token: storedAuthToken } : {}),
-  });
+  const result = await authorizeAccounts(wallet, storedAuthToken, store);
   const account = result.accounts[0];
   if (!account) {
     throw new Error('Wallet authorized no accounts');
@@ -531,7 +587,7 @@ export async function connect(
   let session: StoredSession;
   try {
     session = await transact(
-      (wallet) => authorize(wallet, options?.chooser ? undefined : stored?.authToken),
+      (wallet) => authorize(wallet, options?.chooser ? undefined : stored?.authToken, store),
       associationConfig(baseUri),
     );
   } catch (err) {
@@ -549,7 +605,7 @@ export async function connect(
 export async function disconnect(transact: TransactFn, store: WalletStore): Promise<void> {
   const stored = await loadSession(store);
   try {
-    if (stored) {
+    if (stored?.authToken) {
       await transact(
         (wallet) => wallet.deauthorize({ auth_token: stored.authToken }),
         associationConfig(stored.walletUriBase),
@@ -593,7 +649,7 @@ export async function signAndSendTransactions(
   const stored = await loadSession(store);
   try {
     const signatures = await transact(async (wallet) => {
-      const session = await authorize(wallet, stored?.authToken);
+      const session = await authorize(wallet, stored?.authToken, store);
       await persistSession(store, session);
       if (!wallet.signAndSendTransactions) {
         throw new Error('Wallet cannot sign and send transactions');

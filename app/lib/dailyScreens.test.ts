@@ -757,7 +757,7 @@ test('a stopped rule offers close again after a cancelled signature', async () =
   closeCalls = 0;
   const root = await mount(createElement(Screen));
   assert.match(textOf(root), /You stopped this rule/);
-  const press = () => byLabel(root, 'Close this rule');
+  const press = () => byLabel(root, 'Hold to close this rule');
   await act(async () => {
     press().props.onLongPress();
     await new Promise((resolve) => setImmediate(resolve));

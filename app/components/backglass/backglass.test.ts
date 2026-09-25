@@ -455,6 +455,59 @@ describe('backglass components', { concurrency: 1 }, () => {
     assert.equal(typeof movingShift?.translateX, 'object');
   });
 
+  test('the small hold hint keeps at least 3:1 contrast whenever visible during the fill', async () => {
+    const { HoldToApprove } = await import('./HoldToApprove');
+    motion.reduced = false;
+    const root = await mount(createElement(HoldToApprove, { hint: 'Hold hint', onConfirm: () => undefined }));
+    const hint = root.root.findAll((node) => node.type === ('Text' as unknown) && node.props.children === 'Hold hint')[0];
+    assert.ok(hint);
+    const style = flatStyle(hint.props.style);
+    type Interpolation = { config: { inputRange: number[]; outputRange: (string | number)[] } };
+    const sample = (value: unknown, progress: number): number[] => {
+      const { inputRange, outputRange } = (value as Interpolation).config;
+      const channels = (entry: string | number): number[] => typeof entry === 'number'
+        ? [entry]
+        : [1, 3, 5].map((start) => parseInt(entry.slice(start, start + 2), 16));
+      const end = inputRange.findIndex((at, index) => index > 0 && progress <= at);
+      const start = end - 1;
+      const ratio = (progress - inputRange[start]!) / (inputRange[end]! - inputRange[start]!);
+      const from = channels(outputRange[start]!);
+      const to = channels(outputRange[end]!);
+      return from.map((channel, index) => channel + (to[index]! - channel) * ratio);
+    };
+    const luminance = (rgb: number[]) => rgb.map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    }).reduce((total, value, index) => total + value * [0.2126, 0.7152, 0.0722][index]!, 0);
+    const fill = flatStyle(root.root.findAll((node) => node.props.testID === 'hold-fill')[0]!.props.style);
+    for (let percent = 0; percent <= 100; percent += 1) {
+      const progress = percent / 100;
+      if (style.opacity !== undefined && sample(style.opacity, progress)[0]! === 0) continue;
+      const foreground = luminance(sample(style.color, progress));
+      const background = luminance(sample(fill.backgroundColor, progress));
+      const contrast = (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+      assert.ok(contrast >= 3, `hint contrast at ${percent}% is ${contrast}`);
+    }
+    await act(async () => { root.unmount(); });
+  });
+
+  test('unmounting during a hold never confirms, even with a queued completion', async () => {
+    const { HoldToApprove, HOLD_MS } = await import('./HoldToApprove');
+    motion.reduced = false;
+    let confirmed = 0;
+    const root = await mount(createElement(HoldToApprove, { onConfirm: () => { confirmed += 1; } }));
+    await act(async () => { hostOf(root.root, 'Pressable').props.onPressIn(); });
+    const fill = [...timings].reverse().find((anim) => anim.toValue === 1 && anim.duration === HOLD_MS);
+    assert.ok(fill?._cb);
+    const queuedCompletion = fill._cb;
+    await act(async () => { root.unmount(); });
+    await act(async () => {
+      fill._cb?.({ finished: true });
+      queuedCompletion({ finished: true });
+    });
+    assert.equal(confirmed, 0);
+  });
+
   test('holding through the ring confirms the rule, and letting go early does not', async () => {
     const { HoldToApprove, HOLD_MS } = await import('./HoldToApprove');
     motion.reduced = false;

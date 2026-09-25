@@ -166,11 +166,17 @@ test('a fresh authorize that also fails is not retried again', async () => {
   assert.equal(calls.length, 2);
 });
 
-test('a decline of the stored token is not treated as stale', async () => {
+test('a decline after two seconds keeps the stored token without retrying', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 10000 });
   const owner = Keypair.generate();
   const store = memoryStore(storedSession(owner));
   const calls: AuthorizeParams[] = [];
-  const { fake } = scriptedWallet(owner, [DECLINE(), 'ok'], calls);
+  const { fake } = scriptedWallet(owner, [STALE(), 'ok'], calls);
+  const authorize = fake.authorize;
+  fake.authorize = async (params) => {
+    t.mock.timers.tick(2000);
+    return authorize(params);
+  };
   await assert.rejects(wallet.connect(transactWith(fake, { count: 0 }), store));
   assert.equal(calls.length, 1);
   assert.equal((await wallet.loadSession(store))?.authToken, 'stale-token');
@@ -239,11 +245,13 @@ test('Hold setup account list recovers from a stale token and stops after a decl
   assert.equal(declined.length, 2);
 });
 
-test('isStaleAuthTokenError reads the wallet code and wording', () => {
-  assert.equal(wallet.isStaleAuthTokenError(STALE()), true);
-  assert.equal(wallet.isStaleAuthTokenError(DECLINE()), false);
-  assert.equal(wallet.isStaleAuthTokenError(new ProtocolError(-3, 'not signed')), false);
-  assert.equal(wallet.isStaleAuthTokenError(new Error('authorization request failed')), false);
+test('isStaleAuthTokenError checks elapsed time, wallet code and wording', () => {
+  assert.equal(wallet.isStaleAuthTokenError(STALE(), 100), true);
+  assert.equal(wallet.isStaleAuthTokenError(STALE(), 1500), false);
+  assert.equal(wallet.isStaleAuthTokenError(STALE(), 2000), false);
+  assert.equal(wallet.isStaleAuthTokenError(DECLINE(), 100), false);
+  assert.equal(wallet.isStaleAuthTokenError(new ProtocolError(-3, 'not signed'), 100), false);
+  assert.equal(wallet.isStaleAuthTokenError(new Error('authorization request failed'), 100), false);
   const nested = Object.assign(new Error('authorization request failed'), { userInfo: { jsonRpcErrorCode: -1 } });
-  assert.equal(wallet.isStaleAuthTokenError(nested), true);
+  assert.equal(wallet.isStaleAuthTokenError(nested, 100), true);
 });

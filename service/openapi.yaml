@@ -1,0 +1,650 @@
+openapi: 3.0.3
+info:
+  title: Veto index read API
+  version: 1.0.0
+  description: 'Read-only JSON API over the Postgres index. All amounts, nonces, slots,
+    counters and millisecond lags are decimal strings. CORS allows any origin for
+    GET only; no credentials. Unknown routes return JSON 404. Every response uses
+    Cache-Control: no-store. Run npm run api with standard PG* database variables,
+    VETO_RPC, optional PORT (3000) and HOST (127.0.0.1).'
+paths:
+  /v1/agents/{agent}/rules:
+    get:
+      operationId: listAgentRules
+      description: Rules sorted by rule address. A known agent with only decision
+        history returns an empty list.
+      parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/PublicKey'
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rules'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/{agent}/record:
+    get:
+      operationId: getAgentRecord
+      description: Grade and exact counters from src/grade.ts, with refusal reason
+        tallies. A known rule agent without stats has zero counters and a too-new
+        grade.
+      parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/PublicKey'
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Record'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/rules/{rule}/decisions:
+    get:
+      operationId: listRuleDecisions
+      description: Decisions ordered by slot descending, then signature, instruction_index
+        and inner_index ascending. before is exclusive. When a page cuts through a
+        shared slot, using that slot as before skips remaining rows at that slot.
+        Known rules with no matching history return an empty list.
+      parameters:
+      - name: rule
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/PublicKey'
+      - name: before
+        in: query
+        schema:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)$
+        description: Exclusive slot cursor, 0 through 9223372036854775807. Canonical
+          decimal digits only.
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+        description: Canonical decimal digits only. Values above 500 are rejected.
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decisions'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/rules/{rule}:
+    get:
+      operationId: getRule
+      description: Persisted rule account state. Returns 404 when no rules row exists,
+        even if decision history exists.
+      parameters:
+      - name: rule
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/PublicKey'
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/owners/{owner}/rules:
+    get:
+      operationId: listOwnerRules
+      description: Rules sorted by rule address. A known owner with only decision
+        history returns an empty list.
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/PublicKey'
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rules'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/decisions/{signature}:
+    get:
+      operationId: getSignatureDecisions
+      description: All decision rows for a transaction signature, including distinct
+        instruction locations, ordered by slot descending then signature, instruction_index
+        and inner_index ascending.
+      parameters:
+      - name: signature
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Signature'
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decisions'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/health:
+    get:
+      operationId: getHealth
+      description: Reads the confirmed chain tip through VETO_RPC and reports persisted
+        index progress. RPC requests time out after five seconds. RPC errors are sanitized
+        and no endpoint is returned.
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: '#/components/headers/Access-Control-Allow-Origin'
+            Access-Control-Allow-Methods:
+              $ref: '#/components/headers/Access-Control-Allow-Methods'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/RpcUnavailable'
+components:
+  schemas:
+    Decimal:
+      type: string
+      pattern: ^-?[0-9]+(\.[0-9]+)?$
+      description: Exact decimal database value; never a JSON number.
+    UInt:
+      type: string
+      pattern: ^[0-9]+$
+      description: Exact nonnegative decimal integer, serialized as a string.
+    PublicKey:
+      type: string
+      minLength: 32
+      maxLength: 44
+      pattern: ^[1-9A-HJ-NP-Za-km-z]+$
+      description: Base58 encoding of exactly 32 bytes.
+    Signature:
+      type: string
+      minLength: 64
+      maxLength: 88
+      pattern: ^[1-9A-HJ-NP-Za-km-z]+$
+      description: Base58 encoding of exactly 64 bytes.
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+      - error
+      properties:
+        error:
+          type: string
+    Rule:
+      type: object
+      additionalProperties: false
+      required:
+      - rule
+      - owner
+      - agent
+      - mint
+      - source
+      - merchant
+      - cap
+      - per_tx_max
+      - expires_at
+      - status
+      - opened_at
+      - closed_at
+      properties:
+        rule:
+          $ref: '#/components/schemas/PublicKey'
+        owner:
+          $ref: '#/components/schemas/PublicKey'
+        agent:
+          $ref: '#/components/schemas/PublicKey'
+        mint:
+          type: string
+          minLength: 32
+          maxLength: 44
+          pattern: ^[1-9A-HJ-NP-Za-km-z]+$
+          description: Base58 encoding of exactly 32 bytes.
+          nullable: true
+        source:
+          type: string
+          minLength: 32
+          maxLength: 44
+          pattern: ^[1-9A-HJ-NP-Za-km-z]+$
+          description: Base58 encoding of exactly 32 bytes.
+          nullable: true
+        merchant:
+          type: string
+          minLength: 32
+          maxLength: 44
+          pattern: ^[1-9A-HJ-NP-Za-km-z]+$
+          description: Base58 encoding of exactly 32 bytes.
+          nullable: true
+        cap:
+          type: string
+          pattern: ^-?[0-9]+(\.[0-9]+)?$
+          description: Exact decimal database value; never a JSON number.
+          nullable: true
+        per_tx_max:
+          type: string
+          pattern: ^-?[0-9]+(\.[0-9]+)?$
+          description: Exact decimal database value; never a JSON number.
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: integer
+        opened_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+    Decision:
+      type: object
+      additionalProperties: false
+      required:
+      - signature
+      - slot
+      - block_time
+      - instruction_index
+      - inner_index
+      - program_version
+      - rule_kind
+      - rule
+      - agent
+      - owner
+      - kind
+      - reason
+      - amount
+      - nonce
+      - counterparty
+      - suggested_override
+      - commitment
+      - finalized
+      - source
+      properties:
+        signature:
+          $ref: '#/components/schemas/Signature'
+        slot:
+          $ref: '#/components/schemas/UInt'
+        block_time:
+          type: string
+          format: date-time
+        instruction_index:
+          type: integer
+          minimum: 0
+        inner_index:
+          type: integer
+          minimum: -1
+        program_version:
+          type: integer
+        rule_kind:
+          type: string
+          enum:
+          - mandate
+          - hold
+          - trade
+        rule:
+          $ref: '#/components/schemas/PublicKey'
+        agent:
+          $ref: '#/components/schemas/PublicKey'
+        owner:
+          $ref: '#/components/schemas/PublicKey'
+        kind:
+          type: integer
+        reason:
+          type: integer
+        amount:
+          $ref: '#/components/schemas/Decimal'
+        nonce:
+          $ref: '#/components/schemas/Decimal'
+        counterparty:
+          $ref: '#/components/schemas/PublicKey'
+        suggested_override:
+          type: string
+          pattern: ^-?[0-9]+(\.[0-9]+)?$
+          description: Exact decimal database value; never a JSON number.
+          nullable: true
+        commitment:
+          type: string
+          enum:
+          - confirmed
+          - finalized
+        finalized:
+          type: boolean
+          description: True exactly when commitment is finalized.
+        source:
+          type: string
+          enum:
+          - grpc
+          - webhook
+          - backfill
+          - logs
+    Rules:
+      type: object
+      additionalProperties: false
+      required:
+      - rules
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rule'
+    Decisions:
+      type: object
+      additionalProperties: false
+      required:
+      - decisions
+      properties:
+        decisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Decision'
+    Grade:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - label
+      - requests
+      - paid
+      - outside
+      - allowances
+      - declines
+      - daysRunning
+      - band
+      - steppedDown
+      - movedOutside
+      properties:
+        id:
+          type: string
+          enum:
+          - stayed
+          - tested
+          - pushed
+          - too-new
+        label:
+          type: string
+          enum:
+          - Stayed inside its rule
+          - Tested its limit now and then
+          - Pushed its limit often
+          - Too new to grade
+        requests:
+          $ref: '#/components/schemas/UInt'
+        paid:
+          $ref: '#/components/schemas/UInt'
+        outside:
+          $ref: '#/components/schemas/UInt'
+        allowances:
+          $ref: '#/components/schemas/UInt'
+        declines:
+          $ref: '#/components/schemas/UInt'
+        daysRunning:
+          type: string
+          pattern: ^[0-9]+$
+          description: Exact nonnegative decimal integer, serialized as a string.
+          nullable: true
+        band:
+          type: string
+          nullable: true
+          enum:
+          - stayed
+          - tested
+          - pushed
+          - null
+        steppedDown:
+          type: boolean
+        movedOutside:
+          type: integer
+          enum:
+          - 0
+    Record:
+      type: object
+      additionalProperties: false
+      required:
+      - agent
+      - grade
+      - reason_tallies
+      properties:
+        agent:
+          $ref: '#/components/schemas/PublicKey'
+        grade:
+          $ref: '#/components/schemas/Grade'
+        reason_tallies:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/UInt'
+          description: Counts of refused decision rows (kind 2), keyed by numeric
+            reason code. Missing reasons have zero rows.
+    Health:
+      type: object
+      additionalProperties: false
+      required:
+      - chain_tip_slot
+      - last_indexed_slot
+      - lag_slots
+      - lag_ms
+      - finalized_watermark
+      - rows_per_source
+      properties:
+        chain_tip_slot:
+          $ref: '#/components/schemas/UInt'
+        last_indexed_slot:
+          type: string
+          pattern: ^[0-9]+$
+          description: Maximum of cursor last_slot and persisted decision slot; null
+            for an empty index.
+          nullable: true
+        lag_slots:
+          type: string
+          pattern: ^[0-9]+$
+          description: max(0, chain_tip_slot - last_indexed_slot); null for an empty
+            index.
+          nullable: true
+        lag_ms:
+          type: string
+          pattern: ^[0-9]+$
+          description: Nonnegative difference of RPC getBlockTime timestamps times
+            1000; zero when slot lag is zero. Null for an empty index, an unavailable
+            block timestamp, or a slot outside the safe RPC integer range.
+          nullable: true
+        finalized_watermark:
+          type: string
+          pattern: ^[0-9]+$
+          description: Minimum watermark across cursor rows. Null if there are no
+            cursors or any cursor has no watermark.
+          nullable: true
+        rows_per_source:
+          type: object
+          additionalProperties: false
+          required:
+          - grpc
+          - webhook
+          - backfill
+          - logs
+          properties:
+            grpc:
+              $ref: '#/components/schemas/UInt'
+            webhook:
+              $ref: '#/components/schemas/UInt'
+            backfill:
+              $ref: '#/components/schemas/UInt'
+            logs:
+              $ref: '#/components/schemas/UInt'
+  headers:
+    Access-Control-Allow-Origin:
+      schema:
+        type: string
+        enum:
+        - '*'
+    Access-Control-Allow-Methods:
+      schema:
+        type: string
+        enum:
+        - GET
+    Allow:
+      schema:
+        type: string
+        enum:
+        - GET
+  responses:
+    BadRequest:
+      description: Invalid address, signature, path encoding or query. Unknown and
+        duplicate query parameters are rejected.
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: '#/components/headers/Access-Control-Allow-Origin'
+        Access-Control-Allow-Methods:
+          $ref: '#/components/headers/Access-Control-Allow-Methods'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    MethodNotAllowed:
+      description: 'Only GET is supported. Other methods, including HEAD and OPTIONS,
+        return 405 with Allow: GET.'
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: '#/components/headers/Access-Control-Allow-Origin'
+        Access-Control-Allow-Methods:
+          $ref: '#/components/headers/Access-Control-Allow-Methods'
+        Allow:
+          $ref: '#/components/headers/Allow'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Sanitized internal error
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: '#/components/headers/Access-Control-Allow-Origin'
+        Access-Control-Allow-Methods:
+          $ref: '#/components/headers/Access-Control-Allow-Methods'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Unknown resource
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: '#/components/headers/Access-Control-Allow-Origin'
+        Access-Control-Allow-Methods:
+          $ref: '#/components/headers/Access-Control-Allow-Methods'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RpcUnavailable:
+      description: RPC unavailable, misconfigured, timed out or returned an invalid
+        response
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: '#/components/headers/Access-Control-Allow-Origin'
+        Access-Control-Allow-Methods:
+          $ref: '#/components/headers/Access-Control-Allow-Methods'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

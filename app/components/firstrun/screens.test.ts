@@ -1,10 +1,10 @@
-(globalThis as { __DEV__?: boolean }).__DEV__ = false;
-
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
 
 import { act, createElement, type ReactElement, type ReactNode } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
+
+(globalThis as { __DEV__?: boolean }).__DEV__ = false;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -254,4 +254,30 @@ test('alerts shows loading, empty, error, and the permission ask without a sampl
   assert.match(normal, /Turn on alerts/);
   assert.match(normal, /more than the limit/);
   assert.doesNotMatch(normal, /asked for 14/);
+});
+
+test('Hold offers second Seeker, same phone and later without blocking the agent path', async () => {
+  const { ProtectScreen } = await import('./ProtectScreen');
+  let choice = '';
+  const root = await mount(createElement(ProtectScreen, {
+    cluster: 'devnet', owner: 'owner', error: null,
+    onSeeker: (address) => { choice = address; },
+    onPhone: () => { choice = 'phone'; }, onLater: () => { choice = 'later'; },
+  }));
+  assert.match(visibleText(root), /Protect the rest of your money/);
+  assert.match(visibleText(root), /1, 2 or 3 days/);
+  assert.match(visibleText(root), /same phone is weaker/);
+  const press = async (label: string) => act(async () => {
+    root.root.findAll((node) => (node.type as unknown) === 'Pressable' && node.props.accessibilityLabel === label)[0].props.onPress();
+  });
+  await press('Set up later');
+  assert.equal(choice, 'later');
+  await press('Set up with my second Seeker');
+  assert.match(visibleText(root), /tap Receive for Solana/);
+  await act(async () => {
+    root.root.findByType('TextInput' as never).props.onChangeText('So11111111111111111111111111111111111111112');
+  });
+  await press('Continue with this address');
+  assert.equal(choice, 'So11111111111111111111111111111111111111112');
+  await act(async () => root.unmount());
 });

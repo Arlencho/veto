@@ -35,6 +35,12 @@ export function HoldToApprove({
   const confirmed = useRef(false);
   const [done, setDone] = useState(false);
 
+  const [previousResetKey, setPreviousResetKey] = useState(resetKey);
+  if (previousResetKey !== resetKey) {
+    setPreviousResetKey(resetKey);
+    setDone(false);
+  }
+
   // A cancelled or failed signature must leave the button usable again.
   useEffect(() => {
     running.current?.stop();
@@ -42,7 +48,6 @@ export function HoldToApprove({
     holding.current = false;
     confirmed.current = false;
     progress.setValue(0);
-    setDone(false);
   }, [resetKey, progress]);
 
   function confirm() {

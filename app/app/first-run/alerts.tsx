@@ -26,7 +26,7 @@ export default function AlertsRoute() {
         statusLine={statusLine}
         exampleLimit={null}
         busy={busy}
-        onNotNow={() => router.back()}
+        onNotNow={() => router.replace('/first-run/protect')}
         onTurnOn={() => {
           setBusy(true);
           void (async () => {

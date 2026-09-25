@@ -118,7 +118,7 @@ export function GuardianScreen({
         ) : null}
         <HoldSign
           name="open-vault"
-          label="Sign with your key on this phone"
+          label="Hold to sign with your key on this phone"
           hint={guardianRemovalCopy(days)}
           disabled={signingDisabled}
           onSign={onSign}

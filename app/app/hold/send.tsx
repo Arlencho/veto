@@ -83,7 +83,7 @@ export default function HoldSend() {
         setPreview({
           outlook,
           ...described,
-          signLabel: outlook.outcome === 'held' ? 'Sign. This will be held.' : 'Sign and send',
+          signLabel: outlook.outcome === 'held' ? 'Hold to sign. This will be held.' : 'Hold to sign and send',
         });
       } catch {
         if (alive) setPreview(null);
@@ -115,7 +115,7 @@ export default function HoldSend() {
           }}
           onBack={() => router.back()}
           tokenName={loaded.tokenName}
-          signLabel={preview?.signLabel ?? 'Sign and send'}
+          signLabel={preview?.signLabel ?? 'Hold to sign and send'}
           signingDisabled={loaded.wallet.busy || !preview || preview.outlook.outcome === 'refused'}
           onSign={async () => {
             if (!loaded.client || !loaded.owner || !bundle || !preview) {

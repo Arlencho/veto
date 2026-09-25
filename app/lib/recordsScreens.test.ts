@@ -540,7 +540,7 @@ test('one decision shows what was asked, that nothing moved, and the chain recor
   assert.match(text, /This one payment only: 14 VTEST to Paye\.\.\.1111/);
   assert.match(text, /Your limit stays 10 VTEST per payment/);
   assert.match(text, /258 VTEST now, 244 VTEST after it is paid/);
-  assert.match(text, /Allow this one payment of 14 VTEST/);
+  assert.match(text, /Hold to allow this one payment of 14 VTEST/);
 });
 
 test('a refusal whose ledger names the payee token account shows the rule payee on screen', async () => {
@@ -594,7 +594,7 @@ test('a cancelled or failed allow-once signature arms the hold again', async () 
   const before = root.root.findByType(HoldToApprove);
   assert.equal(before.props.resetKey, 0);
   await act(async () => {
-    pressable(root, 'Allow this one payment of 14').props.onAccessibilityAction({
+    pressable(root, 'Hold to allow this one payment of 14').props.onAccessibilityAction({
       nativeEvent: { actionName: 'longpress' },
     });
     for (let i = 0; i < 8; i += 1) {
@@ -636,7 +636,7 @@ test('a held signature does not start another allow-once signature', async () =>
   const hold = root.root.findByType(HoldToApprove);
   assert.equal(hold.props.disabled, true);
   await act(async () => {
-    pressable(root, 'Allow this one payment of 14').props.onAccessibilityAction({
+    pressable(root, 'Hold to allow this one payment of 14').props.onAccessibilityAction({
       nativeEvent: { actionName: 'longpress' },
     });
   });

@@ -78,7 +78,7 @@ export function AlertPlanScreen({
         </View>
         <HoldSign
           name="stop-plan"
-          label="Stop this withdrawal"
+          label="Hold to stop this withdrawal"
           hint="One fingerprint on this phone or on your second Seeker. Saved on the blockchain."
           disabled={signingDisabled}
           onSign={onStop}

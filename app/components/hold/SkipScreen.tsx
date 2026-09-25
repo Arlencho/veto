@@ -93,7 +93,7 @@ export function SkipScreen({
         {signedHere && payload.length > 0 ? (
           <HoldSign
             name="finish-both"
-            label="Sign with the key on this phone"
+            label="Hold to sign with the key on this phone"
             hint="This finishes the request the other phone started."
             disabled={signingDisabled}
             onSign={onSign}

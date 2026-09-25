@@ -92,7 +92,7 @@ export default function HoldAmount() {
             setFormError(null);
             draft.setAmountText(text);
           }}
-          onBack={() => router.back()}
+          onBack={() => draft.onboarding ? router.replace('/first-run/finish') : router.back()}
           faucet={showFaucet && session.owner ? <GetDevnetUsdc owner={session.owner.toBase58()} /> : null}
           onNext={() => {
             if (draft.amountText.trim().length === 0) {

@@ -401,6 +401,8 @@ function ApprovalCard({
       setOpenedAddress(result.mandate.address);
       if (onOpened) {
         onOpened(result);
+      } else if (firstRun) {
+        router.replace('/first-run/live');
       } else {
         router.replace(`/rule/${result.mandate.address}`);
       }

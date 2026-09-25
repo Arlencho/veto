@@ -86,6 +86,9 @@ export function HoldToApprove({
 
   useEffect(
     () => () => {
+      holding.current = false;
+      running.current?.stop();
+      running.current = null;
       clearHintTimer();
       clearTicks();
     },
@@ -220,10 +223,14 @@ export function HoldToApprove({
       ? colors.forest
       : colors.bone;
   const hintColor = motionOn
-    ? progress.interpolate({ inputRange: [0, 0.55, 0.6, 1], outputRange: [colors.muted, colors.muted, colors.holdHint, colors.holdHint] })
+    ? progress.interpolate({ inputRange: [0, 0.55, 0.6, 1], outputRange: [colors.muted, colors.muted, colors.forest, colors.forest] })
     : lit
-      ? colors.holdHint
+      ? colors.forest
       : colors.muted;
+  // Hide the small copy while foreground and fill colours cross in luminance.
+  const hintOpacity = motionOn
+    ? progress.interpolate({ inputRange: [0, 0.3499, 0.35, 0.7, 0.7001, 1], outputRange: [1, 1, 0, 0, 1, 1] })
+    : 1;
   const markColor = motionOn
     ? progress.interpolate({ inputRange: [0, 1], outputRange: [colors.brass, colors.forest] })
     : lit
@@ -306,7 +313,7 @@ export function HoldToApprove({
         </View>
         <View style={styles.copy}>
           <AnimatedText style={[styles.label, { color: labelColor }]}>{label}</AnimatedText>
-          <AnimatedText style={[styles.hint, { color: hintColor }]}>{hint}</AnimatedText>
+          <AnimatedText style={[styles.hint, { color: hintColor, opacity: hintOpacity }]}>{hint}</AnimatedText>
         </View>
       </Pressable>
       {showHint ? (

@@ -506,15 +506,16 @@ async function confirmSignatures(
 
 export type AuthorizeResult = Awaited<ReturnType<MwaWallet['authorize']>>;
 
+export const STALE_TOKEN_WINDOW_MS = 1500;
+
 /**
- * True when the wallet refused an authorize call that carried an auth_token
- * and the refusal was not the owner declining. A wallet answers a token it no
- * longer honours (after a reinstall, for example) with code -1 and
- * "authorization request failed" within the same moment, before the owner can
- * act, so this is read as a stale token rather than a decision.
+ * Seed Vault uses code -1 and "authorization request failed" for both a stale
+ * token and an owner declining. Time is the discriminator: only a failure in
+ * under STALE_TOKEN_WINDOW_MS is treated as stale. Explicit cancellation or
+ * decline wording is never retried, even when the failure arrives quickly.
  */
-export function isStaleAuthTokenError(error: unknown): boolean {
-  if (numericCode(error) !== -1) {
+export function isStaleAuthTokenError(error: unknown, elapsedMs: number): boolean {
+  if (elapsedMs < 0 || elapsedMs >= STALE_TOKEN_WINDOW_MS || numericCode(error) !== -1) {
     return false;
   }
   const message = error instanceof Error ? error.message.toLowerCase() : '';
@@ -541,10 +542,11 @@ export async function authorizeAccounts(
   if (!storedAuthToken) {
     return request();
   }
+  const started = Date.now();
   try {
     return await request(storedAuthToken);
   } catch (err) {
-    if (!isStaleAuthTokenError(err)) {
+    if (!isStaleAuthTokenError(err, Date.now() - started)) {
       throw err;
     }
     if (store) {

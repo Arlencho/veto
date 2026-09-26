@@ -1,3 +1,4 @@
+import { GUARDIAN_RECOVERY_COPY, SAFE_WALLET_GUIDANCE, OWNER_SAFE_WARNING } from '../../lib/holdSafeAddress';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fonts, radii, space } from '../theme';
@@ -36,7 +37,7 @@ export function PromiseScreen({
         or not your phone was awake.
       </Text>
       <Text style={styles.fact}>
-        A stolen guardian key can send money only to your safe address. A stolen owner key can take at
+        {GUARDIAN_RECOVERY_COPY} {SAFE_WALLET_GUIDANCE} {OWNER_SAFE_WARNING} A stolen owner key can take at
         most the everyday amount until you freeze. Only money inside the vault is protected. Lose both
         keys and nobody, Veto included, can reach the money.
       </Text>

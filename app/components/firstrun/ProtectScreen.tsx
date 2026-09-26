@@ -1,3 +1,4 @@
+import { GUARDIAN_RECOVERY_COPY, SAFE_WALLET_GUIDANCE, OWNER_SAFE_WARNING } from '../../lib/holdSafeAddress';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { canonicalAddress } from '../../lib/ruleRequest';
@@ -56,11 +57,10 @@ export function ProtectScreen({
     >
       <Text style={styles.title}>Protect the rest of your money</Text>
       <Text style={styles.body}>
-        With Hold, big withdrawals wait 1, 2 or 3 days. A second key can only say no.
+        With Hold, big withdrawals wait 1, 2 or 3 days. A second key can stop withdrawals or recover the balance.
       </Text>
       <Text style={styles.body}>
-        Recommended: use your second Seeker. Its key can stop a waiting withdrawal, freeze the vault
-        and move everything to your safe address. It cannot send money anywhere else.
+        Recommended: use your second Seeker. {GUARDIAN_RECOVERY_COPY} {SAFE_WALLET_GUIDANCE}
       </Text>
       {choosing ? (
         <HoldInput
@@ -70,13 +70,14 @@ export function ProtectScreen({
             setAddress(value);
             setInvalid(null);
           }}
-          hint="On your second Seeker, open your wallet, choose the account you want as your second key, tap Receive for Solana and copy its public address. Paste that address here, never a recovery phrase. This is also your safe address unless you change it in setup."
+          hint="On your second Seeker, open your wallet, choose the account you want as your second key, tap Receive for Solana and copy its public address. Paste that address here, never a recovery phrase. You will enter a separate safe wallet address during Hold setup."
         />
       ) : null}
       <Text style={styles.body}>
         A second key on this phone is weaker: if you lose this phone, or someone gets into it, both
         keys are at risk.
       </Text>
+      <Text style={styles.body}>{OWNER_SAFE_WARNING}</Text>
       <Text style={styles.body}>You can set up Hold later from Overview.</Text>
     </FirstRunChrome>
   );

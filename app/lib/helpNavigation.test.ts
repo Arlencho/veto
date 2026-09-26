@@ -427,3 +427,14 @@ test('back from the introduction pops to help', async () => {
   assert.deepEqual(calls, [{ method: 'back' }]);
   assert.deepEqual(history, ['/(tabs)/rules', '/help']);
 });
+
+test('Help explains the guardian recovery destination and safe wallet ownership risks', async () => {
+  const root = await mount(createElement(HelpIndex));
+  const text = root.root.findAll((node) => isHost(node, 'Text'))
+    .map((node) => node.children.filter((child) => typeof child === 'string').join('')).join('\n');
+  assert.match(text, /immediately recover the entire balance to the configured safe address/);
+  assert.match(text, /Acting alone, it cannot choose another destination/);
+  assert.match(text, /guardian does not control/);
+  assert.match(text, /stolen owner key would also reach the safe address/);
+  await act(async () => root.unmount());
+});

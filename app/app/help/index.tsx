@@ -1,3 +1,4 @@
+import { GUARDIAN_RECOVERY_COPY, SAFE_WALLET_GUIDANCE, OWNER_SAFE_WARNING } from '../../lib/holdSafeAddress';
 import { usePathname, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -29,6 +30,7 @@ export default function HelpRuleScreen() {
           </Text>
         </BrassWell>
       </Rise>
+      <Text style={styles.body}>Hold recovery: {GUARDIAN_RECOVERY_COPY} {SAFE_WALLET_GUIDANCE} {OWNER_SAFE_WARNING}</Text>
       <View style={styles.list}>
         <TopicRow
           tone="brass"

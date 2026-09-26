@@ -1,3 +1,4 @@
+import { validateHoldAddresses } from '../../lib/holdSafeAddress';
 import { redactRpc } from '../../lib/rpcPrivacy';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -50,20 +51,14 @@ export default function HoldGuardian() {
     };
   }, [setPhoneKey, session.owner, session.wallet.ready]);
 
-  async function onSign() {
+  async function onSign(ownerSafeConfirmed = false) {
     if (!session.client || !session.config?.mint || !session.owner) {
       throw new Error(session.chain.configError ?? 'Connect a wallet before signing.');
     }
     const guardianText = draft.mode === 'phone' ? draft.phoneKey ?? '' : draft.guardianText.trim();
-    const safeText = (draft.safeText.trim() || guardianText).trim();
-    let guardian: PublicKey;
-    let safeAddress: PublicKey;
-    try {
-      guardian = new PublicKey(guardianText);
-      safeAddress = new PublicKey(safeText);
-    } catch {
-      throw new Error('The guardian key or the safe address could not be read.');
-    }
+    const { guardian, safeAddress } = validateHoldAddresses(
+      session.owner.toBase58(), guardianText, draft.safeText, ownerSafeConfirmed,
+    );
     const mint = new PublicKey(session.config.mint);
     const tokenProgram = await tokenProgramOfMint(session.client, mint);
     const decimals = await fetchMintDecimals(session.client, mint);
@@ -84,7 +79,6 @@ export default function HoldGuardian() {
       tokenProgram,
     });
     draft.setOpenedVault(opened.vault.toBase58());
-    if (!draft.safeTouched) draft.chooseGuardian(draft.mode, guardianText);
     router.replace('/hold/live');
   }
 
@@ -100,7 +94,7 @@ export default function HoldGuardian() {
           days={draft.days}
           mode={draft.mode}
           guardianText={draft.mode === 'phone' ? draft.phoneKey ?? '' : draft.guardianText}
-          safeText={draft.safeText || (draft.mode === 'phone' ? draft.phoneKey ?? '' : draft.guardianText)}
+          safeText={draft.safeText}
           onMode={(mode) => {
             const address = mode === 'phone' ? draft.phoneKey ?? '' : draft.guardianText;
             draft.chooseGuardian(mode, address);

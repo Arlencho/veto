@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { Keypair } from '@solana/web3.js';
 import test, { mock } from 'node:test';
 
 import { act, createElement, useState, type ReactElement, type ReactNode } from 'react';
@@ -126,6 +127,9 @@ async function resignsAfterCancel(
   const withSign = await mount(
     createElement(node.type as (next: Record<string, unknown>) => ReactElement, props),
   );
+  if (name === 'open-vault') {
+    await act(async () => pressable(withSign, 'Review safe address').props.onPress());
+  }
   await act(async () => {
     pressable(withSign, label).props.onLongPress();
     await new Promise((resolve) => setImmediate(resolve));
@@ -278,7 +282,7 @@ test('guardian choices explain a second account and the second Seeker', async ()
       }),
     ),
   );
-  assert.match(missing, /Add a key that can only say no/);
+  assert.match(missing, /Choose a guardian and a safe wallet/);
   assert.match(missing, /Your second Seeker/);
   assert.match(missing, /did not expose a second account/);
   assert.match(missing, /seed phrase/);
@@ -313,12 +317,12 @@ test('a cancelled vault signature arms the hold button again', async () => {
       network: 'Test tokens',
       status: 'ready',
       error: null,
-      owner: 'owner',
+      owner: Keypair.generate().publicKey.toBase58(),
       phoneKey: null,
       days: 2,
       mode: 'seeker',
-      guardianText: '',
-      safeText: '',
+      guardianText: Keypair.generate().publicKey.toBase58(),
+      safeText: Keypair.generate().publicKey.toBase58(),
       onMode() {},
       onGuardian() {},
       onSafe() {},
@@ -1046,4 +1050,66 @@ test('home and rules have no Hold entry on mainnet', async () => {
   const { HoldEntry } = await import('../components/hold/HoldEntry');
   const root = await mount(createElement(HoldEntry, { cluster: 'mainnet-beta' }));
   assert.equal(root.toJSON(), null);
+});
+
+
+test('safe wallet setup requires entry, refuses the guardian, and reviews the full independent address', async () => {
+  const { GuardianScreen } = await import('../components/hold/GuardianScreen');
+  const owner = Keypair.generate().publicKey.toBase58();
+  const guardian = Keypair.generate().publicKey.toBase58();
+  const safe = Keypair.generate().publicKey.toBase58();
+  let signed: string | null = null;
+  function Setup() {
+    const [address, setAddress] = useState('');
+    return createElement(GuardianScreen, {
+      network: 'Devnet', status: 'ready', owner, phoneKey: guardian, days: 2,
+      mode: 'phone', guardianText: guardian, safeText: address,
+      onMode() {}, onGuardian() {}, onSafe: setAddress, onBack() {},
+      onSign: async () => { signed = address; },
+    });
+  }
+  const root = await mount(createElement(Setup));
+  const input = () => root.root.findAll((n) => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Safe address')[0];
+  assert.equal(input().props.value, '');
+  assert.equal(pressable(root, 'Review safe address').props.disabled, true);
+  await act(async () => input().props.onChangeText(guardian));
+  assert.match(textOf(root), /guardian does not control/);
+  assert.equal(pressable(root, 'Review safe address').props.disabled, true);
+  await act(async () => input().props.onChangeText(safe));
+  await act(async () => pressable(root, 'Review safe address').props.onPress());
+  assert.ok(textOf(root).includes(safe));
+  assert.match(textOf(root), /Confirm your safe address/);
+  await act(async () => pressable(root, 'Press and hold to sign').props.onLongPress());
+  assert.equal(signed, safe);
+  await act(async () => root.unmount());
+});
+
+test('owner recovery needs explicit confirmation and editing clears consent and review', async () => {
+  const { GuardianScreen } = await import('../components/hold/GuardianScreen');
+  const owner = Keypair.generate().publicKey.toBase58();
+  const guardian = Keypair.generate().publicKey.toBase58();
+  let accepted: boolean | undefined;
+  function Setup() {
+    const [address, setAddress] = useState(owner);
+    return createElement(GuardianScreen, {
+      network: 'Devnet', status: 'ready', owner, phoneKey: null, days: 2,
+      mode: 'seeker', guardianText: guardian, safeText: address,
+      onMode() {}, onGuardian() {}, onSafe: setAddress, onBack() {},
+      onSign: async (confirmed) => { accepted = confirmed; },
+    });
+  }
+  const root = await mount(createElement(Setup));
+  assert.match(textOf(root), /stolen owner key would also reach the safe address/);
+  assert.equal(pressable(root, 'Review safe address').props.disabled, true);
+  await act(async () => pressable(root, 'I accept the owner wallet recovery risk').props.onPress());
+  await act(async () => pressable(root, 'Review safe address').props.onPress());
+  assert.ok(textOf(root).includes(owner));
+  await act(async () => pressable(root, 'Press and hold to sign').props.onLongPress());
+  assert.equal(accepted, true);
+  const input = () => root.root.findAll((n) => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Safe address')[0];
+  await act(async () => input().props.onChangeText(''));
+  await act(async () => input().props.onChangeText(owner));
+  assert.equal(pressable(root, 'Review safe address').props.disabled, true);
+  assert.doesNotMatch(textOf(root), /Confirm your safe address/);
+  await act(async () => root.unmount());
 });

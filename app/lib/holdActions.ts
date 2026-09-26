@@ -8,6 +8,7 @@ import {
   readTokenAmount,
   resolveHoldDestination,
 } from './holdChain';
+import { SAFE_WALLET_GUIDANCE } from './holdSafeAddress';
 import { HOLD_SHARE_BPS } from './hold';
 import { holdVaultPda } from './holdRead';
 import {
@@ -46,6 +47,7 @@ export async function openHoldVault(args: {
   mint: PublicKey;
   tokenProgram: PublicKey;
 }): Promise<{ signature: string; vault: PublicKey }> {
+  if (args.safeAddress.equals(args.guardian)) throw new Error(SAFE_WALLET_GUIDANCE);
   const vault = holdVaultPda(args.client.programId, args.owner, args.vaultId);
   if (args.safeAddress.equals(vault)) {
     throw new Error('The safe address cannot be the vault itself.');

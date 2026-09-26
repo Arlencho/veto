@@ -6,9 +6,9 @@ import {
   phoneKeyCopy,
   safeAddressCopy,
   seekerKeyCopy,
-  shortKey,
   type HoldDays,
 } from '../../lib/hold';
+import { GUARDIAN_RECOVERY_COPY, OWNER_SAFE_WARNING, SAFE_WALLET_GUIDANCE, validateHoldAddresses } from '../../lib/holdSafeAddress';
 import { colors, fonts, radii, space, touchTarget } from '../theme';
 import { HoldInput, HoldSign, HoldSteps, HoldTop, StatusBlock } from './chrome';
 
@@ -42,30 +42,44 @@ export function GuardianScreen({
   onGuardian: (text: string) => void;
   onSafe: (text: string) => void;
   onBack: () => void;
-  onSign: () => Promise<void>;
+  onSign: (ownerSafeConfirmed?: boolean) => Promise<void>;
   signingDisabled?: boolean;
 }) {
-  const [editingSafe, setEditingSafe] = useState(false);
+  const [reviewed, setReviewed] = useState<string | null>(null);
+  const [confirmedOwner, setConfirmedOwner] = useState<string | null>(null);
   const phone = phoneKeyCopy(owner, phoneKey);
   const seeker = seekerKeyCopy();
-  const safeShown = safeText.length > 0 ? shortKey(safeText) : 'Not chosen yet';
+  const identity = JSON.stringify([owner, mode, guardianText.trim(), safeText.trim()]);
+  const reviewing = reviewed === identity;
+  const ownerSafeConfirmed = confirmedOwner === identity;
+  const ownerSafe = safeText.trim() === owner && owner.length > 0;
+  let validationError: string | null = null;
+  try {
+    validateHoldAddresses(owner, guardianText, safeText, ownerSafeConfirmed);
+  } catch (err) {
+    validationError = (err as Error).message;
+  }
+  function change(action: () => void) {
+    setReviewed(null);
+    setConfirmedOwner(null);
+    action();
+  }
   return (
     <View style={styles.wrap}>
       <HoldTop title="New Hold vault" network={network} onBack={onBack} />
       <HoldSteps current={2} />
       <StatusBlock status={status} error={error}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Text style={styles.h1}>Add a key that can only say no.</Text>
+        <Text style={styles.h1}>Choose a guardian and a safe wallet.</Text>
         <Text style={styles.body}>
-          It can stop a waiting withdrawal, freeze the vault, and send everything to your safe address.
-          It can never send money anywhere else.
+          {GUARDIAN_RECOVERY_COPY}
         </Text>
         <View accessibilityRole="radiogroup" style={styles.options}>
           <Pressable
             accessibilityRole="radio"
             accessibilityState={{ selected: mode === 'seeker' }}
             accessibilityLabel={seeker.title}
-            onPress={() => onMode('seeker')}
+            onPress={() => change(() => onMode('seeker'))}
             style={[styles.option, mode === 'seeker' && styles.optionOn]}
           >
             <Text style={styles.optionTitle}>
@@ -78,7 +92,7 @@ export function GuardianScreen({
             accessibilityState={{ selected: mode === 'phone', disabled: !phone.available }}
             accessibilityLabel={phone.title}
             disabled={!phone.available}
-            onPress={() => onMode('phone')}
+            onPress={() => change(() => onMode('phone'))}
             style={[styles.option, mode === 'phone' && styles.optionOn, !phone.available && styles.dim]}
           >
             <Text style={styles.optionTitle}>{phone.title}</Text>
@@ -89,40 +103,59 @@ export function GuardianScreen({
           <HoldInput
             label="Second Seeker address"
             value={guardianText}
-            onChangeText={onGuardian}
+            onChangeText={(value) => change(() => onGuardian(value))}
             hint="The address of the key on your other phone."
           />
         ) : null}
-        <View style={styles.safe}>
+        <HoldInput
+          label="Safe address"
+          value={safeText}
+          onChangeText={(value) => change(() => onSafe(value))}
+          hint={SAFE_WALLET_GUIDANCE}
+        />
+        <Text style={styles.optionBody}>{safeAddressCopy(days)}</Text>
+        {ownerSafe ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel="I accept the owner wallet recovery risk"
+            accessibilityState={{ checked: ownerSafeConfirmed }}
+            onPress={() => {
+              setReviewed(null);
+              setConfirmedOwner(ownerSafeConfirmed ? null : identity);
+            }}
+            style={styles.option}
+          >
+            <Text style={styles.optionBody}>{OWNER_SAFE_WARNING}</Text>
+            <Text style={styles.optionTitle}>{ownerSafeConfirmed ? 'Confirmed' : 'I accept the owner wallet recovery risk'}</Text>
+          </Pressable>
+        ) : null}
+        {validationError ? <Text style={styles.error}>{validationError}</Text> : null}
+        {reviewing && !validationError ? (
           <View style={styles.safeCopy}>
-            <Text style={styles.safeKicker}>Safe address</Text>
-            <Text style={styles.optionTitle}>{safeShown}</Text>
-            <Text style={styles.optionBody}>{safeAddressCopy(days)}</Text>
+            <Text style={styles.h1}>Confirm your safe address</Text>
+            <Text selectable style={styles.optionTitle}>{safeText.trim()}</Text>
+            <Text style={styles.body}>{GUARDIAN_RECOVERY_COPY}</Text>
+            <Text style={styles.body}>{SAFE_WALLET_GUIDANCE}</Text>
+            <HoldSign
+              name="open-vault"
+              label="Press and hold to sign with your key on this phone"
+              hint={guardianRemovalCopy(days)}
+              disabled={signingDisabled}
+              onSign={() => onSign(ownerSafeConfirmed)}
+            />
           </View>
+        ) : (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Change safe address"
-            onPress={() => setEditingSafe(true)}
+            accessibilityLabel="Review safe address"
+            accessibilityState={{ disabled: Boolean(validationError) || signingDisabled }}
+            disabled={Boolean(validationError) || signingDisabled}
+            onPress={() => { if (!validationError && !signingDisabled) setReviewed(identity); }}
             style={styles.change}
           >
-            <Text style={styles.changeText}>Change</Text>
+            <Text style={styles.changeText}>Review safe address</Text>
           </Pressable>
-        </View>
-        {editingSafe ? (
-          <HoldInput
-            label="Safe address"
-            value={safeText}
-            onChangeText={onSafe}
-            hint="Recover sends everything here, and only here."
-          />
-        ) : null}
-        <HoldSign
-          name="open-vault"
-          label="Press and hold to sign with your key on this phone"
-          hint={guardianRemovalCopy(days)}
-          disabled={signingDisabled}
-          onSign={onSign}
-        />
+        )}
       </StatusBlock>
     </View>
   );
@@ -153,24 +186,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  safe: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: 'rgba(156, 201, 168, 0.45)',
-    backgroundColor: colors.surface,
-    padding: space.xl,
-  },
-  safeCopy: { flex: 1, gap: space.xs },
-  safeKicker: {
-    color: colors.paid,
-    fontFamily: fonts.sansBold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
+  safeCopy: { gap: space.xs },
   change: {
     height: touchTarget,
     justifyContent: 'center',

@@ -18,7 +18,6 @@ export type HoldDraft = {
   mode: 'phone' | 'seeker';
   guardianText: string;
   safeText: string;
-  safeTouched: boolean;
   phoneKey: string | null;
   openedVault: string | null;
 };
@@ -45,8 +44,7 @@ function DraftProvider({ children }: { children: ReactNode }) {
   const [days, setDays] = useState<HoldDays>(HOLD_SUGGESTED_DAYS);
   const [mode, setMode] = useState<'phone' | 'seeker'>(params.mode === 'phone' ? 'phone' : 'seeker');
   const [guardianText, setGuardianText] = useState(params.guardian ?? '');
-  const [safeText, setSafeTextState] = useState(params.guardian ?? '');
-  const [safeTouched, setSafeTouched] = useState(false);
+  const [safeText, setSafeTextState] = useState('');
   const [phoneKey, setPhoneKey] = useState<string | null>(null);
   const [openedVault, setOpenedVault] = useState<string | null>(null);
 
@@ -59,7 +57,6 @@ function DraftProvider({ children }: { children: ReactNode }) {
       mode,
       guardianText,
       safeText,
-      safeTouched,
       phoneKey,
       openedVault,
       setAmountText,
@@ -68,7 +65,6 @@ function DraftProvider({ children }: { children: ReactNode }) {
       setMode,
       setGuardianText,
       setSafeText: (value: string) => {
-        setSafeTouched(true);
         setSafeTextState(value);
       },
       setPhoneKey,
@@ -76,10 +72,9 @@ function DraftProvider({ children }: { children: ReactNode }) {
       chooseGuardian: (nextMode, address) => {
         setMode(nextMode);
         setGuardianText(address);
-        if (!safeTouched) setSafeTextState(address);
       },
     }),
-    [onboarding, amountText, dailyText, days, mode, guardianText, safeText, safeTouched, phoneKey, openedVault],
+    [onboarding, amountText, dailyText, days, mode, guardianText, safeText, phoneKey, openedVault],
   );
 
   return <DraftContext.Provider value={api}>{children}</DraftContext.Provider>;

@@ -16,7 +16,7 @@ export default function HoldLive() {
   const session = useHoldSession();
   const owner = session.owner;
   const guardian = draft.mode === 'phone' ? draft.phoneKey ?? draft.guardianText : draft.guardianText;
-  const safe = draft.safeText || guardian;
+  const safe = draft.safeText.trim();
   useEffect(() => {
     if (!draft.onboarding || !owner) return;
     void rememberHoldChoice(secureStore, owner.toBase58()).catch(() => undefined);
@@ -31,7 +31,7 @@ export default function HoldLive() {
           dailyLabel={`${draft.dailyText} ${session.tokenName}`}
           waitLabel={waitLabel(draft.days)}
           guardianLabel={guardian ? shortKey(guardian) : 'not set'}
-          safeLabel={safe ? shortKey(safe) : 'not set'}
+          safeLabel={safe || 'not set'}
           onBack={() => router.replace(holdSetupDone(draft.onboarding))}
           onDone={() => router.replace(holdSetupDone(draft.onboarding))}
         />

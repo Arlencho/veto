@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { PublicKey } from '@solana/web3.js';
+import { Keypair, type PublicKey } from '@solana/web3.js';
 import test, { mock } from 'node:test';
 
 import { act, createElement, type ReactElement, type ReactNode } from 'react';
@@ -141,7 +141,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => children;
 mock.module('../components/Screen', { namedExports: { Screen: Wrapper } });
 mock.module('../components/ConnectGate', { namedExports: { ConnectGate: Wrapper } });
 let protectionLive = false;
-const owner = new PublicKey('11111111111111111111111111111111');
+const owner = Keypair.generate().publicKey;
 mock.module('./holdSession', {
   namedExports: {
     useHoldSession: () => ({
@@ -169,8 +169,12 @@ mock.module('./holdChain', {
     nextVaultId: () => 0n,
   },
 });
+let openedSafe: string | null = null;
 mock.module('./holdActions', {
-  namedExports: { openHoldVault: async () => ({ vault: owner, signature: 'confirmed' }) },
+  namedExports: { openHoldVault: async ({ safeAddress }: { safeAddress: PublicKey }) => {
+    openedSafe = safeAddress.toBase58();
+    return { vault: owner, signature: 'confirmed' };
+  } },
 });
 
 test('second Seeker address reaches the existing guardian screen and confirmed setup returns to onboarding', async () => {
@@ -190,13 +194,25 @@ test('second Seeker address reaches the existing guardian screen and confirmed s
   await act(async () => root.update(createElement(Layout)));
   const guardian = root.root.findByType(GuardianScreen);
   assert.equal(guardian.props.guardianText, params.guardian);
-  assert.equal(guardian.props.safeText, params.guardian);
+  assert.equal(guardian.props.safeText, '');
+  await assert.rejects(guardian.props.onSign(), /Enter a safe address/);
+  await act(async () => guardian.props.onGuardian(params.guardian));
+  assert.equal(guardian.props.safeText, '');
+  await act(async () => guardian.props.onSafe(params.guardian));
+  await assert.rejects(guardian.props.onSign(), /guardian does not control/);
+  await act(async () => guardian.props.onSafe(owner.toBase58()));
+  await assert.rejects(guardian.props.onSign(), /stolen owner key/);
+  await act(async () => guardian.props.onSafe('not an address'));
+  await assert.rejects(guardian.props.onSign(), /valid Solana/);
+  await act(async () => guardian.props.onSafe('Vote111111111111111111111111111111111111111'));
   assert.equal(guardian.props.mode, 'seeker');
   await act(async () => guardian.props.onSign());
+  assert.equal(openedSafe, 'Vote111111111111111111111111111111111111111');
   assert.equal(destination, '/hold/live');
   current = createElement(Live);
   await act(async () => root.update(createElement(Layout)));
   assert.match(visibleText(root), /Your vault is live/);
+  assert.match(visibleText(root), /Vote111111111111111111111111111111111111111/);
   await act(async () => root.root.findByType(LiveScreen).props.onDone());
   assert.equal(destination, '/first-run/finish');
   assert.equal(saved.get(`veto.onboarding.hold.${owner.toBase58()}`), '1');

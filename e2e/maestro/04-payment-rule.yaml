@@ -1,0 +1,61 @@
+appId: com.veto.app
+---
+- tapOn: "Rules"
+- scrollUntilVisible:
+    element:
+      text: "Write a rule"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Write a rule"
+- scrollUntilVisible:
+    element: "Most per payment"
+    direction: DOWN
+    timeout: 60000
+- tapOn: "Most per payment"
+- eraseText
+- inputText: "0.1"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Most in total, ever"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Most in total, ever"
+- eraseText
+- inputText: "1"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Agent"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Agent"
+- eraseText
+- inputText: "${AGENT}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Payee"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Payee"
+- eraseText
+- inputText: "${PAYEE}"
+- hideKeyboard
+# Maestro longPressOn holds for 3 seconds.
+- assertVisible:
+    text: "Press and hold to approve rule.*"
+    enabled: true
+- longPressOn: "Press and hold to approve rule.*"
+- runFlow: helpers/fake-wallet-transaction.yaml
+- extendedWaitUntil:
+    visible: "Your rule"
+    timeout: 90000
+- extendedWaitUntil:
+    visible: "Active"
+    timeout: 60000
+- tapOn: "Rules"
+- scrollUntilVisible:
+    element: "Write a rule"
+    direction: DOWN
+- assertVisible: "Write a rule"

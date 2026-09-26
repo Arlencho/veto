@@ -1,0 +1,28 @@
+appId: com.veto.app
+---
+- tapOn: "Paste your agent's address"
+- tapOn: "Paste your agent's address"
+- inputText: "${AGENT}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Name your agent"
+      index: 1
+    direction: DOWN
+# The heading is index 0; the editable field with the same label is index 1.
+- tapOn:
+    text: "Name your agent"
+    index: 1
+- eraseText
+- inputText: "Maestro agent"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Review the rule"
+    direction: DOWN
+- tapOn: "Review the rule"
+- scrollUntilVisible:
+    element: "Most per payment"
+    direction: DOWN
+    timeout: 60000
+- assertVisible: "Press and hold to approve rule.*"
+# Leave this unsigned. Flow 04 exercises the Rules > Write a rule entry.

@@ -1,0 +1,13 @@
+appId: com.veto.app
+---
+# Continue the pending MWA request in com.solana.mobilewalletadapter.fakewallet.
+# Do not launch either app here: restarting the wallet changes its test key.
+- assertVisible: "AUTHORIZE"
+- tapOn: "AUTHORIZE"
+- extendedWaitUntil:
+    visible: "Add your agent"
+    timeout: 60000
+- tapOn:
+    text: "^Add your agent$"
+    index: 0
+- assertVisible: "Paste your agent's address"

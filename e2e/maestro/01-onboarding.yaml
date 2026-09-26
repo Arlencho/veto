@@ -1,0 +1,33 @@
+appId: com.veto.app
+---
+# Only this flow clears Veto data. It never clears the fake wallet.
+- launchApp:
+    clearState: true
+- scrollUntilVisible:
+    element: "Next: you set one rule"
+    direction: DOWN
+    timeout: 60000
+- tapOn: "Next: you set one rule"
+- scrollUntilVisible:
+    element: "Next: a refusal is saved"
+    direction: DOWN
+    timeout: 60000
+- tapOn: "Next: a refusal is saved"
+- scrollUntilVisible:
+    element: "Next: you decide"
+    direction: DOWN
+    timeout: 60000
+- tapOn: "Next: you decide"
+# Case-sensitive exact label plus index targets the button, not CONNECT WALLET
+# in the step strip or its "Connect wallet, not yet" accessibility label.
+- scrollUntilVisible:
+    element:
+      text: "^Connect wallet$"
+      index: 0
+    direction: DOWN
+- tapOn:
+    text: "^Connect wallet$"
+    index: 0
+- extendedWaitUntil:
+    visible: "AUTHORIZE"
+    timeout: 30000

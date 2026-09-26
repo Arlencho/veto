@@ -1,0 +1,16 @@
+appId: com.veto.app
+---
+# MWA opens com.solana.mobilewalletadapter.fakewallet from Veto.
+# Reauthorization may be cached, so AUTHORIZE is conditional; sending is required.
+- extendedWaitUntil:
+    visible: "AUTHORIZE|SEND TRANSACTION TO CLUSTER"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "AUTHORIZE"
+    commands:
+      - tapOn: "AUTHORIZE"
+- extendedWaitUntil:
+    visible: "SEND TRANSACTION TO CLUSTER"
+    timeout: 30000
+- tapOn: "SEND TRANSACTION TO CLUSTER"

@@ -1,4 +1,4 @@
-import { GUARDIAN_RECOVERY_COPY, SAFE_WALLET_GUIDANCE, OWNER_SAFE_WARNING } from '../../lib/holdSafeAddress';
+import { GUARDIAN_RECOVERY_COPY, SAFE_WALLET_GUIDANCE, OWNER_SAFE_REASON } from '../../lib/holdSafeAddress';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { canonicalAddress } from '../../lib/ruleRequest';
@@ -77,7 +77,7 @@ export function ProtectScreen({
         A second key on this phone is weaker: if you lose this phone, or someone gets into it, both
         keys are at risk.
       </Text>
-      <Text style={styles.body}>{OWNER_SAFE_WARNING}</Text>
+      <Text style={styles.body}>{OWNER_SAFE_REASON}</Text>
       <Text style={styles.body}>You can set up Hold later from Overview.</Text>
     </FirstRunChrome>
   );

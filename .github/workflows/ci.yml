@@ -47,25 +47,37 @@ jobs:
           fi
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
-      # Anchor is pinned to 1.2.0, so the cache key names the version and the
-      # runner OS. The toolchain lives in ~/.avm; avm and the anchor shim it
-      # places in ~/.cargo/bin are cached too, so a hit skips the cargo build.
-      # Every run still downloads Anchor and checks its provenance attestation.
+      # PRs can restore main caches; PR merge-ref caches are not shared.
+      # Keep the legacy paths so the existing main v1 cache can seed this key.
+      # Only the pinned binary is used; cached avm and its shim are not executed.
       - name: Cache the Anchor toolchain
         id: anchor-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.avm
             ~/.cargo/bin/avm
             ~/.cargo/bin/anchor
-          key: ${{ runner.os }}-anchor-1.2.0-v1
+          key: ${{ runner.os }}-${{ runner.arch }}-anchor-1.2.0-${{ hashFiles('scripts/anchor-1.2.0-linux-x64.sha256') }}-v2
+          restore-keys: |
+            ${{ runner.os }}-anchor-1.2.0-v1
 
       - name: Install Anchor
         run: |
-          export PATH="$HOME/.cargo/bin:$HOME/.avm/bin:$PATH"
-          # Reuse cached avm, but always download and attest the Anchor binary.
           bash scripts/ci-toolchain.sh install-anchor
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      # Publish immediately after verification, even if later program tests fail.
+      # PRs consume main's cache without creating isolated merge-ref entries.
+      - name: Save verified Anchor on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.anchor-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.avm
+            ~/.cargo/bin/avm
+            ~/.cargo/bin/anchor
+          key: ${{ steps.anchor-cache.outputs.cache-primary-key }}
 
       - name: Build and test
         run: |

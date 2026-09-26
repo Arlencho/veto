@@ -408,6 +408,16 @@ pub mod veto {
         hold::skip(ctx, id)
     }
 
+    /// Upgrade the previous Hold layout without relaxing any stored rule.
+    pub fn migrate_hold_vault(ctx: Context<MigrateHoldVault>) -> Result<()> {
+        hold::migrate_hold_vault(ctx)
+    }
+
+    /// Close an idle, unfrozen vault to its stored safe address.
+    pub fn close_hold_vault(ctx: Context<CloseHoldVault>) -> Result<()> {
+        hold::close_hold_vault(ctx)
+    }
+
     /// Send the whole vault balance to the safe address. Works while frozen.
     pub fn recover(ctx: Context<Recover>) -> Result<()> {
         hold::recover(ctx)
@@ -814,6 +824,10 @@ pub enum VetoError {
     SourceAlreadyDelegated,
     #[msg("account is not an initialized SPL token account")]
     NotATokenAccount,
+    #[msg("vault is not the supported legacy Hold layout")]
+    InvalidLegacyHoldLayout,
+    #[msg("a held withdrawal must be resolved before closing")]
+    HoldWithdrawalPending,
 }
 
 #[derive(Accounts)]
@@ -1071,6 +1085,61 @@ pub struct Skip<'info> {
     #[account(
         mut,
         constraint = destination.mint == vault.mint @ VetoError::HoldMintMismatch,
+        constraint = destination.owner != vault.key() @ VetoError::DestinationIsVault
+    )]
+    pub destination: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
+    #[account(address = anchor_spl::token::ID)]
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
+pub struct MigrateHoldVault<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    /// CHECK: Exact legacy length, discriminator, stored owner and PDA checked in handler.
+    #[account(mut, owner = crate::ID)]
+    pub vault: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseHoldVault<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        mut,
+        has_one = mint @ VetoError::HoldMintMismatch,
+        has_one = vault_token @ VetoError::VaultTokenMismatch,
+        has_one = owner @ VetoError::NotTheVaultOwner,
+        close = owner,
+        seeds = [b"hold", vault.owner.as_ref(), &vault.vault_id.to_le_bytes()],
+        bump = vault.bump
+    )]
+    pub vault: Box<Account<'info, HoldVault>>,
+
+    #[account(
+        mut,
+        seeds = [b"hold-ledger", vault.key().as_ref()],
+        bump = vault.ledger_bump,
+        close = owner
+    )]
+    pub ledger: AccountLoader<'info, HoldLedger>,
+
+    #[account(
+        mut,
+        seeds = [b"hold-token", vault.key().as_ref()],
+        bump = vault.token_bump,
+        constraint = vault_token.owner == vault.key() @ VetoError::BadVaultAuthority
+    )]
+    pub vault_token: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        constraint = destination.mint == vault.mint @ VetoError::HoldMintMismatch,
+        constraint = destination.owner == vault.safe_address @ VetoError::NotTheSafeAddress,
         constraint = destination.owner != vault.key() @ VetoError::DestinationIsVault
     )]
     pub destination: Box<InterfaceAccount<'info, TokenAccount>>,

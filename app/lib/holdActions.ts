@@ -12,6 +12,8 @@ import { SAFE_WALLET_GUIDANCE } from './holdSafeAddress';
 import { HOLD_SHARE_BPS } from './hold';
 import { holdVaultPda } from './holdRead';
 import {
+  migrateHoldVaultInstruction,
+  closeHoldVaultInstruction,
   depositInstruction,
   freezeInstruction,
   initVaultInstruction,
@@ -237,5 +239,26 @@ export async function compileUnfreeze(args: {
       guardian: args.guardian,
       vaultId: args.vaultId,
     }),
+  ]);
+}
+
+export async function migrateHoldVault(args: {
+  client: ChainClient; signAndSend: SignAndSend; owner: PublicKey; vaultId: bigint;
+}): Promise<string> {
+  return send(args.client, args.signAndSend, args.owner, [
+    migrateHoldVaultInstruction({ programId: args.client.programId, owner: args.owner, vaultId: args.vaultId }),
+  ]);
+}
+
+export async function closeHoldVault(args: {
+  client: ChainClient; signAndSend: SignAndSend; owner: PublicKey; vaultId: bigint;
+  safeAddress: PublicKey; mint: PublicKey; tokenProgram: PublicKey;
+}): Promise<string> {
+  const destination = ownerTokenAccount(args.mint, args.safeAddress, args.tokenProgram);
+  return send(args.client, args.signAndSend, args.owner, [
+    createTokenAccountIx({ payer: args.owner, owner: args.safeAddress, mint: args.mint,
+      tokenAccount: destination, tokenProgram: args.tokenProgram }),
+    closeHoldVaultInstruction({ programId: args.client.programId, owner: args.owner,
+      vaultId: args.vaultId, destination, mint: args.mint, tokenProgram: args.tokenProgram }),
   ]);
 }

@@ -3,7 +3,7 @@ import { PublicKey } from '@solana/web3.js';
 
 import { HOLD_LEDGER_DISC, HOLD_VAULT_DISC } from './holdIdl';
 
-/** Account size the vault client decodes. A shorter account is not a Hold vault. */
+/** Current account size. Only the exact legacy size may be read for migration. */
 export const HOLD_VAULT_LEN = 1691;
 export const HOLD_LEDGER_LEN = 2096;
 export const HOLD_OWNER_OFFSET = 8;
@@ -65,6 +65,7 @@ export type HoldChange = {
 };
 
 export type HoldAccount = {
+  migrationRequired?: boolean;
   address: PublicKey;
   owner: PublicKey;
   guardian: PublicKey;
@@ -74,7 +75,7 @@ export type HoldAccount = {
   vaultId: bigint;
   dailyLimit: bigint;
   dailyBuckets: { hour: bigint; amount: bigint }[];
-  /** Fixed window retained only for the big-door share calculation. */
+  /** Legacy window total retained for layout migration. */
   windowSpent: bigint;
   windowStart: bigint;
   delaySecs: bigint;
@@ -185,7 +186,12 @@ function requireDisc(data: Buffer, expected: Buffer, what: string): void {
   }
 }
 
-export function decodeHoldVault(data: Buffer, address: PublicKey): HoldAccount {
+export function decodeHoldVault(data: Buffer, address: PublicKey, allowLegacy = false): HoldAccount {
+  const migrationRequired = data.length === 1291;
+  if (migrationRequired) {
+    if (!allowLegacy) throw new Error('Legacy Hold vault: owner must migrate to the 1691 byte layout before use');
+    data = Buffer.concat([data, Buffer.alloc(400)]);
+  }
   requireDisc(data, HOLD_VAULT_DISC, 'Hold vault');
   if (data.length < HOLD_VAULT_LEN) {
     throw new Error(`Hold vault account is ${data.length} bytes, need ${HOLD_VAULT_LEN}`);
@@ -211,6 +217,7 @@ export function decodeHoldVault(data: Buffer, address: PublicKey): HoldAccount {
   }
   const changeAt = OFF_CHANGE;
   return {
+    ...(migrationRequired ? { migrationRequired: true } : {}),
     address,
     owner: new PublicKey(data.subarray(HOLD_OWNER_OFFSET, HOLD_OWNER_OFFSET + 32)),
     guardian: new PublicKey(data.subarray(HOLD_GUARDIAN_OFFSET, HOLD_GUARDIAN_OFFSET + 32)),
@@ -305,6 +312,7 @@ export function holdWithdrawalOutlook(
   vault: HoldAccount,
   args: { amount: bigint; destination: PublicKey; balance: bigint; now: bigint },
 ): HoldOutlook {
+  if (vault.migrationRequired) throw new Error('Update this vault before previewing withdrawals.');
   const { amount, balance, now, destination } = args;
   if (amount <= 0n) throw new Error('amount must be positive');
   if (amount > balance) return { outcome: 'refused', reason: 'insufficient_funds' };

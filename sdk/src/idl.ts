@@ -51,3 +51,7 @@ export const PAID_EVENT_DISCRIMINATOR = discriminator(idl.events, "Paid");
 export const REFUSED_EVENT_DISCRIMINATOR = discriminator(idl.events, "Refused");
 export const TRADED_EVENT_DISCRIMINATOR = discriminator(idl.events, "Traded");
 export const TRADE_REFUSED_EVENT_DISCRIMINATOR = discriminator(idl.events, "TradeRefused");
+
+export const MIGRATE_HOLD_VAULT_DISCRIMINATOR = discriminator(idl.instructions, "migrate_hold_vault");
+
+export const CLOSE_HOLD_VAULT_DISCRIMINATOR = discriminator(idl.instructions, "close_hold_vault");

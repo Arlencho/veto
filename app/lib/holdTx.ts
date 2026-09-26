@@ -8,6 +8,8 @@ import {
 } from '@solana/web3.js';
 
 import {
+  MIGRATE_HOLD_VAULT_DISC,
+  CLOSE_HOLD_VAULT_DISC,
   DEPOSIT_DISC,
   FREEZE_DISC,
   INIT_VAULT_DISC,
@@ -245,4 +247,27 @@ export function unfreezeInstruction(args: {
     ],
     Buffer.from(UNFREEZE_DISC),
   );
+}
+
+export function migrateHoldVaultInstruction(args: {
+  programId: PublicKey; owner: PublicKey; vaultId: bigint;
+}): TransactionInstruction {
+  const where = holdWhere(args.programId, args.owner, args.vaultId);
+  return ix(args.programId, [
+    meta(args.owner, true, true), meta(where.vault, false, true),
+    meta(SystemProgram.programId, false, false),
+  ], Buffer.from(MIGRATE_HOLD_VAULT_DISC));
+}
+
+export function closeHoldVaultInstruction(args: {
+  programId: PublicKey; owner: PublicKey; vaultId: bigint;
+  destination: PublicKey; mint: PublicKey; tokenProgram?: PublicKey;
+}): TransactionInstruction {
+  const where = holdWhere(args.programId, args.owner, args.vaultId);
+  return ix(args.programId, [
+    meta(args.owner, true, true), meta(where.vault, false, true),
+    meta(where.ledger, false, true), meta(where.vaultToken, false, true),
+    meta(args.destination, false, true), meta(args.mint, false, false),
+    meta(args.tokenProgram ?? TOKEN_PROGRAM_ID, false, false),
+  ], Buffer.from(CLOSE_HOLD_VAULT_DISC));
 }

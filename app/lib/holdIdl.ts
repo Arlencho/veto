@@ -12,3 +12,7 @@ export const SKIP_DISC = Buffer.from([154, 63, 181, 53, 19, 26, 117, 45]);
 export const RECOVER_DISC = Buffer.from([108, 216, 38, 58, 109, 146, 116, 17]);
 export const HOLD_VAULT_DISC = Buffer.from([225, 219, 122, 198, 245, 163, 91, 55]);
 export const HOLD_LEDGER_DISC = Buffer.from([195, 103, 143, 50, 70, 255, 84, 161]);
+
+export const MIGRATE_HOLD_VAULT_DISC = Buffer.from([223, 75, 49, 252, 155, 82, 164, 36]);
+
+export const CLOSE_HOLD_VAULT_DISC = Buffer.from([44, 82, 147, 65, 191, 42, 43, 216]);

@@ -189,7 +189,7 @@ require_local_inputs() {
 require_gcloud() {
   need_cmd gcloud
   local account
-  account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n1 || true)"
+  account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | sed -n '1p' || true)"
   [[ -n "$account" ]] || die "gcloud is not logged in"
 }
 
@@ -204,7 +204,7 @@ require_services() {
     cloudscheduler.googleapis.com \
     logging.googleapis.com
   do
-    if ! gcloud services list --enabled --project="$PROJECT" --filter="config.name:${svc}" --format='value(config.name)' | grep -qx "$svc"; then
+    if ! gcloud services list --enabled --project="$PROJECT" --filter="config.name:${svc}" --format='value(config.name)' | grep -x "$svc" >/dev/null; then
       die "required API ${svc} is not enabled on ${PROJECT}"
     fi
   done
@@ -274,7 +274,7 @@ ensure_db_user_and_url_secret() {
   local users
   users="$(sql_users)"
   local user_exists=1
-  if printf '%s\n' "$users" | grep -qx "$DB_USER"; then
+  if printf '%s\n' "$users" | grep -x "$DB_USER" >/dev/null; then
     user_exists=0
   fi
   local secret_exists_rc=0
@@ -401,7 +401,7 @@ smoke_check() {
   local attempt body
   for ((attempt = 1; attempt <= SMOKE_ATTEMPTS; attempt++)); do
     if body="$(curl -fsS --max-time 20 "${url}/v1/health" 2>/dev/null)"; then
-      if printf '%s' "$body" | grep -q '"chain_tip_slot"'; then
+      if printf '%s' "$body" | grep '"chain_tip_slot"' >/dev/null; then
         log "smoke check ok: GET ${url}/v1/health"
         return 0
       fi

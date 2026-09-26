@@ -133,7 +133,7 @@ role_grants_versions_access_via_describe() {
     if [ $rc -ne 0 ]; then
         return 2
     fi
-    if printf '%s\n' "$perms" | tr ';,' '\n' | grep -qx 'secretmanager.versions.access'; then
+    if printf '%s\n' "$perms" | tr ';,' '\n' | grep -x 'secretmanager.versions.access' >/dev/null; then
         return 0
     fi
     return 1

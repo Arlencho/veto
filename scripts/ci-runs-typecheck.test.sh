@@ -41,7 +41,7 @@ except Exception: print('no')" "$pkg")
         bad "$name has a typecheck script but no CI job"
         continue
     fi
-    if printf '%s' "$block" | grep -qE "run: npm run typecheck"; then
+    if printf '%s' "$block" | grep -E "run: npm run typecheck" >/dev/null; then
         ok "$name CI job runs npm run typecheck"
     else
         bad "$name CI job does not run npm run typecheck (a bare tsc skips every tsconfig the script adds)"

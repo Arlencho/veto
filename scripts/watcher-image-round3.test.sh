@@ -17,19 +17,19 @@ fi
 meta="$(docker inspect "$IMAGE" --format 'User={{.Config.User}} Cmd={{json .Config.Cmd}} Env={{json .Config.Env}}')"
 printf '%s\n' "$meta"
 
-if printf '%s' "$meta" | grep -q 'User=veto'; then
+if printf '%s' "$meta" | grep 'User=veto' >/dev/null; then
   pass "runtime user is veto"
 else
   bad "runtime user is not veto: ${meta}"
 fi
 
-if printf '%s' "$meta" | grep -q 'Cmd=\["node","dist/index.js","once"\]'; then
+if printf '%s' "$meta" | grep 'Cmd=\["node","dist/index.js","once"\]' >/dev/null; then
   pass "CMD is node dist/index.js once (compiled JavaScript)"
 else
   bad "CMD is not compiled JS once: ${meta}"
 fi
 
-if printf '%s' "$meta" | grep -Eq 'VETO_|AGENT_KEY|PRIVATE|SECRET'; then
+if printf '%s' "$meta" | grep -E 'VETO_|AGENT_KEY|PRIVATE|SECRET' >/dev/null; then
   bad "image env contains a key, secret, or VETO_ identity: ${meta}"
 else
   pass "image env has no VETO_ identity, key, or secret"
@@ -55,8 +55,8 @@ else
 fi
 
 if head_out="$(docker run --rm --user veto --entrypoint sh "$IMAGE" -c 'head -8 /app/dist/index.js')" \
-  && printf '%s' "$head_out" | grep -q 'from "node:fs"' \
-  && printf '%s' "$head_out" | grep -q 'from "./cadence.js"'; then
+  && printf '%s' "$head_out" | grep 'from "node:fs"' >/dev/null \
+  && printf '%s' "$head_out" | grep 'from "./cadence.js"' >/dev/null; then
   pass "dist/index.js is compiled JavaScript"
 else
   bad "dist/index.js is not compiled JavaScript: ${head_out-}"
@@ -80,7 +80,7 @@ fi
 # identity env files. The bundled IDL address and public program constants
 # are expected; a keypair array or a .env is not.
 hits="$(docker run --rm --user veto --entrypoint sh "$IMAGE" -c '
-  grep -R --binary-files=without-match -nE "\\[0, 0, 0, 0|BEGIN (OPENSSH|PRIVATE)|VETO_RPC=|VETO_AGENT_KEY|id.json" /app 2>/dev/null | head -n 50 || true
+  grep -R --binary-files=without-match -nE "\\[0, 0, 0, 0|BEGIN (OPENSSH|PRIVATE)|VETO_RPC=|VETO_AGENT_KEY|id.json" /app 2>/dev/null | sed -n "1,50p" || true
 ')"
 if [[ -n "$hits" ]]; then
   bad "image grep found a key or baked identity: ${hits}"
@@ -92,7 +92,7 @@ set +e
 run_out="$(docker run --rm "$IMAGE" 2>&1)"
 run_exit=$?
 set -e
-if [[ "$run_exit" -eq 1 ]] && printf '%s' "$run_out" | grep -q 'missing VETO_RPC'; then
+if [[ "$run_exit" -eq 1 ]] && printf '%s' "$run_out" | grep 'missing VETO_RPC' >/dev/null; then
   pass "image entrypoint refuses without VETO_RPC (no baked endpoint)"
 else
   bad "image entrypoint did not refuse missing VETO_RPC (exit ${run_exit}): ${run_out}"

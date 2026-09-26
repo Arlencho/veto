@@ -205,8 +205,8 @@ secret_write_in_log() {
 if out="$(run_deploy project-accessor --dry-run 2>&1)"; then
   bad "project-level secretAccessor on the default compute account must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' \
-    && printf '%s' "$out" | grep -q 'found: roles/secretmanager.secretAccessor on project policy'; then
+  if printf '%s' "$out" | grep 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' >/dev/null \
+    && printf '%s' "$out" | grep 'found: roles/secretmanager.secretAccessor on project policy' >/dev/null; then
     if secret_write_in_log; then
       bad "project-level secretAccessor must stop before secrets create/add"
     else
@@ -221,8 +221,8 @@ fi
 if out="$(run_deploy secret-accessor --dry-run 2>&1)"; then
   bad "secret-level secretAccessor on the default compute account must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' \
-    && printf '%s' "$out" | grep -q 'found: roles/secretmanager.secretAccessor on secret veto-agent-keypair policy'; then
+  if printf '%s' "$out" | grep 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' >/dev/null \
+    && printf '%s' "$out" | grep 'found: roles/secretmanager.secretAccessor on secret veto-agent-keypair policy' >/dev/null; then
     if secret_write_in_log; then
       bad "secret-level secretAccessor must stop before secrets create/add"
     else
@@ -237,8 +237,8 @@ fi
 if out="$(run_deploy indirect-accessor --dry-run 2>&1)"; then
   bad "custom role that grants secretmanager.versions.access must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' \
-    && printf '%s' "$out" | grep -q 'found: projects/veto-watcher-260921/roles/customSecretReader on project policy'; then
+  if printf '%s' "$out" | grep 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' >/dev/null \
+    && printf '%s' "$out" | grep 'found: projects/veto-watcher-260921/roles/customSecretReader on project policy' >/dev/null; then
     if secret_write_in_log; then
       bad "indirect role must stop before secrets create/add"
     else
@@ -253,9 +253,9 @@ fi
 if out="$(run_deploy iam-denied --dry-run 2>&1)"; then
   bad "permission denied on project IAM policy must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'could not read project IAM policy' \
-    && printf '%s' "$out" | grep -q 'PERMISSION_DENIED' \
-    && printf '%s' "$out" | grep -q 'refusing to create the secret'; then
+  if printf '%s' "$out" | grep 'could not read project IAM policy' >/dev/null \
+    && printf '%s' "$out" | grep 'PERMISSION_DENIED' >/dev/null \
+    && printf '%s' "$out" | grep 'refusing to create the secret' >/dev/null; then
     if secret_write_in_log; then
       bad "project IAM permission denied must stop before secrets create/add"
     else
@@ -270,9 +270,9 @@ fi
 if out="$(run_deploy secret-iam-denied --dry-run 2>&1)"; then
   bad "permission denied on secret IAM policy must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'could not read IAM policy on secret' \
-    && printf '%s' "$out" | grep -q 'PERMISSION_DENIED' \
-    && printf '%s' "$out" | grep -q 'refusing to store the agent key'; then
+  if printf '%s' "$out" | grep 'could not read IAM policy on secret' >/dev/null \
+    && printf '%s' "$out" | grep 'PERMISSION_DENIED' >/dev/null \
+    && printf '%s' "$out" | grep 'refusing to store the agent key' >/dev/null; then
     if secret_write_in_log; then
       bad "secret IAM permission denied must stop before secrets create/add"
     else
@@ -287,8 +287,8 @@ fi
 if out="$(run_deploy role-describe-denied --dry-run 2>&1)"; then
   bad "permission denied describing a bound role must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'could not establish that default compute account' \
-    && printf '%s' "$out" | grep -q 'could not describe projects/veto-watcher-260921/roles/customSecretReader'; then
+  if printf '%s' "$out" | grep 'could not establish that default compute account' >/dev/null \
+    && printf '%s' "$out" | grep 'could not describe projects/veto-watcher-260921/roles/customSecretReader' >/dev/null; then
     if secret_write_in_log; then
       bad "role describe permission denied must stop before secrets create/add"
     else
@@ -303,7 +303,7 @@ fi
 if out="$(run_deploy pap-new-inherited 2>&1)"; then
   bad "new bucket whose PAP read-back is inherited must fail"
 else
-  if printf '%s' "$out" | grep -q "public access prevention on gs://veto-watcher-260921-journal is 'inherited', wanted enforced"; then
+  if printf '%s' "$out" | grep "public access prevention on gs://veto-watcher-260921-journal is 'inherited', wanted enforced" >/dev/null; then
     if secret_write_in_log; then
       bad "inherited PAP on a new bucket must fail before the secret is created"
     elif grep -q 'storage buckets create' "$FAKE_LOG" \
@@ -322,7 +322,7 @@ fi
 if out="$(run_deploy pap-new-enforced-accessor 2>&1)"; then
   bad "new bucket with PAP enforced must still apply the default-compute guard"
 else
-  if printf '%s' "$out" | grep -q 'can read a secret version' \
+  if printf '%s' "$out" | grep 'can read a secret version' >/dev/null \
     && grep -q 'storage buckets create' "$FAKE_LOG" \
     && grep -q -- '--public-access-prevention' "$FAKE_LOG" \
     && grep -q 'format=json' "$FAKE_LOG"; then
@@ -340,7 +340,7 @@ fi
 if out="$(run_deploy pap-existing-inherited 2>&1)"; then
   bad "existing bucket whose PAP read-back is inherited must fail"
 else
-  if printf '%s' "$out" | grep -q "public access prevention on gs://veto-watcher-260921-journal is 'inherited', wanted enforced"; then
+  if printf '%s' "$out" | grep "public access prevention on gs://veto-watcher-260921-journal is 'inherited', wanted enforced" >/dev/null; then
     if secret_write_in_log; then
       bad "inherited PAP on an existing bucket must fail before the secret is created"
     else
@@ -355,7 +355,7 @@ fi
 if out="$(run_deploy pap-update-fail 2>&1)"; then
   bad "existing bucket that cannot take PAP must fail"
 else
-  if printf '%s' "$out" | grep -q 'could not set public access prevention to enforced'; then
+  if printf '%s' "$out" | grep 'could not set public access prevention to enforced' >/dev/null; then
     if secret_write_in_log; then
       bad "PAP update failure must happen before the secret is created"
     else
@@ -370,7 +370,7 @@ fi
 if out="$(run_deploy pap-create-fail 2>&1)"; then
   bad "create that cannot set PAP must fail"
 else
-  if printf '%s' "$out" | grep -q 'could not create gs://veto-watcher-260921-journal with public access prevention enforced'; then
+  if printf '%s' "$out" | grep 'could not create gs://veto-watcher-260921-journal with public access prevention enforced' >/dev/null; then
     if secret_write_in_log; then
       bad "PAP create failure must happen before the secret is created"
     else
@@ -385,7 +385,7 @@ fi
 if out="$(run_deploy pap-existing-enforced-accessor 2>&1)"; then
   bad "existing bucket with PAP enforced must still apply the default-compute guard"
 else
-  if printf '%s' "$out" | grep -q 'can read a secret version' \
+  if printf '%s' "$out" | grep 'can read a secret version' >/dev/null \
     && grep -q 'storage buckets update' "$FAKE_LOG" \
     && grep -q -- '--public-access-prevention' "$FAKE_LOG" \
     && grep -q 'format=json' "$FAKE_LOG"; then

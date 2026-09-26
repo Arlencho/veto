@@ -820,10 +820,10 @@ test.describe('landed open', { concurrency: 1 }, () => {
         await api!.grantOverride(api!.mandate!.address, refusedRow());
       });
       const text = await settle(root, (value) =>
-        value.includes('Allowed once: this payment of 0.00018'),
+        value.includes('Allowed once: this payment of <0.01'),
       );
-      assert.match(text, /Allowed once: this payment of 0\.00018/);
-      assert.match(text, /0\.00018/);
+      assert.match(text, /Allowed once: this payment of <0\.01/);
+      assert.match(text, /<0\.01/);
       assert.equal(text.includes('No decisions on this rule yet'), false);
       assert.ok(labelsOf(root).includes(`Waived by the owner 0.00018 ${tokenSymbol(MINT.toBase58())}`));
     } finally {

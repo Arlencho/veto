@@ -368,7 +368,7 @@ test('an agent-signed v1 memo is shown as the agent\'s own note, with the reason
   assert.match(listText, /Your agent's own note/);
   assert.match(listText, /Your agent declined on its own: bar tab, not transport/);
   assert.match(listText, /Not a refusal by the rule\. Your agent signed this note itself\./);
-  assert.match(listText, /0\.00018/);
+  assert.match(listText, /<0\.01/);
   assert.equal(amount, '0.00018');
   assert.doesNotMatch(listText, /Your rule held/);
   assert.doesNotMatch(listText, /Refused/);

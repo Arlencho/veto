@@ -395,7 +395,7 @@ test('the home spend board says what one block is and shows two decimals', async
   const root = await mount(
     createElement(SpendBoard, {
       kicker: 'Your agent can still spend',
-      remainingText: '15.15275',
+      remainingText: '0.996 USDC',
       ofText: 'of 300',
       spentText: '16.939875',
       spentCaption: 'spent so far',
@@ -409,9 +409,9 @@ test('the home spend board says what one block is and shows two decimals', async
   const text = textOf(root);
   assert.match(text, /1 block = 1 payment of 10/);
   assert.doesNotMatch(text, /one share of/);
-  assert.match(text, /15\.15/);
+  assert.match(text, /0\.99 USDC/);
   assert.match(text, /16\.94/);
-  assert.doesNotMatch(text, /15\.15275|16\.939875/);
+  assert.doesNotMatch(text, /0\.996|16\.939875/);
 });
 
 test('a refusal streak counts only the newest run, and the day comes from the opened time', () => {

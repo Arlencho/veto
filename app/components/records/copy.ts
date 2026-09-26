@@ -155,6 +155,7 @@ export function decisionFace(
       tone: 'refused',
       badge: null,
       title: tradeDecisionTitle({
+        amounts: screen ? 'display' : 'exact',
         kind: row.kind,
         amountIn: row.amount,
         amountOut: row.amountOut ?? 0n,
@@ -207,6 +208,7 @@ export function decisionFace(
   } else if (row.kind === KIND_PAID && row.family === 'trade') {
     const outDecimals = row.outDecimals ?? decimals;
     const title = tradeDecisionTitle({
+      amounts: screen ? 'display' : 'exact',
       kind: row.kind,
       amountIn: row.amount,
       amountOut: row.amountOut ?? 0n,
@@ -330,5 +332,5 @@ export function networkFoot(): string {
   if (cluster === 'mainnet-beta') {
     return 'You sign in Seed Vault. Veto never sees your key.';
   }
-  return `You sign in Seed Vault. Veto never sees your key. This is Solana ${cluster} with test tokens, not real money.`;
+  return `You sign in Seed Vault. Veto never sees your key. This is Solana ${cluster} with no real monetary value.`;
 }

@@ -50,7 +50,7 @@ export function RuleListItem({
       </View>
       <View style={styles.figures}>
         <Text style={styles.remaining} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4}>
-          {formatTokenDisplay(remaining, decimals, mint)}
+          {formatTokenDisplay(remaining, decimals, mint, 'floor')}
         </Text>
         <View style={styles.subFigures}>
           <Text style={styles.of}>{`left of your ${cap} total`}</Text>
@@ -64,7 +64,7 @@ export function RuleListItem({
         <BlockBar
           remaining={bars.remaining}
           cap={bars.cap}
-          accessibilityLabel={`${formatTokenDisplay(remaining, decimals, mint)} left of ${cap}. ${spentShare} percent of the total is spent.`}
+          accessibilityLabel={`${formatTokenDisplay(remaining, decimals, mint, 'floor')} left of ${cap}. ${spentShare} percent of the total is spent.`}
         />
       </View>
       <View style={styles.foot}>

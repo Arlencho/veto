@@ -756,3 +756,23 @@ for (const reason of [11, 12, 13, 14]) {
     assert.doesNotMatch(text, reason <= 12 ? /Output account/ : /Tried account/);
   });
 }
+
+test('the trade detail headline preserves every base unit', async () => {
+  const { WSOL_MINT, DEVNET_USDC_MINT } = await import('./tokens');
+  const row = { ...paidRow(), family: 'trade' as const, amount: 999_994n,
+    amountOut: 10_992_000n, outDecimals: 6, outMint: DEVNET_USDC_MINT };
+  const rule = mandate({ mint: WSOL_MINT, perTxMax: 1_996_000n });
+  chainState = baseChain({ decimals: 9, rows: [row], mandate: rule, mandates: [rule] });
+  params = { id: `${rule.address}:${row.ts}:${row.kind}:${row.nonce}` };
+  const { default: Detail } = await import('../app/decision/[id]');
+  const root = await mount(createElement(Detail));
+  assert.ok(textLines(root).includes('Traded 0.000999994 wrapped SOL for 10.992 USDC.'));
+});
+
+test('the decisions balance never rounds remaining USDC up', async () => {
+  const { DEVNET_USDC_MINT } = await import('./tokens');
+  const rule = mandate({ mint: DEVNET_USDC_MINT, cap: 1_000_000n, spent: 4_000n });
+  chainState = baseChain({ decimals: 6, rows: [paidRow()], mandate: rule, mandates: [rule] });
+  const { default: Decisions } = await import('../app/(tabs)/decisions');
+  assert.match(visibleText(await mount(createElement(Decisions))), /0\.99 USDC left of your/);
+});

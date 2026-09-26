@@ -1,3 +1,4 @@
+import { tokenName, tokenSymbol, VTEST_MINT } from './tokens';
 import { clusterNotice, loadSession, type WalletStore } from './wallet';
 
 /** Same shape as `veto.notify.asked`: a `'1'` flag in the secure store. */
@@ -94,25 +95,30 @@ export const FIRST_RUN_ROUTES = {
   finish: '/first-run/finish',
 } as const;
 
-export function networkPillLabel(cluster: string | null | undefined): string | null {
+export function networkPillLabel(cluster: string | null | undefined, mint?: string | null): string | null {
   if (!cluster) {
     return null;
   }
-  if (cluster === 'devnet' || cluster === 'testnet') {
+  if (mint?.trim() === VTEST_MINT && (cluster === 'devnet' || cluster === 'testnet')) {
     return 'Test tokens';
   }
-  return cluster;
+  if (mint?.trim()) {
+    return tokenName(mint) ?? tokenSymbol(mint);
+  }
+  return cluster === 'devnet' ? 'Devnet' : cluster === 'testnet' ? 'Testnet' : cluster === 'mainnet-beta' ? 'Mainnet' : cluster;
 }
 
 export const CONNECT_WALLET_BODY =
   'You will approve with your Seeker ID (Seed Vault), the secure key store on this phone. Every rule you approve is signed there. Veto never sees your key.';
 
-export function connectNetworkLine(cluster: string | null | undefined): string | null {
+export function connectNetworkLine(cluster: string | null | undefined, mint?: string | null): string | null {
   if (!cluster) {
     return null;
   }
   if (cluster === 'devnet' || cluster === 'testnet') {
-    return `Test money only. Veto runs on Solana ${cluster} with test tokens. Your wallet must be set to ${cluster} before you connect.`;
+    const label = mint?.trim() === VTEST_MINT ? 'test tokens' : networkPillLabel(cluster, mint);
+    const token = mint?.trim() ? ` with ${label}` : '';
+    return `Test money only. Veto runs on Solana ${cluster}${token}. Your wallet must be set to ${cluster} before you connect.`;
   }
   return clusterNotice(cluster);
 }

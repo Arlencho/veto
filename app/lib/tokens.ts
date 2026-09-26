@@ -35,7 +35,7 @@ export type KnownToken = {
 export const KNOWN_TOKENS: readonly KnownToken[] = [
   { mint: WSOL_MINT, symbol: 'wrapped SOL', name: 'Wrapped SOL' },
   { mint: VTEST_MINT, symbol: 'VTEST', name: 'Veto test token' },
-  { mint: DEVNET_USDC_MINT, symbol: 'USDC', name: 'USDC' },
+  { mint: DEVNET_USDC_MINT, symbol: 'USDC', name: 'Devnet USDC' },
   { mint: MAINNET_USDC_MINT, symbol: 'USDC', name: 'USDC' },
   { mint: SKR_MINT, symbol: 'SKR', name: 'SKR' },
 ];
@@ -90,8 +90,9 @@ export function formatTokenDisplay(
   amount: bigint,
   decimals: number,
   mint: string | null | undefined,
+  rounding: 'nearest' | 'floor' = 'nearest',
 ): string {
-  return withToken(formatDisplayAmount(amount, decimals), mint);
+  return withToken(formatDisplayAmount(amount, decimals, mint?.trim() === WSOL_MINT ? 4 : 2, rounding), mint);
 }
 
 /** One plain line on devnet, for VTEST or Circle's devnet USDC. Null for every other mint and cluster. */

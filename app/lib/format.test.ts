@@ -4,6 +4,7 @@ import test from 'node:test';
 import { KIND_OPENED, KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, KIND_REVOKED } from './constants';
 import {
   formatBaseUnits,
+  roundShownAmounts,
   formatDayHeading,
   formatTimeLeft,
   groupByLocalDay,
@@ -102,4 +103,10 @@ test('today keeps signatures already on the rows', () => {
   assert.equal(rows.length, 2);
   assert.equal(rows[0]?.signature, 'sig-two');
   assert.equal(rows[1]?.signature, 'sig-one');
+});
+
+test('display copy keeps four SOL decimals and two USDC decimals without rounding twice', () => {
+  const shown = roundShownAmounts('0.123456789 wrapped SOL for 10.992 USDC');
+  assert.equal(shown, '0.1235 wrapped SOL for 10.99 USDC');
+  assert.equal(roundShownAmounts(shown), shown);
 });

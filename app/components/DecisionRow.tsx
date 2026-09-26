@@ -6,7 +6,7 @@ import { ADVISORY_DECLINE_LABEL, KIND_ADVISORY_DECLINE } from '../lib/advisory';
 import { KIND_OVERRIDE, KIND_REFUSED } from '../lib/constants';
 import { encodeDecisionId } from '../lib/exportRecord';
 import { explorerTxUrl } from '../lib/format';
-import { formatTokenAmount } from '../lib/tokens';
+import { formatTokenDisplay } from '../lib/tokens';
 import { overrideRowView } from '../lib/override';
 import type { LedgerRow } from '../lib/ring';
 import { decisionFace, type RowTone } from './records/copy';
@@ -52,7 +52,7 @@ export function DecisionRow({
   const face = decisionFace(row, decimals, perTxMax, nowMs, { payee, mint });
   const tone = TONE[face.tone];
   const id = encodeDecisionId(mandateAddress, row);
-  const amount = formatTokenAmount(row.amount, decimals, mint);
+  const amount = formatTokenDisplay(row.amount, decimals, mint);
 
   const openDetail = () => {
     router.push(`/decision/${encodeURIComponent(id)}`);

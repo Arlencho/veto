@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, STATUS_REVOKED } from '../lib/constants';
 import { isListedDecision, newestFirst } from '../lib/format';
 import { poolByAddress } from '../lib/pools';
-import { formatTokenAmount } from '../lib/tokens';
+import { formatTokenDisplay } from '../lib/tokens';
 import { tradeWorstCase } from '../lib/tradeCopy';
 import {
   floorPriceLabel,
@@ -47,7 +47,7 @@ export function TradeRuleDetail({ rule }: { rule: TradeRuleAccount }) {
   const today = inputSentToday(rule, nowSec);
   const received = outputReceived(rows);
   const active = isTradeActive(rule, nowSec);
-  const dailyLabel = formatTokenAmount(rule.dailyLimit, inDecimals, inMint);
+  const dailyLabel = formatTokenDisplay(rule.dailyLimit, inDecimals, inMint);
   const pair = tradePairLabel(rule);
 
   useEffect(() => {
@@ -106,15 +106,15 @@ export function TradeRuleDetail({ rule }: { rule: TradeRuleAccount }) {
           <Text style={styles.body}>{known?.feeLine ?? 'The exchange fee is set by the pool.'}</Text>
           <Fact
             label="Input sent today"
-            value={`${formatTokenAmount(today, inDecimals, inMint)} of ${dailyLabel}`}
+            value={`${formatTokenDisplay(today, inDecimals, inMint)} of ${dailyLabel}`}
           />
           <Fact
             label="Input sent in total"
-            value={`${formatTokenAmount(rule.spent, inDecimals, inMint)} of ${formatTokenAmount(rule.cap, inDecimals, inMint)}`}
+            value={`${formatTokenDisplay(rule.spent, inDecimals, inMint)} of ${formatTokenDisplay(rule.cap, inDecimals, inMint)}`}
           />
           <Fact
             label="Output received in total"
-            value={formatTokenAmount(received, outDecimals, outMint)}
+            value={formatTokenDisplay(received, outDecimals, outMint)}
           />
           <Fact label="Pinned output account" value={rule.destination} />
           <Fact

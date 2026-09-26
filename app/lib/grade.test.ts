@@ -248,8 +248,8 @@ test('the grade sentences are the four rules on the how grades work screen', () 
   assert.equal(GRADE_RULE.pushed, 'More than 4 requests in 20 outside its rule.');
   assert.match(GRADE_RULE['too-new'], /Fewer than 10 requests/);
   assert.match(GRADE_RULE['too-new'], /fewer than 3 days/);
-  assert.equal(networkBadge('devnet', 'card'), 'Devnet, test tokens');
+  assert.equal(networkBadge('devnet', 'card'), 'Devnet');
   assert.equal(networkBadge('devnet', 'name'), 'Devnet');
-  assert.equal(networkBadge('devnet', 'tokens'), 'Test tokens');
+  assert.equal(networkBadge('devnet', 'tokens'), 'Devnet');
   assert.equal(networkBadge('mainnet-beta', 'card'), 'Mainnet');
 });

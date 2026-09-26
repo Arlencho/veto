@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { ConfiguredTokenContext } from '../../lib/configuredToken';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { connectNetworkLine } from '../../lib/onboarding';
@@ -18,7 +20,7 @@ export function WalletConnectedScreen({
   onAddAgent: () => void;
   view?: ScreenView;
 }) {
-  const network = connectNetworkLine(cluster);
+  const network = connectNetworkLine(cluster, useContext(ConfiguredTokenContext));
   const resolved = view ?? (error ? 'error' : owner ? 'normal' : 'empty');
   const shown = owner ? truncateAddress(owner, 4) : '';
   return (

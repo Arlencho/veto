@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { ConfiguredTokenContext } from '../../lib/configuredToken';
 import { StyleSheet, Text } from 'react-native';
 
 import { CONNECT_WALLET_BODY, connectNetworkLine } from '../../lib/onboarding';
@@ -24,7 +26,7 @@ export function ConnectWalletScreen({
   onBack?: () => void;
   view?: ScreenView;
 }) {
-  const network = connectNetworkLine(cluster);
+  const network = connectNetworkLine(cluster, useContext(ConfiguredTokenContext));
   const resolved = view ?? (cluster ? 'normal' : 'empty');
   return (
     <FirstRunChrome

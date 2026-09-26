@@ -385,7 +385,7 @@ test('plaques show loading, empty, error, and an engraved fact', async () => {
   assert.match(normal, /Engraved under this rule/);
   assert.match(normal, /First payment inside the rule/);
   assert.match(normal, /Paid 8 VTEST to/);
-  assert.match(normal, /Test tokens/);
+  assert.match(normal, /Devnet/);
 });
 
 test('the track record shows loading, empty, error, Devnet, and a failed share can be tried again', async () => {
@@ -406,7 +406,7 @@ test('the track record shows loading, empty, error, Devnet, and a failed share c
     }),
   );
   const text = visibleText(normal);
-  assert.match(text, /Devnet, test tokens/);
+  assert.match(text, /Devnet/);
   assert.match(text, /Asked outside its rule 12 times/);
   const images = normal.root.findAll((node) => (node.type as unknown) === 'Image');
   assert.ok(images.some((node) => node.props.accessibilityLabel === 'QR code of the rule address'));
@@ -450,7 +450,7 @@ test('week in review shows loading, empty, error, and the seven-day counts', asy
   assert.match(text, /Week in review/);
   assert.match(text, /Why it was refused/);
   assert.match(text, /Asked more than 10 VTEST per payment/);
-  assert.match(text, /Test tokens/);
+  assert.match(text, /Devnet/);
   await act(async () => {
     button(normal, 'Save this week as a file').props.onPress();
     await Promise.resolve();

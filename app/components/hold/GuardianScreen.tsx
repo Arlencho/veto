@@ -8,7 +8,7 @@ import {
   seekerKeyCopy,
   type HoldDays,
 } from '../../lib/hold';
-import { GUARDIAN_RECOVERY_COPY, OWNER_SAFE_WARNING, SAFE_WALLET_GUIDANCE, validateHoldAddresses } from '../../lib/holdSafeAddress';
+import { GUARDIAN_RECOVERY_COPY, SAFE_WALLET_GUIDANCE, validateHoldAddresses } from '../../lib/holdSafeAddress';
 import { colors, fonts, radii, space, touchTarget } from '../theme';
 import { HoldInput, HoldSign, HoldSteps, HoldTop, StatusBlock } from './chrome';
 
@@ -42,26 +42,22 @@ export function GuardianScreen({
   onGuardian: (text: string) => void;
   onSafe: (text: string) => void;
   onBack: () => void;
-  onSign: (ownerSafeConfirmed?: boolean) => Promise<void>;
+  onSign: () => Promise<void>;
   signingDisabled?: boolean;
 }) {
   const [reviewed, setReviewed] = useState<string | null>(null);
-  const [confirmedOwner, setConfirmedOwner] = useState<string | null>(null);
   const phone = phoneKeyCopy(owner, phoneKey);
   const seeker = seekerKeyCopy();
   const identity = JSON.stringify([owner, mode, guardianText.trim(), safeText.trim()]);
   const reviewing = reviewed === identity;
-  const ownerSafeConfirmed = confirmedOwner === identity;
-  const ownerSafe = safeText.trim() === owner && owner.length > 0;
   let validationError: string | null = null;
   try {
-    validateHoldAddresses(owner, guardianText, safeText, ownerSafeConfirmed);
+    validateHoldAddresses(owner, guardianText, safeText);
   } catch (err) {
     validationError = (err as Error).message;
   }
   function change(action: () => void) {
     setReviewed(null);
-    setConfirmedOwner(null);
     action();
   }
   return (
@@ -114,21 +110,6 @@ export function GuardianScreen({
           hint={SAFE_WALLET_GUIDANCE}
         />
         <Text style={styles.optionBody}>{safeAddressCopy(days)}</Text>
-        {ownerSafe ? (
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityLabel="I accept the owner wallet recovery risk"
-            accessibilityState={{ checked: ownerSafeConfirmed }}
-            onPress={() => {
-              setReviewed(null);
-              setConfirmedOwner(ownerSafeConfirmed ? null : identity);
-            }}
-            style={styles.option}
-          >
-            <Text style={styles.optionBody}>{OWNER_SAFE_WARNING}</Text>
-            <Text style={styles.optionTitle}>{ownerSafeConfirmed ? 'Confirmed' : 'I accept the owner wallet recovery risk'}</Text>
-          </Pressable>
-        ) : null}
         {validationError ? <Text style={styles.error}>{validationError}</Text> : null}
         {reviewing && !validationError ? (
           <View style={styles.safeCopy}>
@@ -141,7 +122,7 @@ export function GuardianScreen({
               label="Press and hold to sign with your key on this phone"
               hint={guardianRemovalCopy(days)}
               disabled={signingDisabled}
-              onSign={() => onSign(ownerSafeConfirmed)}
+              onSign={onSign}
             />
           </View>
         ) : (

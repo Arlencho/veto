@@ -1,10 +1,12 @@
+import { VetoErrorMessage } from './veto_errors';
 import { PublicKey } from '@solana/web3.js';
 
 export const SAFE_WALLET_GUIDANCE = 'The safe address must be a wallet the guardian does not control, for example a cold wallet or an exchange deposit address you own.';
-export const OWNER_SAFE_WARNING = 'If you choose your owner wallet, a stolen owner key would also reach the safe address and could spend money recovered there. This choice requires explicit risk confirmation.';
+export const OWNER_SAFE_REASON = VetoErrorMessage.SafeAddressIsOwner;
+export const GUARDIAN_SAFE_REASON = VetoErrorMessage.SafeAddressIsGuardian;
 export const GUARDIAN_RECOVERY_COPY = 'The guardian can stop a waiting withdrawal, freeze the vault, or immediately recover the entire balance to the configured safe address. Acting alone, it cannot choose another destination. Anyone controlling the safe wallet can spend money recovered there.';
 
-export function validateHoldAddresses(ownerText: string, guardianText: string, safeText: string, ownerSafeConfirmed = false) {
+export function validateHoldAddresses(ownerText: string, guardianText: string, safeText: string, _ownerSafeConfirmed = false) {
   if (!safeText.trim()) throw new Error('Enter a safe address explicitly before continuing.');
   let owner: PublicKey;
   let guardian: PublicKey;
@@ -19,8 +21,8 @@ export function validateHoldAddresses(ownerText: string, guardianText: string, s
   if (guardian.equals(PublicKey.default) || safeAddress.equals(PublicKey.default)) {
     throw new Error('Choose a nonzero guardian key and safe address.');
   }
-  if (safeAddress.equals(guardian)) throw new Error(SAFE_WALLET_GUIDANCE);
+  if (safeAddress.equals(guardian)) throw new Error(GUARDIAN_SAFE_REASON);
   if (guardian.equals(owner)) throw new Error('The guardian key has to be a different key from yours.');
-  if (safeAddress.equals(owner) && !ownerSafeConfirmed) throw new Error(OWNER_SAFE_WARNING);
+  if (safeAddress.equals(owner)) throw new Error(OWNER_SAFE_REASON);
   return { guardian, safeAddress };
 }

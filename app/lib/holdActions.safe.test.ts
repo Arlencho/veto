@@ -21,5 +21,17 @@ test('opening a vault refuses recovery to the guardian before reading balances o
     owner, vaultId: 0n, guardian, safeAddress: guardian,
     dailyLimit: 1n, delaySecs: 86400n, amount: 10n,
     mint: Keypair.generate().publicKey, tokenProgram: Keypair.generate().publicKey,
-  }), /safe address must be a wallet the guardian does not control/);
+  }), /safe address must differ from the guardian/);
+});
+
+test('opening a vault refuses recovery to the owner before reading balances or signing', async () => {
+  const { openHoldVault } = await import('./holdActions');
+  const owner = Keypair.generate().publicKey;
+  await assert.rejects(openHoldVault({
+    client: { programId: Keypair.generate().publicKey } as ChainClient,
+    signAndSend: async () => { throw new Error('Unexpected signature'); },
+    owner, vaultId: 0n, guardian: Keypair.generate().publicKey, safeAddress: owner,
+    dailyLimit: 1n, delaySecs: 86400n, amount: 10n,
+    mint: Keypair.generate().publicKey, tokenProgram: Keypair.generate().publicKey,
+  }), /safe address must differ from the owner/);
 });

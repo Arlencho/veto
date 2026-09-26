@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import {
@@ -54,6 +55,9 @@ export function linesForProgram(logs: readonly string[], programId: string): rea
 }
 
 export type DecodedEvent = {
+  vault?: string;
+  owner?: string;
+  destination?: string;
   rule?: string;
   amountIn?: bigint;
   amountOut?: bigint;
@@ -83,6 +87,14 @@ export function decodeEventsFromLogs(logs: readonly string[], programId?: string
 export function decodeEventBytes(raw: Uint8Array): DecodedEvent | null {
   if (raw.length < 8) return null;
   const disc = raw.subarray(0, 8);
+  for (const [name, kind] of [["HoldMigrated", "hold_migrated"], ["HoldClosed", "hold_closed"]] as const) {
+    if (!buffersEqual(disc, createHash("sha256").update(`event:${name}`).digest().subarray(0, 8))) continue;
+    if (raw.length !== 112) return null;
+    const vault = new PublicKey(raw.subarray(8, 40)).toBase58();
+    return { vault, mandate: vault, owner: new PublicKey(raw.subarray(40, 72)).toBase58(),
+      amount: readU64Le(raw, 72), destination: new PublicKey(raw.subarray(80, 112)).toBase58(),
+      kind, kindCode: kind === "hold_migrated" ? 14 : 15, nonce: 0n, reason: 0, suggestedOverride: 0n };
+  }
   const traded = buffersEqual(disc, TRADED_EVENT_DISC);
   const refusedTrade = buffersEqual(disc, TRADE_REFUSED_EVENT_DISC);
   if (traded || refusedTrade) {
@@ -179,6 +191,7 @@ export function decisionsFromTx(tx: TxView, programId: string, mandateFilter?: s
       ) : undefined;
       out.push({
         ...(event.rule ? { rule: event.rule, amountIn: event.amountIn, amountOut: event.amountOut, minOut: event.minOut ?? (trade ? readU64Le(trade.data, 16) : undefined) } : {}),
+        ...(event.vault ? { vault: event.vault, owner: event.owner, destination: event.destination } : {}),
         signature: tx.signature,
         slot: tx.slot,
         timestamp: tx.blockTime,
@@ -187,9 +200,9 @@ export function decisionsFromTx(tx: TxView, programId: string, mandateFilter?: s
         nonce: event.nonce,
         // Reason 12 may name any of seven pool accounts. The event does not
         // carry which one differed, so history must not guess it from the pool.
-        counterparty: event.rule
+        counterparty: event.destination ?? (event.rule
           ? (event.reason === 12 ? "" : trade?.accounts[event.reason === 11 ? 4 : 6] ?? "")
-          : counterpartyFromCharge(tx, event.mandate),
+          : counterpartyFromCharge(tx, event.mandate)),
         kind: event.kind,
         reason: event.reason,
         reasonText: event.rule && event.reason === 1 ? "rule not active" : event.rule && event.reason === 5 ? "over per-trade maximum" : reasonText(event.reason),

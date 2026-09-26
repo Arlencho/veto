@@ -171,14 +171,13 @@ it did not deploy or roll back the program.
 
 #### Demo Hold replacement
 
-Old vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` cannot be closed:
-there is no Hold close instruction. It remains 1291 bytes, and the upgraded
-program requires 1691 bytes, including for Recover. Its token account
-`6ANFiGcMZgL9WbRcqRLc1Y4tTYyPVxNHnhh8m4vVQ9Ai` still held 5000000 base
-units (5 USDC) at confirmed slot 504441389. Recovery before the upgrade was
-missed. This run did not recover those tokens, reclaim rent, or roll back.
-Do not fund the old vault. Its 5 USDC remains stranded pending a separately
-authorized recovery procedure; replacement does not mean it was emptied.
+At the recorded upgrade, old vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
+remained 1291 bytes and its token account
+`6ANFiGcMZgL9WbRcqRLc1Y4tTYyPVxNHnhh8m4vVQ9Ai` held 5000000 base
+units (5 USDC) at confirmed slot 504441389. That run did not recover tokens
+or reclaim rent. The repository now provides owner-signed realloc migration
+and safe closure; see [Hold migrations](HOLD_MIGRATIONS.md). Deployment and
+owner execution are separate steps. Do not fund the old vault before migration.
 
 The replacement uses the available repository demo owner `keys/owner.json`,
 `EGQdANFMq6xVjKcSrij4gWiH91q8TvhdY5e87KjjF2yc`. The previous owner was the
@@ -446,44 +445,10 @@ use this rolling total, so a fixed-window reset cannot reopen that allowance.
 Execute and Skip still count releases without imposing the everyday limit
 on those doors.
 
-The decision for demo vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
-was to retire it and reopen after the upgrade, with no realloc migration.
-The replacement above is live, but the old vault was not emptied before the
-upgrade and still holds 5 USDC. The recovery procedure below was not executed.
-There is **no Hold close instruction** in the existing program. Neither the
-old nor the new binary can reclaim its account rent. Here, retiring means
-recovering all tokens to the configured safe address, leaving the old empty
-accounts, and opening a new vault with a different vault ID. Do not try to
-initialize the existing PDA again.
-
-Recovery procedure for a separately authorized release operator:
-
-1. Before upgrading, retain the actual currently deployed program binary and
-   its matching IDL/client. Read the demo vault with that client and record its
-   owner, vault ID, mint, safe address, guardian, daily limit, delay and share.
-   Derive a token account for the same mint owned by that safe address and
-   create it if absent. Verify its mint and owner on chain.
-2. While the old binary is still deployed, call the SDK's
-   `HoldVault.recover({ authority, owner, vaultId, destination, mint })`, signed
-   by the vault owner or guardian, with that safe token account as destination.
-   Recover works while frozen and clears pending withdrawals. Confirm the
-   transaction and verify the vault token balance is zero and the destination
-   received the full previous balance. Keep the old vault empty thereafter.
-3. Upgrade the program. The new binary rejects old 1291-byte vaults during
-   account deserialization, including Recover. If step 2 was missed, the
-   upgrade authority must temporarily restore the saved pre-upgrade binary,
-   perform step 2 using its matching client, then deploy the new binary again.
-   Do not send funds to the old PDA or attempt a direct owner token transfer;
-   its token authority is the program PDA.
-4. With the new client, call `initVault` with the recorded rules and a fresh
-   vault ID, then deposit from a token account controlled by the funding signer.
-   If the safe address differs from the owner, its signer must first return the
-   recovered tokens to the owner's funding account. Verify the new vault is
-   1691 bytes, its buckets are empty, and its owner, guardian, safe address and
-   rules match. Replace the demo address in app/watch configuration and these
-   docs with the confirmed new address. Known destinations must be learned
-   again through the normal delayed withdrawal flow.
-
-These recovery steps were not performed by this continuation. The completed
-upgrade and replacement funding are recorded above; no rollback is authorized
-by this record.
+The original demo replacement left 5 USDC in the legacy vault. The repository
+now supports `migrate_hold_vault` to reallocate it in place, preserving its
+rules, queued changes and release accounting. After the upgraded binary is
+deployed, the owner can migrate, resolve any holds and freeze, then call
+`close_hold_vault` to sweep tokens to the configured safe address and reclaim
+rent. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
+These instructions do not authorize or record a deployment or recovery transaction.

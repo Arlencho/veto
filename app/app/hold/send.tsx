@@ -122,7 +122,7 @@ export default function HoldSend() {
               throw new Error('The vault is not ready to sign.');
             }
             if (!loaded.owner.equals(bundle.account.owner)) {
-              throw new Error('Only your key can ask the vault to send. The guardian key can only say no.');
+              throw new Error('Only your key can ask the vault to send. The guardian key cannot start a withdrawal.');
             }
             const before = new Set(bundle.account.pending.map((row) => row.id.toString()));
             await sendHoldWithdrawal({

@@ -619,6 +619,73 @@ Devnet USDC is Circle's test token. It has no value.
 
 The founder gets it from https://faucet.circle.com by pasting the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` and the deployer `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`. Nobody can mint this token. `scripts/devnet-usdc.sh` creates the merchant and deployer accounts when they are absent, and re-running it is a no-op.
 
+## Indexed USDC demo calibration (issue 105)
+
+This is an opt-in request-sizing mode for the existing spending rule
+`UsRHyKtm41XMpQUcFGevYKgdWJEHQUf44QDCxLjEGWh`: 20 USDC total,
+0.50 USDC per payment, opened for 40 days. It changes no on-chain limit.
+No Cloud Run deployment or live calibration switch was performed by this change.
+
+Set these environment variables on the watcher when separately enabling the demo:
+
+```text
+VETO_DEMO_CALIBRATION=1
+VETO_DEMO_CAP=20000000
+VETO_DEMO_PER_TX_MAX=500000
+VETO_DEMO_DAYS=40
+VETO_DEMO_REFUSAL_HOURS=6,18
+```
+
+Only the first line is required. The other lines are the defaults, in USDC
+base units (6 decimals), days, and Stockholm hours. Unset or `0` disables
+calibration and preserves the existing price arithmetic, including
+`VETO_KWH_MILLI=50000` and the existing `VETO_QUOTE_CURRENCY` selection.
+For USDC, retain `VETO_QUOTE_CURRENCY=USD` to convert SEK using the ECB rate.
+Missing or stale FX and missing prices still leave a gap, with no request.
+Negative and zero prices still skip; they never manufacture a refusal.
+
+There are four cadence slots: 00:00, 06:00, 12:00 and 18:00 in Stockholm.
+By default, two of four positive-price slots deliberately exceed the payment
+maximum: 06:00 and 18:00. The other two request payments within it. This is
+scheduled request shaping, not a claim that an uncontrolled price spike caused
+every refusal. The hours can select one to three distinct cadence hours.
+The existing nonce, journal and chain-history checks cover paid and refused
+slots, including restart recovery. Calibration sends one request per slot,
+not a payment followed by a refusal. Run a single watcher for this rule and
+retain its journal. It does not provide a distributed lock between workers.
+
+The original amount A still comes from SE3 spot times configured kWh, with
+ECB conversion when USD is selected. Integer request sizing is:
+
+- N = 4 * (days + 1), including a boundary day for partial days and clock changes.
+- B = min(per-payment maximum, floor((cap - maximum - 1) / (N + 1))).
+- Indexed amount = max(1, floor(A * B / (A + B))) for positive A.
+- Ordinary slot: request the indexed amount.
+- Scheduled refusal slot: request maximum + 1 + indexed amount.
+
+With the defaults, B is 118181 base units (0.118181 USDC). Each refusal is
+above 0.50 and at most 0.618182 USDC. Even if all N possible slots paid B,
+N * B plus the largest refusal remains within 20 USDC. Refusals move no
+USDC but still cost transaction fees. The normal request increases with the
+spot-derived amount, subject to integer rounding and this lifetime budget.
+The journal retains `spot_amount` and `calibration=indexed-demo-v1` alongside
+the actual requested amount, price and any FX metadata.
+
+The budget assumes these configured limits match the rule and no other agent
+or manual override spends its allowance. Before enabling on an already-used
+rule, check its remaining cap, expiry, active state, payee and any override.
+Prior spending reduces available headroom; the chain remains authoritative.
+Do not use an override to pay the scheduled above-limit requests. Changing
+the cap, lifetime or schedule midway requires rechecking remaining headroom.
+The mode neither renews the 40-day expiry nor replenishes spent USDC.
+
+For the video, collect actual paid and reason-5 refused transactions on this
+same rule across a real day. Recovered or catch-up rows are not evidence of
+six-hour wall-clock spacing. Disclose the scheduled oversized requests and
+that this is devnet test USDC paying our counterparty for an indexed bill;
+it buys no electricity. Roll back request shaping with
+`VETO_DEMO_CALIBRATION=0`, keeping the existing journal and rule identity.
+
 ## Demo pool
 
 Constant-product pool on the token-swap program `SwaPpA9LAaLfeLi3a68M4DjnLqgtticKg6CnyNwgAC8`. The pair is wrapped SOL (`So11111111111111111111111111111111111111112`, 9 decimals) and Circle devnet USDC (`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, 6 decimals).

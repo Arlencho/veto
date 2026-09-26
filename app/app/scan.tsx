@@ -29,6 +29,13 @@ export default function ScanScreen() {
   const cluster = wallet.cluster ?? undefined;
   const requestScan = target === 'request';
 
+  function returnAddress(field: AddressScanTarget, address: string) {
+    // Resume the existing draft, including its agent and first-run state.
+    // A single address is a field edit, never a rule request.
+    stageAddressScan(field, address);
+    router.back();
+  }
+
   const fallback = target === 'payee' ? (
     <View style={styles.paste}>
       <Field
@@ -53,8 +60,7 @@ export default function ScanScreen() {
             return;
           }
           handled.current = true;
-          stageAddressScan('payee', address);
-          router.back();
+          returnAddress('payee', address);
         }}
       >
         <Text style={styles.ghostText}>Use payee address</Text>
@@ -155,8 +161,7 @@ export default function ScanScreen() {
                   router.replace('/rule/new' as Href);
                   return;
                 }
-                stageAddressScan(target, read.address);
-                router.back();
+                returnAddress(target, read.address);
                 return;
               }
               setError(

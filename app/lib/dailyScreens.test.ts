@@ -310,6 +310,23 @@ mock.module('./chain', {
   },
 });
 
+mock.module('./presignRead', {
+  namedExports: {
+    observePresign: async () => ({
+      configuredCluster: 'devnet',
+      genesisHash: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
+      ownerTokenBalance: 1000n,
+      cap: 0n,
+      decimals: 0,
+      mintReadable: true,
+      solLamports: 1000000000,
+      rentAndFeesLamports: 1000000,
+      walletFloorLamports: 1000000,
+      payeeHasTokenAccount: true,
+    }),
+  },
+});
+
 const UNPROVEN_CLAIM =
   /no rule live|no rule yet|no rules yet|no decisions|no agent|nothing on chain|no rule on chain|open your first rule/i;
 
@@ -999,5 +1016,97 @@ test('payee scanning stays in approval after rejecting a rule request code', asy
     assert.deepEqual(navigation, ['back']);
   } finally {
     await act(async () => root.unmount());
+  }
+});
+
+function inputByLabel(root: ReactTestRenderer, label: string): ReactTestInstance {
+  const input = root.root.findAll((node) => (node.type as unknown) === 'TextInput')
+    .find((node) => node.props.accessibilityLabel === label);
+  assert.ok(input, `missing ${label} field`);
+  return input;
+}
+
+for (const firstRun of [false, true]) {
+  test(`pasting a payee keeps the draft Agent field and its value${firstRun ? ' in first-run approval' : ' after Write a rule'}`, async () => {
+    const Rules = (await import('../app/(tabs)/rules')).default;
+    const Approval = firstRun
+      ? (await import('../app/first-run/approve')).default
+      : (await import('../app/rule/new')).default;
+    const Scan = (await import('../app/scan')).default;
+    const { ApprovalScreen } = await import('../components/ApprovalScreen');
+    route.current = {};
+    focused = true;
+    navigation.length = 0;
+    if (!firstRun) {
+      const rules = await mount(createElement(Rules));
+      await act(async () => byLabel(rules, 'Write a rule').props.onPress());
+      assert.equal(navigation.at(-1), '/rule/new');
+      await act(async () => rules.unmount());
+    }
+    const draft = await mount(createElement(Approval));
+    let scan: ReactTestRenderer | null = null;
+    try {
+      const agent = key();
+      const payee = key();
+      await act(async () => inputByLabel(draft, 'Agent').props.onChangeText(agent));
+      await act(async () => inputByLabel(draft, 'Purpose').props.onChangeText('Weekly supplies'));
+      await act(async () => byLabel(draft, 'Edit who your agent may pay').props.onPress());
+      assert.equal(navigation.at(-1), '/scan?target=payee');
+      focused = false;
+      await act(async () => draft.update(createElement(Approval)));
+      route.current = { target: 'payee' };
+      camera.permission = { granted: false, canAskAgain: false };
+      scan = await mount(createElement(Scan));
+      await act(async () => inputByLabel(scan!, 'Payee address').props.onChangeText(` ${payee} `));
+      await act(async () => byLabel(scan!, 'Use payee address').props.onPress());
+      assert.equal(navigation.at(-1), 'back');
+      route.current = {};
+      focused = true;
+      await act(async () => draft.update(createElement(Approval)));
+      assert.equal(inputByLabel(draft, 'Agent').props.value, agent);
+      assert.equal(inputByLabel(draft, 'Payee').props.value, payee);
+      assert.equal(inputByLabel(draft, 'Purpose').props.value, 'Weekly supplies');
+      assert.equal(draft.root.findByType(ApprovalScreen).props.mode, 'template');
+      assert.equal(draft.root.findByType(ApprovalScreen).props.request, null);
+      if (firstRun) {
+        assert.ok(draft.root.findAll((node) =>
+          node.props.accessibilityLabel === 'Approve the rule, current step').length > 0);
+      }
+    } finally {
+      focused = true;
+      await act(async () => { scan?.unmount(); draft.unmount(); });
+    }
+  });
+}
+
+test('a genuine scanned rule request opens request mode with the requested agent and payee', async () => {
+  const Scan = (await import('../app/scan')).default;
+  const Request = (await import('../app/rule-request')).default;
+  const { ApprovalScreen } = await import('../components/ApprovalScreen');
+  const agent = key();
+  const payee = key();
+  const url = `veto://rule-request?v=1&agent=${agent}&payee=${payee}&mint=${chain.config.mint}&cap=80&max=12&days=7&purpose=Weekly%20supplies`;
+  route.current = { target: 'request' };
+  camera.permission = { granted: true, canAskAgain: true };
+  navigation.length = 0;
+  const scan = await mount(createElement(Scan));
+  let approval: ReactTestRenderer | null = null;
+  try {
+    const cameraNode = scan.root.findAll((node) => (node.type as unknown) === 'CameraView')[0];
+    await act(async () => cameraNode.props.onBarcodeScanned({ data: url }));
+    const destination = navigation.at(-1)!;
+    assert.equal(destination, `/rule-request?url=${encodeURIComponent(url)}`);
+    route.current = Object.fromEntries(new URLSearchParams(destination.split('?')[1]));
+    approval = await mount(createElement(Request));
+    const props = approval.root.findByType(ApprovalScreen).props;
+    assert.equal(props.mode, 'request');
+    assert.equal(props.request.agent, agent);
+    assert.equal(props.request.payee, payee);
+    assert.equal(approval.root.findAll((node) => (node.type as unknown) === 'TextInput'
+      && node.props.accessibilityLabel === 'Agent').length, 0);
+    assert.match(textOf(approval), /Weekly supplies/);
+    assert.match(textOf(approval), /asks you for this rule/);
+  } finally {
+    await act(async () => { scan.unmount(); approval?.unmount(); });
   }
 });

@@ -318,7 +318,9 @@ function ApprovalCard({
           payeeHasTokenAccount: payeeFieldReady(payeeText) ? liveObservation.payeeHasTokenAccount : null,
         })
       : [];
-  const needsRetry = !liveObservation || checks.some((check) => !check.ok);
+  const needsRetry = !liveObservation || checks.some(
+    (check) => !check.ok && (check.id !== 'payee' || payeeFieldReady(payeeText)),
+  );
   useEffect(() => {
     if (!focused || refreshing || !needsRetry || !chain.config || !wallet.ownerPublicKey || !mintText) return;
     const timer = setInterval(() => { void refreshChecks(); }, 10_000);

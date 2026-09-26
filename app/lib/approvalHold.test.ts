@@ -244,9 +244,13 @@ const observation = {
   payeeHasTokenAccount: true,
 };
 
+let presignReads = 0;
 mock.module('./presignRead', {
   namedExports: {
-    observePresign: async () => ({ ...observation }),
+    observePresign: async () => {
+      presignReads += 1;
+      return { ...observation };
+    },
   },
 });
 
@@ -513,6 +517,33 @@ test('typed limits round to token precision, constrain per payment, and reject i
     assert.equal(hold(root).props.disabled, false);
   } finally { await act(async () => root.unmount()); }
 });
+
+for (const firstRun of [false, true]) {
+  test(`a healthy empty-payee template stays at one chain read with firstRun=${firstRun}`, async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const saved = { ...observation };
+    Object.assign(observation, { decimals: 6, ownerTokenBalance: 100_000_000n });
+    presignReads = 0;
+    const { ApprovalScreen } = await import('../components/ApprovalScreen');
+    const root = await mount(createElement(ApprovalScreen, {
+      mode: 'template', request: null, invalidReason: null,
+      templateId: 'charging-agent', firstRun,
+    }));
+    try {
+      assert.equal(amountInput(root, 'Payee').props.value, '');
+      assert.match(visibleText(root), /Scan or paste the payee address/);
+      assert.equal(hold(root).props.disabled, true);
+      assert.equal(presignReads, 1);
+      for (let interval = 0; interval < 3; interval += 1) {
+        await act(async () => t.mock.timers.tick(10_000));
+        assert.equal(presignReads, 1, 'a hidden payee check must not trigger chain reads');
+      }
+    } finally {
+      Object.assign(observation, saved);
+      await act(async () => root.unmount());
+    }
+  });
+}
 
 for (const trigger of ['pull', 'focus', 'interval'] as const) {
   test(`${trigger} refresh clears wallet warnings after the token account appears`, async (t) => {

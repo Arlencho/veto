@@ -2,7 +2,7 @@
  * Program IDL in camelCase format in order to be used in JS/TS.
  *
  * Note that this is only a type helper and is not the actual IDL. The original
- * IDL can be found at `watcher/idl/veto.json`.
+ * IDL can be found at `target/idl/veto.json`.
  */
 export type Veto = {
   "address": "3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV",
@@ -15,6 +15,9 @@ export type Veto = {
   "instructions": [
     {
       "name": "applyChange",
+      "docs": [
+        "Apply a loosening change once the chain clock reaches `effective_at`."
+      ],
       "discriminator": [
         248,
         177,
@@ -86,6 +89,9 @@ export type Veto = {
     },
     {
       "name": "cancelChange",
+      "docs": [
+        "Drop a loosening change. Owner or guardian."
+      ],
       "discriminator": [
         100,
         30,
@@ -161,6 +167,12 @@ export type Veto = {
     },
     {
       "name": "charge",
+      "docs": [
+        "Submit a charge. Signed by the agent, decided by this program.",
+        "",
+        "Returns Ok whether the charge is paid or refused. See the module doc",
+        "for why a refusal must not be an error."
+      ],
       "discriminator": [
         26,
         55,
@@ -174,6 +186,10 @@ export type Veto = {
       "accounts": [
         {
           "name": "agent",
+          "docs": [
+            "The agent holds authority and nothing else. It is not the owner, it",
+            "pays only the transaction fee, and it cannot change any limit."
+          ],
           "signer": true,
           "relations": [
             "mandate"
@@ -239,7 +255,136 @@ export type Veto = {
       ]
     },
     {
+      "name": "closeHoldVault",
+      "docs": [
+        "Close an idle, unfrozen vault to its stored safe address."
+      ],
+      "discriminator": [
+        44,
+        82,
+        147,
+        65,
+        191,
+        42,
+        43,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.owner",
+                "account": "holdVault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.vaultId",
+                "account": "holdVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  45,
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultToken",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closeMandate",
+      "docs": [
+        "Reclaim rent once a mandate is finished. Only the owner, never while active."
+      ],
       "discriminator": [
         117,
         87,
@@ -291,6 +436,10 @@ export type Veto = {
     },
     {
       "name": "closeTradeRule",
+      "docs": [
+        "Reclaim rent once a trade rule is finished or past expiry, and revoke",
+        "any delegation the source still gives the rule."
+      ],
       "discriminator": [
         93,
         102,
@@ -345,6 +494,9 @@ export type Veto = {
         },
         {
           "name": "source",
+          "docs": [
+            "still a token account delegated to this rule, close revokes that."
+          ],
           "writable": true
         },
         {
@@ -356,6 +508,9 @@ export type Veto = {
     },
     {
       "name": "deposit",
+      "docs": [
+        "Move tokens into the vault token account."
+      ],
       "discriminator": [
         242,
         35,
@@ -482,6 +637,9 @@ export type Veto = {
     },
     {
       "name": "execute",
+      "docs": [
+        "Pay a held withdrawal once the chain clock reaches its unlock time."
+      ],
       "discriminator": [
         130,
         221,
@@ -602,6 +760,9 @@ export type Veto = {
     },
     {
       "name": "freeze",
+      "docs": [
+        "Block every outflow except `recover`. Owner or guardian."
+      ],
       "discriminator": [
         255,
         91,
@@ -677,6 +838,13 @@ export type Veto = {
     },
     {
       "name": "grantOverride",
+      "docs": [
+        "Let one specific charge through above the per-payment ceiling.",
+        "",
+        "The owner signs, so the override is explicit. It is written to the",
+        "ledger, so it is on the record. It raises the per-payment ceiling only:",
+        "the total cap stays absolute."
+      ],
       "discriminator": [
         225,
         146,
@@ -746,6 +914,9 @@ export type Veto = {
     },
     {
       "name": "grantTradeOverride",
+      "docs": [
+        "Raise the per-trade ceiling for one nonce. The daily limit and the cap stay put."
+      ],
       "discriminator": [
         133,
         223,
@@ -811,6 +982,9 @@ export type Veto = {
     },
     {
       "name": "initVault",
+      "docs": [
+        "Open a Hold vault. The vault PDA is the authority of its token account."
+      ],
       "discriminator": [
         77,
         79,
@@ -931,7 +1105,71 @@ export type Veto = {
       ]
     },
     {
+      "name": "migrateHoldVault",
+      "docs": [
+        "Upgrade the previous Hold layout without relaxing any stored rule."
+      ],
+      "discriminator": [
+        223,
+        75,
+        49,
+        252,
+        155,
+        82,
+        164,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  45,
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "openMandate",
+      "docs": [
+        "Open a mandate and delegate `cap` to it in the same transaction, so the",
+        "owner signs exactly once."
+      ],
       "discriminator": [
         116,
         145,
@@ -1027,6 +1265,9 @@ export type Veto = {
     },
     {
       "name": "openTradeRule",
+      "docs": [
+        "Open a trade rule and delegate `cap` of the input token account to it."
+      ],
       "discriminator": [
         109,
         183,
@@ -1154,6 +1395,9 @@ export type Veto = {
     },
     {
       "name": "proposeChange",
+      "docs": [
+        "Tighten a rule now. A looser rule waits out the current delay."
+      ],
       "discriminator": [
         167,
         211,
@@ -1240,6 +1484,9 @@ export type Veto = {
     },
     {
       "name": "recover",
+      "docs": [
+        "Send the whole vault balance to the safe address. Works while frozen."
+      ],
       "discriminator": [
         108,
         216,
@@ -1359,6 +1606,13 @@ export type Veto = {
     },
     {
       "name": "revokeMandate",
+      "docs": [
+        "Withdraw the agent's authority immediately, in one owner signature.",
+        "",
+        "Allowed from any status except already REVOKED, so an EXPIRED or",
+        "EXHAUSTED mandate can still drop its SPL delegation. A second revoke",
+        "is refused."
+      ],
       "discriminator": [
         252,
         97,
@@ -1419,6 +1673,9 @@ export type Veto = {
     },
     {
       "name": "revokeTradeRule",
+      "docs": [
+        "Withdraw the agent's authority. Allowed from any status except revoked."
+      ],
       "discriminator": [
         112,
         252,
@@ -1486,6 +1743,9 @@ export type Veto = {
     },
     {
       "name": "skip",
+      "docs": [
+        "Pay a held withdrawal before its unlock time. Both keys, and not while frozen."
+      ],
       "discriminator": [
         154,
         63,
@@ -1616,6 +1876,9 @@ export type Veto = {
     },
     {
       "name": "stop",
+      "docs": [
+        "Cancel one held withdrawal. Owner or guardian, with no wait."
+      ],
       "discriminator": [
         42,
         133,
@@ -1696,6 +1959,11 @@ export type Veto = {
     },
     {
       "name": "trade",
+      "docs": [
+        "Sell `amount_in` of the pinned input through the pinned pool.",
+        "",
+        "Returns Ok whether the trade is filled or refused."
+      ],
       "discriminator": [
         178,
         144,
@@ -1805,6 +2073,9 @@ export type Veto = {
     },
     {
       "name": "unfreeze",
+      "docs": [
+        "Clear a freeze. Both keys, or the owner alone after the delay when no guardian is set."
+      ],
       "discriminator": [
         133,
         160,
@@ -1887,6 +2158,9 @@ export type Veto = {
     },
     {
       "name": "withdraw",
+      "docs": [
+        "Pay `amount` now when the rules allow it. Otherwise record a hold."
+      ],
       "discriminator": [
         183,
         18,
@@ -2133,6 +2407,19 @@ export type Veto = {
       ]
     },
     {
+      "name": "holdClosed",
+      "discriminator": [
+        111,
+        175,
+        192,
+        227,
+        192,
+        83,
+        108,
+        99
+      ]
+    },
+    {
       "name": "holdDeposited",
       "discriminator": [
         14,
@@ -2182,6 +2469,19 @@ export type Veto = {
         57,
         137,
         224
+      ]
+    },
+    {
+      "name": "holdMigrated",
+      "discriminator": [
+        32,
+        149,
+        140,
+        45,
+        3,
+        28,
+        129,
+        197
       ]
     },
     {
@@ -2661,11 +2961,38 @@ export type Veto = {
       "code": 6063,
       "name": "notATokenAccount",
       "msg": "account is not an initialized SPL token account"
+    },
+    {
+      "code": 6064,
+      "name": "invalidLegacyHoldLayout",
+      "msg": "vault is not the supported legacy Hold layout"
+    },
+    {
+      "code": 6065,
+      "name": "holdWithdrawalPending",
+      "msg": "a held withdrawal must be resolved before closing"
+    },
+    {
+      "code": 6066,
+      "name": "safeAddressIsGuardian",
+      "msg": "safe address must differ from the guardian"
+    },
+    {
+      "code": 6067,
+      "name": "safeAddressIsOwner",
+      "msg": "safe address must differ from the owner"
     }
   ],
   "types": [
     {
       "name": "entry",
+      "docs": [
+        "One decision, paid or refused, exactly as the program made it.",
+        "",
+        "`repr(C)` with explicit padding, because the ledger is a zero-copy account:",
+        "the ring is larger than the BPF stack frame and must never be deserialized",
+        "onto it."
+      ],
       "serialization": "bytemuck",
       "repr": {
         "kind": "c"
@@ -2691,6 +3018,11 @@ export type Veto = {
           },
           {
             "name": "suggestedOverride",
+            "docs": [
+              "For a refusal, the one-shot override that would have cleared this exact",
+              "charge, or zero when no override could. A decline that tells you how to",
+              "proceed is the difference between a limit and an answer."
+            ],
             "type": "u64"
           },
           {
@@ -2715,6 +3047,9 @@ export type Veto = {
     },
     {
       "name": "holdChange",
+      "docs": [
+        "The desired rules, passed whole to `propose_change`."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -2785,6 +3120,33 @@ export type Veto = {
           {
             "name": "fields",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "holdClosed",
+      "docs": [
+        "Full token balance swept to the safe token account before closure."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
           }
         ]
       }
@@ -2969,6 +3331,33 @@ export type Veto = {
       }
     },
     {
+      "name": "holdMigrated",
+      "docs": [
+        "Rent top-up in lamports. No vault tokens move during layout migration."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "holdOpened",
       "type": {
         "kind": "struct",
@@ -3142,6 +3531,10 @@ export type Veto = {
     },
     {
       "name": "holdVault",
+      "docs": [
+        "Funds live in the vault token account. Its authority is this PDA, so a",
+        "raw transfer signed by the owner or the guardian cannot move them."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -3151,10 +3544,16 @@ export type Veto = {
           },
           {
             "name": "guardian",
+            "docs": [
+              "`Pubkey::default()` means no guardian is set."
+            ],
             "type": "pubkey"
           },
           {
             "name": "safeAddress",
+            "docs": [
+              "Wallet that must own the token account `recover` pays."
+            ],
             "type": "pubkey"
           },
           {
@@ -3175,6 +3574,9 @@ export type Veto = {
           },
           {
             "name": "windowSpent",
+            "docs": [
+              "Unused legacy fixed-window fields, retained to preserve account layout."
+            ],
             "type": "u64"
           },
           {
@@ -3187,6 +3589,10 @@ export type Veto = {
           },
           {
             "name": "unfreezeAt",
+            "docs": [
+              "When no guardian is set, `unfreeze` arms this timestamp and finishes",
+              "only once the chain clock reaches it. Zero means no unfreeze is waiting."
+            ],
             "type": "i64"
           },
           {
@@ -3246,6 +3652,23 @@ export type Veto = {
                 "name": "pendingChange"
               }
             }
+          },
+          {
+            "name": "dailyBuckets",
+            "docs": [
+              "Rolling daily and share accounting, retaining the current and preceding 24 hours.",
+              "Appended so all existing field offsets remain stable."
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "tradeBucket"
+                  }
+                },
+                25
+              ]
+            }
           }
         ]
       }
@@ -3284,6 +3707,14 @@ export type Veto = {
     },
     {
       "name": "ledger",
+      "docs": [
+        "A ring of the most recent decisions. Refusals are recorded here with the",
+        "same weight as payments, which is the point of the whole program.",
+        "",
+        "The ring is the authoritative recent window. Longer history is rebuilt by",
+        "indexing `Paid` and `Refused` events from transaction logs, so a busy week",
+        "wrapping the ring costs nothing."
+      ],
       "serialization": "bytemuck",
       "repr": {
         "kind": "c"
@@ -3297,10 +3728,16 @@ export type Veto = {
           },
           {
             "name": "total",
+            "docs": [
+              "Total entries ever written, including those the ring has overwritten."
+            ],
             "type": "u32"
           },
           {
             "name": "head",
+            "docs": [
+              "Index the next entry is written to."
+            ],
             "type": "u16"
           },
           {
@@ -3334,63 +3771,113 @@ export type Veto = {
     },
     {
       "name": "mandate",
+      "docs": [
+        "A permission to spend, owned by the human and enforced by this program.",
+        "",
+        "The owner key never leaves Seed Vault and signs only `open_mandate`,",
+        "`grant_override`, `revoke_mandate` and `close_mandate`. The agent key signs",
+        "`charge` and can do nothing else: it cannot widen any limit, change the",
+        "merchant, extend the expiry, or move funds outside this account's rules."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "owner",
+            "docs": [
+              "Human who owns the funds and the mandate."
+            ],
             "type": "pubkey"
           },
           {
             "name": "agent",
+            "docs": [
+              "Key allowed to submit charges. Holds authority, never ownership."
+            ],
             "type": "pubkey"
           },
           {
             "name": "mint",
+            "docs": [
+              "Asset this mandate governs."
+            ],
             "type": "pubkey"
           },
           {
             "name": "source",
+            "docs": [
+              "The owner's token account. Funds stay here until a charge is allowed."
+            ],
             "type": "pubkey"
           },
           {
             "name": "merchant",
+            "docs": [
+              "The only wallet that may receive funds under this mandate."
+            ],
             "type": "pubkey"
           },
           {
             "name": "mandateId",
+            "docs": [
+              "Distinguishes several mandates held by the same owner."
+            ],
             "type": "u64"
           },
           {
             "name": "cap",
+            "docs": [
+              "Total that may ever be spent, in base units."
+            ],
             "type": "u64"
           },
           {
             "name": "spent",
+            "docs": [
+              "Spent so far, in base units. Never exceeds `cap`."
+            ],
             "type": "u64"
           },
           {
             "name": "perTxMax",
+            "docs": [
+              "Largest single payment allowed, in base units."
+            ],
             "type": "u64"
           },
           {
             "name": "expiresAt",
+            "docs": [
+              "Unix seconds after which nothing may be spent."
+            ],
             "type": "i64"
           },
           {
             "name": "overrideAmount",
+            "docs": [
+              "One-shot allowance the owner granted for a specific charge."
+            ],
             "type": "u64"
           },
           {
             "name": "overrideNonce",
+            "docs": [
+              "Nonce the override applies to. Zero means no override is pending."
+            ],
             "type": "u64"
           },
           {
             "name": "lastNonce",
+            "docs": [
+              "Highest nonce that has been paid. Blocks replay of a settled charge."
+            ],
             "type": "u64"
           },
           {
             "name": "purpose",
+            "docs": [
+              "What the money is for, in the owner's own words, fixed at creation."
+            ],
             "type": "string"
           },
           {
@@ -3531,6 +4018,9 @@ export type Veto = {
           },
           {
             "name": "fields",
+            "docs": [
+              "Which fields wait. See `CHANGE_*`."
+            ],
             "type": "u8"
           },
           {
@@ -3634,6 +4124,13 @@ export type Veto = {
     },
     {
       "name": "tradeEntry",
+      "docs": [
+        "One trade decision. `repr(C)` with explicit padding, because the ledger is",
+        "zero-copy and the ring must never be deserialized onto the stack.",
+        "",
+        "`counterparty` is the pool on a paid trade and on most refusals. On reason",
+        "11 or 12 it is the account the agent tried."
+      ],
       "serialization": "bytemuck",
       "repr": {
         "kind": "c"
@@ -3691,6 +4188,9 @@ export type Veto = {
     },
     {
       "name": "tradeLedger",
+      "docs": [
+        "A ring of the most recent trade decisions, including refusals."
+      ],
       "serialization": "bytemuck",
       "repr": {
         "kind": "c"
@@ -3704,10 +4204,16 @@ export type Veto = {
           },
           {
             "name": "total",
+            "docs": [
+              "Total entries ever written, including those the ring has overwritten."
+            ],
             "type": "u32"
           },
           {
             "name": "head",
+            "docs": [
+              "Index the next entry is written to."
+            ],
             "type": "u16"
           },
           {
@@ -3773,6 +4279,12 @@ export type Veto = {
     },
     {
       "name": "tradeRule",
+      "docs": [
+        "A permission to swap, owned by the human and enforced by this program.",
+        "",
+        "The owner signs `open_trade_rule`, `grant_trade_override`, `revoke_trade_rule`",
+        "and `close_trade_rule`. The agent signs `trade` and can do nothing else."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -3782,14 +4294,23 @@ export type Veto = {
           },
           {
             "name": "agent",
+            "docs": [
+              "Key allowed to submit trades. Holds authority, never ownership."
+            ],
             "type": "pubkey"
           },
           {
             "name": "source",
+            "docs": [
+              "The owner's input token account. Delegated to this rule for `cap`."
+            ],
             "type": "pubkey"
           },
           {
             "name": "destination",
+            "docs": [
+              "The owner's output token account, pinned at open."
+            ],
             "type": "pubkey"
           },
           {
@@ -3806,6 +4327,9 @@ export type Veto = {
           },
           {
             "name": "exchangeKind",
+            "docs": [
+              "0 is the SPL token-swap program named by `SPL_TOKEN_SWAP_ID`."
+            ],
             "type": "u8"
           },
           {
@@ -3830,6 +4354,9 @@ export type Veto = {
           },
           {
             "name": "poolFeeAccount",
+            "docs": [
+              "Stored at open and compared on every trade. The fee owner is not hardcoded."
+            ],
             "type": "pubkey"
           },
           {
@@ -3838,22 +4365,38 @@ export type Veto = {
           },
           {
             "name": "cap",
+            "docs": [
+              "Total input that may ever be sold, in base units."
+            ],
             "type": "u64"
           },
           {
             "name": "spent",
+            "docs": [
+              "Input sold so far, in base units. Never exceeds `cap`."
+            ],
             "type": "u64"
           },
           {
             "name": "perTradeMax",
+            "docs": [
+              "Largest single trade allowed, in base units, before a one-shot override."
+            ],
             "type": "u64"
           },
           {
             "name": "dailyLimit",
+            "docs": [
+              "Most input that may be sold in any rolling 24 hour interval."
+            ],
             "type": "u64"
           },
           {
             "name": "dailyBuckets",
+            "docs": [
+              "Current hour plus the preceding 24 hours. This retains a partial oldest",
+              "hour conservatively, so allowance may take up to 25 hours to recover."
+            ],
             "type": {
               "array": [
                 {
@@ -3867,6 +4410,9 @@ export type Veto = {
           },
           {
             "name": "floorNum",
+            "docs": [
+              "Minimum output per unit of input, as `floor_num / floor_den`."
+            ],
             "type": "u64"
           },
           {
@@ -3879,14 +4425,23 @@ export type Veto = {
           },
           {
             "name": "overrideAmount",
+            "docs": [
+              "One-shot per-trade ceiling the owner granted for a specific nonce."
+            ],
             "type": "u64"
           },
           {
             "name": "overrideNonce",
+            "docs": [
+              "Nonce the override applies to. Zero means no override is pending."
+            ],
             "type": "u64"
           },
           {
             "name": "lastNonce",
+            "docs": [
+              "Highest nonce that has been traded. A refusal does not advance it."
+            ],
             "type": "u64"
           },
           {

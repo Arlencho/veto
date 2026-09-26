@@ -2,6 +2,22 @@
 
 The command you run next to your agent. Pairing does not need a developer, and it does not need a copied setup block.
 
+## Install
+
+Requires Node 22 or newer. After version 0.1.0 is published:
+
+```bash
+npm install --global @veto-hq/veto
+```
+
+Or run without a global install:
+
+```bash
+npx @veto-hq/veto connect
+```
+
+Version 0.1.0 is prepared for release. See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for maintainer release steps.
+
 ## One command, one scan, one hold
 
 ```bash

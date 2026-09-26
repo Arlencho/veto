@@ -199,9 +199,9 @@ test('second Seeker address reaches the existing guardian screen and confirmed s
   await act(async () => guardian.props.onGuardian(params.guardian));
   assert.equal(guardian.props.safeText, '');
   await act(async () => guardian.props.onSafe(params.guardian));
-  await assert.rejects(guardian.props.onSign(), /guardian does not control/);
+  await assert.rejects(guardian.props.onSign(), /^Error: Your safe address must be a different wallet from the guardian wallet\.$/);
   await act(async () => guardian.props.onSafe(owner.toBase58()));
-  await assert.rejects(guardian.props.onSign(), /stolen owner key/);
+  await assert.rejects(guardian.props.onSign(), /^Error: Your safe address must be a different wallet from the one you sign with\.$/);
   await act(async () => guardian.props.onSafe('not an address'));
   await assert.rejects(guardian.props.onSign(), /valid Solana/);
   await act(async () => guardian.props.onSafe('Vote111111111111111111111111111111111111111'));

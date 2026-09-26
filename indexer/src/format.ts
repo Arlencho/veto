@@ -2,6 +2,7 @@ import type { Comparison, Decision } from "./types.js";
 
 export function decisionToJson(d: Decision): Record<string, unknown> {
   return {
+    ...(d.vault ? { vault: d.vault, owner: d.owner, destination: d.destination, amount_unit: d.kind === "hold_migrated" ? "lamports" : "token_base_units" } : {}),
     signature: d.signature,
     slot: d.slot,
     timestamp: d.timestamp,

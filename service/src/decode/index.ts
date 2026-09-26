@@ -27,10 +27,11 @@ export type OpenMandate = OwnerRecord & {
 export type GrantOverride = OwnerRecord & { kind: 'grant_override'; source: string; token_program: string; amount: bigint; nonce: bigint };
 export type RevokeMandate = OwnerRecord & { kind: 'revoke_mandate'; source: string; token_program: string };
 export type CloseMandate = OwnerRecord & { kind: 'close_mandate' };
-export type ChargeDecision = Decision & Location;
-export type DecodedRecord = OpenMandate | GrantOverride | RevokeMandate | CloseMandate | ChargeDecision;
+export type ChargeDecision = Decision & Location & { kind: 'paid' | 'refused' | 'traded' };
+export type HoldLifecycle = Decision & Location & { kind: 'hold_migrated' | 'hold_closed'; owner: string; vault: string; destination: string };
+export type DecodedRecord = OpenMandate | GrantOverride | RevokeMandate | CloseMandate | ChargeDecision | HoldLifecycle;
 type LocatedInstruction = CompiledIx & Pick<Location, 'instructionIndex' | 'innerInstructionIndex'>;
-const names = ['open_mandate', 'grant_override', 'revoke_mandate', 'close_mandate', 'charge'];
+const names = ['open_mandate', 'grant_override', 'revoke_mandate', 'close_mandate', 'charge', 'migrate_hold_vault', 'close_hold_vault'];
 const layouts = idl.instructions.filter(ix => names.includes(ix.name));
 
 /** Flatten in execution order, resolving static, loaded writable, then loaded readonly keys. */
@@ -99,13 +100,25 @@ export function decodeTransaction(tx: RpcTransaction, programId = PROGRAM_ID): D
           if (data.length !== 8) throw new Error('Invalid close length');
           records.push({ ...owner, kind: 'close_mandate' });
           break;
+        case 'migrate_hold_vault':
+        case 'close_hold_vault': {
+          if (data.length !== 8) throw new Error('Invalid Hold instruction length');
+          const kind = layout.name === 'migrate_hold_vault' ? 'hold_migrated' : 'hold_closed';
+          const index = remaining.findIndex(d => d.kind === kind && d.vault === accounts.vault && d.owner === accounts.owner);
+          if (index < 0) throw new Error('Missing Hold lifecycle event');
+          const [decision] = remaining.splice(index, 1);
+          if (!decision.destination) throw new Error('Missing Hold destination');
+          records.push({ ...decision, ...location, kind, vault: accounts.vault, owner: accounts.owner, destination: decision.destination });
+          break;
+        }
         case 'charge': {
           if (data.length !== 24) throw new Error('Invalid charge length');
           const amount = data.readBigUInt64LE(8), nonce = data.readBigUInt64LE(16);
-          const index = remaining.findIndex(d => d.mandate === accounts.mandate && d.amount === amount && d.nonce === nonce);
+          const index = remaining.findIndex(d => (d.kind === 'paid' || d.kind === 'refused' || d.kind === 'traded') && d.mandate === accounts.mandate && d.amount === amount && d.nonce === nonce);
           if (index < 0) throw new Error('Missing Paid or Refused decision');
           const [decision] = remaining.splice(index, 1);
-          records.push({ ...decision, ...location, counterparty: accounts.destination });
+          if (decision.kind !== 'paid' && decision.kind !== 'refused' && decision.kind !== 'traded') throw new Error('Invalid charge decision');
+          records.push({ ...decision, kind: decision.kind, ...location, counterparty: accounts.destination });
           break;
         }
       }
@@ -113,6 +126,6 @@ export function decodeTransaction(tx: RpcTransaction, programId = PROGRAM_ID): D
       throw new Error(`Malformed or incomplete ${layout.name} at instruction ${ix.instructionIndex}`, { cause: error });
     }
   }
-  if (remaining.length) throw new Error('Decision event without matching charge instruction');
+  if (remaining.length) throw new Error('Decision event without matching instruction');
   return records;
 }

@@ -6,9 +6,9 @@ TypeScript client for one `charge`, for one `trade`, for reading the mandate, th
 npm install @veto-hq/agent-sdk
 ```
 
-Published to npm on <date>.
+Version 0.1.0 is prepared for release. The install command above becomes available after the maintainer publishes it.
 
-The package is published from this checkout by the maintainer. `watcher/` is the full reference agent. The app does not import this package. It builds Hold instructions itself.
+See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for the maintainer release steps. `watcher/` is the full reference agent. The app does not import this package. It builds Hold instructions itself.
 
 Node 22 or newer.
 
@@ -112,7 +112,7 @@ const config = loadAgentConfig(jsonText);
 const veto = await VetoAgent.fromConfig(config, agentKeypair);
 ```
 
-In this repo the import is from `../sdk/src/index.js` until the package is built and linked. `main` points at `./dist/index.js`, which exists after `npm run build`.
+In this repo the import is from `../sdk/src/index.js` until the package is built and linked. `main` points at `./dist/src/index.js`, which exists after `npm run build`.
 
 The checks, in order:
 

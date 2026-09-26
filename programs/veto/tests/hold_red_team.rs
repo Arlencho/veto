@@ -1728,6 +1728,15 @@ fn init_vault_rejects_a_safe_address_equal_to_the_vault_and_the_owner_key_rules(
     }
 
     reject_init(
+        |_, _, args| args.safe_address = args.guardian,
+        "SafeAddressIsGuardian",
+    );
+    reject_init(
+        |owner, _, args| args.safe_address = *owner,
+        "SafeAddressIsOwner",
+    );
+
+    reject_init(
         |_owner, vault, args| args.safe_address = *vault,
         "SafeAddressRequired",
     );
@@ -1807,10 +1816,12 @@ fn init_vault_rejects_a_safe_address_equal_to_the_vault_and_the_owner_key_rules(
             big_share_bps: 0,
         },
     );
-    send(&mut svm, &owner, &[&owner], &[ix]).expect("owner may name their own wallet as safe");
-    assert_eq!(read_vault(&svm, &vault).safe_address, owner.pubkey());
+    assert_err(
+        send(&mut svm, &owner, &[&owner], &[ix]),
+        "SafeAddressIsOwner",
+    );
+    assert!(svm.get_account(&vault).is_none());
     assert_eq!(token_balance(&svm, &source), 50 * ONE);
-    assert_eq!(token_balance(&svm, &vault_token), 0);
 
     let (mut w, _shop) = known_world(Rules::default());
     let vault_before = token_balance(&w.svm, &w.vault_token);
@@ -1912,4 +1923,110 @@ fn a_withdrawal_queued_before_recover_cannot_spend_a_later_deposit() {
     assert_eq!(token_balance(&w.svm, &pocket), 0);
     assert_eq!(token_balance(&w.svm, &w.vault_token), later);
     assert_eq!(token_balance(&w.svm, &w.safe_token), sitting);
+}
+
+#[test]
+fn unsafe_safe_changes_are_rejected_without_partial_tightening() {
+    for owner_safe in [false, true] {
+        for combined in [false, true] {
+            let mut w = open_vault(Rules::default());
+            let before = w.svm.get_account(&w.vault).unwrap().data;
+            let mut values = current_rules(&w);
+            values.safe_address = if owner_safe {
+                w.owner.pubkey()
+            } else {
+                w.guardian.pubkey()
+            };
+            if combined {
+                values.daily_limit = 1;
+                values.delay_secs = HOLD_DELAY_2_DAYS;
+            }
+            assert_err(
+                propose(&mut w, values),
+                if owner_safe {
+                    "SafeAddressIsOwner"
+                } else {
+                    "SafeAddressIsGuardian"
+                },
+            );
+            assert_eq!(w.svm.get_account(&w.vault).unwrap().data, before);
+        }
+    }
+}
+
+#[test]
+fn changing_guardian_to_the_safe_wallet_is_rejected() {
+    let mut w = open_vault(Rules::default());
+    let mut values = current_rules(&w);
+    values.guardian = values.safe_address;
+    assert_err(propose(&mut w, values), "SafeAddressIsGuardian");
+}
+
+#[test]
+fn legacy_unsafe_safe_can_be_repaired_by_owner_after_the_normal_delay() {
+    let mut w = open_vault(Rules::default());
+    let mut legacy = read_vault(&w.svm, &w.vault);
+    legacy.safe_address = legacy.guardian;
+    overwrite_vault(&mut w.svm, &w.vault, &legacy);
+    let mut values = current_rules(&w);
+    values.safe_address = w.safe;
+    propose(&mut w, values).unwrap();
+    let owner = w.owner.insecure_clone();
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    let pending = read_vault(&w.svm, &w.vault);
+    assert_eq!(pending.safe_address, legacy.guardian);
+    warp(&mut w.svm, pending.change.effective_at);
+    apply_change(&mut w, &owner).unwrap();
+    assert_eq!(read_vault(&w.svm, &w.vault).safe_address, w.safe);
+}
+
+#[test]
+fn old_pending_changes_cannot_apply_unsafe_resulting_rules() {
+    for fields in [CHANGE_SAFE, CHANGE_GUARDIAN, CHANGE_SAFE | CHANGE_GUARDIAN] {
+        for owner_safe in [false, true] {
+            if owner_safe && fields == CHANGE_GUARDIAN {
+                continue;
+            }
+            let mut w = open_vault(Rules::default());
+            let mut vault = read_vault(&w.svm, &w.vault);
+            vault.change.active = true;
+            vault.change.fields = fields;
+            vault.change.effective_at = 0;
+            vault.change.guardian = if fields == CHANGE_GUARDIAN {
+                vault.safe_address
+            } else {
+                vault.guardian
+            };
+            vault.change.safe_address = if owner_safe {
+                vault.owner
+            } else {
+                vault.guardian
+            };
+            overwrite_vault(&mut w.svm, &w.vault, &vault);
+            let before = w.svm.get_account(&w.vault).unwrap().data;
+            let owner = w.owner.insecure_clone();
+            assert_err(
+                apply_change(&mut w, &owner),
+                if owner_safe {
+                    "SafeAddressIsOwner"
+                } else {
+                    "SafeAddressIsGuardian"
+                },
+            );
+            assert_eq!(w.svm.get_account(&w.vault).unwrap().data, before);
+        }
+    }
+}
+
+#[test]
+fn combined_guardian_addition_cannot_take_the_current_safe_during_the_delay() {
+    let mut w = open_vault(Rules {
+        guardian: false,
+        ..Rules::default()
+    });
+    let mut values = current_rules(&w);
+    values.guardian = values.safe_address;
+    values.safe_address = Pubkey::new_unique();
+    assert_err(propose(&mut w, values), "SafeAddressIsGuardian");
+    assert_eq!(read_vault(&w.svm, &w.vault).guardian, Pubkey::default());
 }

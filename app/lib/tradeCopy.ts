@@ -6,7 +6,7 @@ import {
   REASON_POOL_NOT_ALLOWED,
   reasonText,
 } from './constants';
-import { formatTokenAmount } from './tokens';
+import { formatTokenAmount, formatTokenDisplay } from './tokens';
 import { truncateAddress } from './wallet';
 
 export function tradeWorstCase(dailyLimitLabel: string): string {
@@ -42,9 +42,11 @@ export function tradeDecisionTitle(args: {
   reason: number;
   counterparty: string;
   perTradeMax?: bigint;
+  amounts?: 'exact' | 'display';
 }): string {
-  const sold = formatTokenAmount(args.amountIn, args.inDecimals, args.inMint);
-  const bought = formatTokenAmount(args.amountOut, args.outDecimals, args.outMint);
+  const format = args.amounts === 'exact' ? formatTokenAmount : formatTokenDisplay;
+  const sold = format(args.amountIn, args.inDecimals, args.inMint);
+  const bought = format(args.amountOut, args.outDecimals, args.outMint);
   if (args.kind === KIND_PAID) {
     return `Traded ${sold} for ${bought}`;
   }
@@ -60,7 +62,7 @@ export function tradeDecisionTitle(args: {
     return `Refused: ${label} (tried ${tried})`;
   }
   if (args.reason === REASON_OVER_PER_TX_MAX && args.perTradeMax != null) {
-    const limit = formatTokenAmount(args.perTradeMax, args.inDecimals, args.inMint);
+    const limit = format(args.perTradeMax, args.inDecimals, args.inMint);
     return `Refused: your agent asked ${sold}, your limit is ${limit} per trade`;
   }
   return `Refused: ${reasonText(args.reason)} (${sold})`;

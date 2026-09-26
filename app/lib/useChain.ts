@@ -1,3 +1,4 @@
+import { ConfiguredTokenContext } from './configuredToken';
 import { redactRpc } from './rpcPrivacy';
 import { PublicKey } from '@solana/web3.js';
 import {
@@ -660,7 +661,9 @@ const ChainContext = createContext<ChainState | null>(null);
 
 export function ChainProvider({ children }: { children: ReactNode }) {
   const value = useChainState();
-  return createElement(ChainContext.Provider, { value }, children);
+  return createElement(ChainContext.Provider, { value },
+    createElement(ConfiguredTokenContext.Provider, { value: value.config?.mint ?? null }, children),
+  );
 }
 
 export function useChain(): ChainState {

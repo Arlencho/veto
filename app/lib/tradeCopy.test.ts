@@ -69,3 +69,13 @@ test('a refused pool account names the account that was tried', () => {
   });
   assert.equal(title, `Refused: pool account not allowed (tried ${truncateAddress(tried)})`);
 });
+
+test('trade titles round overview values while exact verification retains every base unit', () => {
+  const args = {
+    kind: KIND_PAID, amountIn: 999994n, amountOut: 10992000n,
+    inDecimals: 9, outDecimals: 6, inMint: SOL, outMint: DEVNET_USDC_MINT,
+    reason: 0, counterparty: 'pool',
+  };
+  assert.equal(tradeDecisionTitle(args), 'Traded 0.001 wrapped SOL for 10.99 USDC');
+  assert.equal(tradeDecisionTitle({ ...args, amounts: 'exact' }), 'Traded 0.000999994 wrapped SOL for 10.992 USDC');
+});

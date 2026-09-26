@@ -66,7 +66,7 @@ test('a finished rule card states the outside count, the return, and Devnet', ()
   ];
   const now = START + 90n * DAY;
   const record = trackRecordFor(snapshotRule(facts(rows), now), 'Charging agent', 'devnet', now, true);
-  assert.equal(record.badge, 'Devnet, test tokens');
+  assert.equal(record.badge, 'Devnet');
   assert.equal(record.paid, 61);
   assert.equal(record.refused, 11);
   assert.equal(record.allowances, 0);
@@ -74,7 +74,7 @@ test('a finished rule card states the outside count, the return, and Devnet', ()
   assert.match(record.lead, /Asked outside its rule 11 times in 90 days/);
   assert.equal(record.follow, 'Refused every time.');
   const lines = trackRecordLines(record).join('\n');
-  assert.match(lines, /Devnet, test tokens/);
+  assert.match(lines, /Devnet/);
   assert.match(lines, /32 VTEST returned to the owner/);
   assert.doesNotMatch(lines, /decline/i);
   const text = trackRecordText(record, ruleCheckUrl(ADDRESS, 'devnet', 'https://api.devnet.solana.com'));
@@ -94,7 +94,7 @@ test('the shared image is a PNG of the rule address as a QR, and it says Devnet'
   assert.equal(bytes[0], 137);
   assert.equal(bytes[1], 80);
   const comment = pngComment(bytes);
-  assert.match(comment ?? '', /Devnet, test tokens/);
+  assert.match(comment ?? '', /Devnet/);
   assert.match(comment ?? '', new RegExp(ADDRESS));
   const png = PNG.sync.read(Buffer.from(bytes));
   const code = jsQR(new Uint8ClampedArray(png.data), png.width, png.height);

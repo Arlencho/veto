@@ -20,7 +20,7 @@ import { displayPurpose, rulesHeading } from '../../lib/ruleView';
 import { PAYEE_NOT_IN_RULESET, PAYEE_PREFILL, RULESET_ENVELOPE } from '../../lib/ruleset';
 import { TEMPLATES } from '../../lib/templates';
 import { poolByAddress } from '../../lib/pools';
-import { formatTokenAmount, rulesTokenSummary, tokenSymbol } from '../../lib/tokens';
+import { formatTokenDisplay, rulesTokenSummary, tokenSymbol } from '../../lib/tokens';
 import { isTradeActive, tradePairLabel } from '../../lib/tradeRule';
 import { useChain } from '../../lib/useChain';
 import { useRefreshOnFocus } from '../../lib/useRefreshOnFocus';
@@ -122,7 +122,7 @@ export default function RulesScreen() {
                     <View style={styles.tplText}>
                       <Text style={styles.tplName}>{displayPurpose(rule.purpose)}</Text>
                       <Text style={styles.tplSum}>
-                        {`${tradePairLabel(rule)}. ${formatTokenAmount(rule.spent, decimals, rule.inMint)} of ${formatTokenAmount(rule.cap, decimals, rule.inMint)} sent.`}
+                        {`${tradePairLabel(rule)}. ${formatTokenDisplay(rule.spent, decimals, rule.inMint)} of ${formatTokenDisplay(rule.cap, decimals, rule.inMint)} sent.`}
                       </Text>
                     </View>
                   </Pressable>

@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ConfiguredTokenContext } from '../../lib/configuredToken';
 import { FIRST_RUN_STAGES, ProgressStrip, type FirstRunStage } from '../backglass/ProgressStrip';
 import { networkPillLabel } from '../../lib/onboarding';
 import { colors, fonts, radii, space, type as typeScale } from '../theme';
@@ -33,10 +34,9 @@ export function FirstRunChrome({
   children?: ReactNode;
   footer?: ReactNode;
 }) {
-  const pill = networkPillLabel(cluster);
+  const pill = networkPillLabel(cluster, useContext(ConfiguredTokenContext));
   return (
     <View style={styles.screen}>
-      <View style={styles.wash} />
       {title ? (
         <View style={styles.titleRow}>
           {onBack ? (
@@ -66,6 +66,9 @@ export function FirstRunChrome({
       )}
       <ProgressStrip current={stage} done={stagesBefore(stage)} cluster={cluster} />
       <View style={styles.body}>
+        <View pointerEvents="none" accessible={false} style={styles.washLayer}>
+          <View style={styles.wash} />
+        </View>
         {view === 'loading' ? (
           <View>
             <ActivityIndicator color={colors.bone} accessibilityLabel="Loading" />
@@ -150,6 +153,15 @@ const styles = StyleSheet.create({
     gap: space.xl,
     alignSelf: 'stretch',
     flexGrow: 1,
+  },
+  washLayer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: -1,
   },
   wash: {
     position: 'absolute',

@@ -26,7 +26,7 @@ import { colors, fonts, radii, space } from '../../components/theme';
 import { KIND_REFUSED } from '../../lib/constants';
 import { isListedDecision, timeLeftParts, todaysAgentDecisions } from '../../lib/format';
 import { showDevnetUsdcFaucet } from '../../lib/faucet';
-import { mainnetPreviewNote, devnetTestTokenNote, formatTokenAmount } from '../../lib/tokens';
+import { mainnetPreviewNote, devnetTestTokenNote, formatTokenDisplay } from '../../lib/tokens';
 import { useWallet } from '../../lib/useWallet';
 import { isActive, mandateRemaining } from '../../lib/mandate';
 import { liveMandateCount, showRulePill, tabPillFace } from '../../lib/mandateRead';
@@ -60,10 +60,10 @@ export default function OverviewScreen() {
   const liveCount = liveMandateCount(chain.mandates, chain.nowMs);
   const spentShare = Math.round(ratio * 100);
   const mint = mandate?.mint;
-  const remainingText = formatTokenAmount(remaining, chain.decimals, mint);
-  const capText = formatTokenAmount(mandate?.cap ?? 0n, chain.decimals, mint);
-  const spentText = formatTokenAmount(mandate?.spent ?? 0n, chain.decimals, mint);
-  const perText = formatTokenAmount(mandate?.perTxMax ?? 0n, chain.decimals, mint);
+  const remainingText = formatTokenDisplay(remaining, chain.decimals, mint);
+  const capText = formatTokenDisplay(mandate?.cap ?? 0n, chain.decimals, mint);
+  const spentText = formatTokenDisplay(mandate?.spent ?? 0n, chain.decimals, mint);
+  const perText = formatTokenDisplay(mandate?.perTxMax ?? 0n, chain.decimals, mint);
   const tokenNote = mainnetPreviewNote(mint, chain.config?.explorerCluster ?? null) ?? devnetTestTokenNote(mint, chain.config?.explorerCluster ?? null);
   const offerFaucet =
     chain.mandateStatus === 'empty' &&

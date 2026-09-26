@@ -16,7 +16,7 @@ import { colors, fonts, radii, touchTarget } from '../../components/theme';
 import { KIND_ADVISORY_DECLINE } from '../../lib/advisory';
 import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, LEDGER_CAPACITY } from '../../lib/constants';
 import { decisionTotals, groupByLocalDay, isListedDecision, newestFirst } from '../../lib/format';
-import { formatTokenAmount } from '../../lib/tokens';
+import { formatTokenDisplay } from '../../lib/tokens';
 import { mandateRemaining } from '../../lib/mandate';
 import { liveMandateCount, showRulePill, tabPillFace } from '../../lib/mandateRead';
 import type { LedgerRow } from '../../lib/ring';
@@ -160,8 +160,8 @@ export default function DecisionsScreen() {
                   </Text>
                   <Text style={styles.ruleSub}>
                     {chain.mandates.length === 1 ? 'Your only rule' : `${chain.mandates.length} rules`}.{' '}
-                    {formatTokenAmount(mandateRemaining(mandate), chain.decimals, mandate.mint)} left of your{' '}
-                    {formatTokenAmount(mandate.cap, chain.decimals, mandate.mint)} total. Agent{' '}
+                    {formatTokenDisplay(mandateRemaining(mandate), chain.decimals, mandate.mint)} left of your{' '}
+                    {formatTokenDisplay(mandate.cap, chain.decimals, mandate.mint)} total. Agent{' '}
                     {truncateAddress(mandate.agent)}.
                   </Text>
                 </View>

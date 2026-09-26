@@ -17,43 +17,25 @@ export function formatBaseUnits(amount: bigint, decimals: number): string {
   return `${sign}${whole.toString()}.${fracStr}`;
 }
 
-function roundDecimalToken(token: string): string {
-  const negative = token.startsWith('-');
-  const body = negative ? token.slice(1) : token;
-  const [wholeRaw, fracRaw = ''] = body.split('.');
-  if (fracRaw.length <= 2) {
-    return token;
-  }
-  let cents = Number(fracRaw.slice(0, 2).padEnd(2, '0'));
-  let whole = BigInt(wholeRaw || '0');
-  if ((fracRaw[2] ?? '0') >= '5') {
-    cents += 1;
-  }
-  if (cents >= 100) {
-    cents = 0;
-    whole += 1n;
-  }
-  const sign = negative ? '-' : '';
-  if (cents === 0) {
-    return `${sign}${whole.toString()}`;
-  }
-  const frac = String(cents).padStart(2, '0').replace(/0+$/, '');
-  return `${sign}${whole.toString()}.${frac}`;
-}
-
-/** Screen money keeps at most two decimal places. A non-zero amount that would round to 0 stays exact. */
+/** Token-aware rounding for display copy; signing and verification use exact values. */
 export function roundShownAmounts(text: string): string {
-  return text.replace(/-?\d+\.\d{3,}/g, (token) => {
-    const rounded = roundDecimalToken(token);
-    if ((rounded === '0' || rounded === '-0') && token !== '0' && token !== '-0') {
-      return token;
-    }
-    return rounded;
+  return text.replace(/-?\d+\.\d{3,}( wrapped SOL)?/g, (token, sol: string | undefined) => {
+    const amount = sol ? token.slice(0, -sol.length) : token;
+    const decimals = amount.split('.')[1]!.length;
+    return formatDisplayAmount(parseBaseUnits(amount, decimals), decimals, sol ? 4 : 2) + (sol ?? '');
   });
 }
 
-export function formatDisplayAmount(amount: bigint, decimals: number): string {
-  return roundShownAmounts(formatBaseUnits(amount, decimals));
+export function formatDisplayAmount(amount: bigint, decimals: number, precision = 2): string {
+  const places = Math.min(decimals, precision);
+  const unit = 10n ** BigInt(decimals - places);
+  const absolute = amount < 0n ? -amount : amount;
+  const rounded = (absolute + unit / 2n) / unit;
+  if (absolute > 0n && rounded === 0n) {
+    const threshold = formatBaseUnits(1n, places);
+    return amount < 0n ? `>-${threshold}` : `<${threshold}`;
+  }
+  return formatBaseUnits(amount < 0n ? -rounded : rounded, places);
 }
 
 export function parseBaseUnits(text: string, decimals: number): bigint {

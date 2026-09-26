@@ -736,7 +736,7 @@ export function plaqueDateLabel(day: number | null, atSec: bigint): string {
   return `Day ${day}, ${when}`;
 }
 
-export function networkBadge(cluster: string, place: 'name' | 'tokens' | 'card'): string {
+export function networkBadge(cluster: string, _place: 'name' | 'tokens' | 'card'): string {
   const name =
     cluster === 'devnet'
       ? 'Devnet'
@@ -745,17 +745,5 @@ export function networkBadge(cluster: string, place: 'name' | 'tokens' | 'card')
         : cluster === 'mainnet-beta'
           ? 'Mainnet'
           : cluster;
-  if (place === 'card') {
-    if (cluster === 'devnet' || cluster === 'testnet') {
-      return `${name}, test tokens`;
-    }
-    return name;
-  }
-  if (place === 'tokens') {
-    if (cluster === 'devnet' || cluster === 'testnet') {
-      return 'Test tokens';
-    }
-    return name;
-  }
   return name;
 }

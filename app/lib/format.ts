@@ -18,22 +18,24 @@ export function formatBaseUnits(amount: bigint, decimals: number): string {
 }
 
 /** Token-aware rounding for display copy; signing and verification use exact values. */
-export function roundShownAmounts(text: string): string {
+export function roundShownAmounts(text: string, rounding: 'nearest' | 'floor' = 'nearest'): string {
   return text.replace(/-?\d+\.\d{3,}( wrapped SOL)?/g, (token, sol: string | undefined) => {
     const amount = sol ? token.slice(0, -sol.length) : token;
     const decimals = amount.split('.')[1]!.length;
-    return formatDisplayAmount(parseBaseUnits(amount, decimals), decimals, sol ? 4 : 2) + (sol ?? '');
+    return formatDisplayAmount(parseBaseUnits(amount, decimals), decimals, sol ? 4 : 2, rounding) + (sol ?? '');
   });
 }
 
-export function formatDisplayAmount(amount: bigint, decimals: number, precision = 2): string {
+export function formatDisplayAmount(amount: bigint, decimals: number, precision = 2, rounding: 'nearest' | 'floor' = 'nearest'): string {
   const places = Math.min(decimals, precision);
   const unit = 10n ** BigInt(decimals - places);
   const absolute = amount < 0n ? -amount : amount;
-  const rounded = (absolute + unit / 2n) / unit;
+  const rounded = rounding === 'floor'
+    ? (absolute + (amount < 0n ? unit - 1n : 0n)) / unit
+    : (absolute + unit / 2n) / unit;
   if (absolute > 0n && rounded === 0n) {
     const threshold = formatBaseUnits(1n, places);
-    return amount < 0n ? `>-${threshold}` : `<${threshold}`;
+    return amount < 0n ? `-<${threshold}` : `<${threshold}`;
   }
   return formatBaseUnits(amount < 0n ? -rounded : rounded, places);
 }

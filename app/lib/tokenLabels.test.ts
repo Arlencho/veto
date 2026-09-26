@@ -11,3 +11,7 @@ test('first-run labels identify the configured token instead of guessing from de
   assert.match(connectNetworkLine('devnet', DEVNET_USDC_MINT) ?? '', /Devnet USDC/);
   assert.doesNotMatch(connectNetworkLine('devnet', DEVNET_USDC_MINT) ?? '', /test tokens/i);
 });
+
+test('test tokens uses sentence case in wallet connection copy', () => {
+  assert.match(connectNetworkLine('devnet', VTEST_MINT) ?? '', /with test tokens\./);
+});

@@ -22,7 +22,7 @@ for (const [mint, label] of [[DEVNET_USDC_MINT, 'Devnet USDC'], [VTEST_MINT, 'Te
     });
     const text = JSON.stringify(root.toJSON());
     assert.match(text, new RegExp(label));
-    assert.match(text, new RegExp(`with ${label}`));
+    assert.match(text, new RegExp(`with ${mint === VTEST_MINT ? 'test tokens' : label}`));
     if (mint === DEVNET_USDC_MINT) assert.doesNotMatch(text, /test tokens/i);
     await act(async () => root.unmount());
   });

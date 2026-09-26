@@ -36,11 +36,11 @@ export function SpendBoard({
 }) {
   const blockLine = roundShownAmounts(homeBlockCaption(leftCaption, rightCaption) ?? leftCaption);
   const perLine = roundShownAmounts(rightCaption);
-  const remainingLine = roundShownAmounts(remainingText);
+  const remainingLine = roundShownAmounts(remainingText, 'floor');
   const ofLine = roundShownAmounts(ofText);
   const spentLine = roundShownAmounts(spentText);
   return (
-    <BrassFrame accessibilityLabel={roundShownAmounts(accessibilityLabel)} padding={16}>
+    <BrassFrame accessibilityLabel={roundShownAmounts(accessibilityLabel, 'floor')} padding={16}>
       {dimmed ? <DimLamps /> : null}
       <View style={styles.head}>
         <Text style={styles.kicker}>{kicker}</Text>

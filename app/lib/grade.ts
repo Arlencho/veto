@@ -490,7 +490,7 @@ export function snapshotRule(rule: RuleFacts, nowSec: bigint): RuleSnapshot {
   const totalDays = ruleTotalDays(startedAt, rule.expiresAt);
   const remaining = remainingCap(rule.cap, rule.spent);
   const mint = rule.mint;
-  const remainingLabel = formatTokenDisplay(remaining, rule.decimals, mint);
+  const remainingLabel = formatTokenDisplay(remaining, rule.decimals, mint, 'floor');
   const capLabel = formatTokenDisplay(rule.cap, rule.decimals, mint);
   const facts = countRule(rule.rows);
   const dayLabel =

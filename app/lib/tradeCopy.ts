@@ -44,7 +44,7 @@ export function tradeDecisionTitle(args: {
   perTradeMax?: bigint;
   amounts?: 'exact' | 'display';
 }): string {
-  const format = args.amounts === 'exact' ? formatTokenAmount : formatTokenDisplay;
+  const format = args.amounts === 'display' ? formatTokenDisplay : formatTokenAmount;
   const sold = format(args.amountIn, args.inDecimals, args.inMint);
   const bought = format(args.amountOut, args.outDecimals, args.outMint);
   if (args.kind === KIND_PAID) {

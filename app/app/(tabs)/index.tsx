@@ -60,7 +60,7 @@ export default function OverviewScreen() {
   const liveCount = liveMandateCount(chain.mandates, chain.nowMs);
   const spentShare = Math.round(ratio * 100);
   const mint = mandate?.mint;
-  const remainingText = formatTokenDisplay(remaining, chain.decimals, mint);
+  const remainingText = formatTokenDisplay(remaining, chain.decimals, mint, 'floor');
   const capText = formatTokenDisplay(mandate?.cap ?? 0n, chain.decimals, mint);
   const spentText = formatTokenDisplay(mandate?.spent ?? 0n, chain.decimals, mint);
   const perText = formatTokenDisplay(mandate?.perTxMax ?? 0n, chain.decimals, mint);

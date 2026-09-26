@@ -248,7 +248,7 @@ export default function RuleDetailScreen() {
     ? ruleDay(sameLedger ? openedAtSec(chain.rows) : null, mandate.expiresAt, nowSec)
     : null;
   const left = mandate ? timeLeftParts(mandate.expiresAt, nowSec) : null;
-  const remainingText = formatTokenDisplay(remaining, amountDecimals, mandate?.mint);
+  const remainingText = formatTokenDisplay(remaining, amountDecimals, mandate?.mint, 'floor');
   const connectStatus = mandate
     ? agentConnectStatus({
         active,

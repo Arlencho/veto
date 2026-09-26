@@ -116,7 +116,8 @@ export function connectNetworkLine(cluster: string | null | undefined, mint?: st
     return null;
   }
   if (cluster === 'devnet' || cluster === 'testnet') {
-    const token = mint?.trim() ? ` with ${networkPillLabel(cluster, mint)}` : '';
+    const label = mint?.trim() === VTEST_MINT ? 'test tokens' : networkPillLabel(cluster, mint);
+    const token = mint?.trim() ? ` with ${label}` : '';
     return `Test money only. Veto runs on Solana ${cluster}${token}. Your wallet must be set to ${cluster} before you connect.`;
   }
   return clusterNotice(cluster);

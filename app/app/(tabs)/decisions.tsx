@@ -160,7 +160,7 @@ export default function DecisionsScreen() {
                   </Text>
                   <Text style={styles.ruleSub}>
                     {chain.mandates.length === 1 ? 'Your only rule' : `${chain.mandates.length} rules`}.{' '}
-                    {formatTokenDisplay(mandateRemaining(mandate), chain.decimals, mandate.mint)} left of your{' '}
+                    {formatTokenDisplay(mandateRemaining(mandate), chain.decimals, mandate.mint, 'floor')} left of your{' '}
                     {formatTokenDisplay(mandate.cap, chain.decimals, mandate.mint)} total. Agent{' '}
                     {truncateAddress(mandate.agent)}.
                   </Text>

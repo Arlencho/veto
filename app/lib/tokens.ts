@@ -90,8 +90,9 @@ export function formatTokenDisplay(
   amount: bigint,
   decimals: number,
   mint: string | null | undefined,
+  rounding: 'nearest' | 'floor' = 'nearest',
 ): string {
-  return withToken(formatDisplayAmount(amount, decimals, mint?.trim() === WSOL_MINT ? 4 : 2), mint);
+  return withToken(formatDisplayAmount(amount, decimals, mint?.trim() === WSOL_MINT ? 4 : 2, rounding), mint);
 }
 
 /** One plain line on devnet, for VTEST or Circle's devnet USDC. Null for every other mint and cluster. */

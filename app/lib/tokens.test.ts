@@ -147,9 +147,16 @@ test('display amounts round token precision while signing amounts remain exact',
   assert.equal(formatTokenDisplay(10_992_000n, 6, DEVNET_USDC_MINT), '10.99 USDC');
   assert.equal(formatTokenDisplay(10_999_999n, 6, MAINNET_USDC_MINT), '11 USDC');
   assert.equal(formatTokenDisplay(1n, 9, WSOL_MINT), '<0.0001 wrapped SOL');
-  assert.equal(formatTokenDisplay(-1n, 6, DEVNET_USDC_MINT), '>-0.01 USDC');
+  assert.equal(formatTokenDisplay(-1n, 6, DEVNET_USDC_MINT), '-<0.01 USDC');
   assert.equal(formatTokenDisplay(0n, 6, DEVNET_USDC_MINT), '0 USDC');
   assert.equal(formatTokenDisplay(1234567890123456789000n, 6, DEVNET_USDC_MINT), '1234567890123456.79 USDC');
   assert.equal(formatTokenAmount(999994n, 9, WSOL_MINT), '0.000999994 wrapped SOL');
   assert.equal(formatTokenAmount(10_992_000n, 6, DEVNET_USDC_MINT), '10.992 USDC');
+});
+
+test('remaining balances floor at the token display precision', () => {
+  assert.equal(formatTokenDisplay(996_000n, 6, DEVNET_USDC_MINT, 'floor'), '0.99 USDC');
+  assert.equal(formatTokenDisplay(999_994n, 9, WSOL_MINT, 'floor'), '0.0009 wrapped SOL');
+  assert.equal(formatTokenDisplay(1n, 6, DEVNET_USDC_MINT, 'floor'), '<0.01 USDC');
+  assert.equal(formatTokenDisplay(0n, 6, DEVNET_USDC_MINT, 'floor'), '0 USDC');
 });

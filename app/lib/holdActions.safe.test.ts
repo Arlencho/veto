@@ -21,7 +21,7 @@ test('opening a vault refuses recovery to the guardian before reading balances o
     owner, vaultId: 0n, guardian, safeAddress: guardian,
     dailyLimit: 1n, delaySecs: 86400n, amount: 10n,
     mint: Keypair.generate().publicKey, tokenProgram: Keypair.generate().publicKey,
-  }), /safe address must differ from the guardian/);
+  }), /Your safe address must be a different wallet from the guardian wallet\./);
 });
 
 test('opening a vault refuses recovery to the owner before reading balances or signing', async () => {
@@ -33,5 +33,5 @@ test('opening a vault refuses recovery to the owner before reading balances or s
     owner, vaultId: 0n, guardian: Keypair.generate().publicKey, safeAddress: owner,
     dailyLimit: 1n, delaySecs: 86400n, amount: 10n,
     mint: Keypair.generate().publicKey, tokenProgram: Keypair.generate().publicKey,
-  }), /safe address must differ from the owner/);
+  }), /Your safe address must be a different wallet from the one you sign with\./);
 });

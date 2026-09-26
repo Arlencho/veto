@@ -1092,7 +1092,7 @@ test('owner recovery is refused without offering a risk override', async () => {
     mode: 'seeker', guardianText: Keypair.generate().publicKey.toBase58(), safeText: owner,
     onMode() {}, onGuardian() {}, onSafe() {}, onBack() {}, onSign: async () => {},
   }));
-  assert.match(textOf(root), /safe address must differ from the owner/);
+  assert.match(textOf(root), /Your safe address must be a different wallet from the one you sign with\./);
   assert.equal(pressable(root, 'Review safe address').props.disabled, true);
   assert.doesNotMatch(textOf(root), /accept the owner wallet recovery risk|Confirm your safe address/);
   await act(async () => root.unmount());

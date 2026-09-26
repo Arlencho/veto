@@ -12,7 +12,8 @@ const { createWebhookServer } = await import('../src/sources/webhook.js');
 const { backfill, finalize } = await import('../src/sources/backfill.js');
 const { createRpc, ingestTransaction } = await import('../src/sources/shared.js');
 const { decodeTransaction } = await import('../src/decode/index.js');
-const { insertDecision } = await import('../src/ingest.js');
+const { createApiServer } = await import('../src/api/index.js');
+const { insertDecision, reverseDecision } = await import('../src/ingest.js');
 const { ingestLocation } = await import('../src/boundary.js');
 import type { RpcTransaction } from '../src/decode/index.js';
 const read = (name: string) => JSON.parse(readFileSync(new URL(`../fixtures/devnet/${name}.json`, import.meta.url), 'utf8'));
@@ -195,6 +196,17 @@ for (const [instruction, event, kind] of [
     }]);
     assert.equal(await ingestTransaction(tx, 'backfill', noRpc), 0);
     assert.deepEqual((await pool.query('SELECT requests, paid, outside FROM rule_stats')).rows, [{ requests: '0', paid: '0', outside: '0' }]);
+    const api = createApiServer();
+    await new Promise<void>(resolve => api.listen(0, '127.0.0.1', resolve));
+    try {
+      const url = `http://127.0.0.1:${(api.address() as { port: number }).port}`;
+      for (const endpoint of ['record', 'rules']) {
+        assert.equal((await fetch(`${url}/v1/agents/${owner}/${endpoint}`)).status, 404);
+      }
+    } finally { await new Promise<void>(resolve => api.close(() => resolve())); }
+    assert.equal((await pool.query('SELECT * FROM agent_stats WHERE agent = $1', [owner])).rowCount, 0);
+    assert.equal(await reverseDecision({ signature: event, instruction_index: 0, inner_index: -1 }), true);
+    assert.equal((await pool.query('SELECT * FROM agent_stats WHERE agent = $1', [owner])).rowCount, 0);
     const missing = structuredClone(tx); missing.meta!.logMessages = [];
     assert.throws(() => decodeTransaction(missing), /Malformed or incomplete/);
     const failed = structuredClone(tx); failed.meta!.err = 'failed';

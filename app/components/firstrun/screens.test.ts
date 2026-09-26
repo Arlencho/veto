@@ -3,6 +3,7 @@ import test, { mock } from 'node:test';
 
 import { act, createElement, type ReactElement, type ReactNode } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
+import { OWNER_SAFE_REASON } from '../../lib/holdSafeAddress';
 
 (globalThis as { __DEV__?: boolean }).__DEV__ = false;
 
@@ -273,7 +274,7 @@ test('Hold offers second Seeker, same phone and later without blocking the agent
   assert.match(visibleText(root), /A second key on this phone is weaker: if you lose this phone, or someone gets into it, both keys are at risk\./);
   assert.match(visibleText(root), /Acting alone, it cannot choose another destination\./);
   assert.match(visibleText(root), /guardian does not control/);
-  assert.match(visibleText(root), /stolen owner key/);
+  assert.ok(visibleText(root).includes(OWNER_SAFE_REASON));
   assert.doesNotMatch(visibleText(root), /only say no|also your safe address/);
   assert.match(visibleText(root), /You can set up Hold later from Overview\./);
   const press = async (label: string) => act(async () => {

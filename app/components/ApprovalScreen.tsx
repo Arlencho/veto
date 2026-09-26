@@ -2,7 +2,7 @@ import { redactRpc } from '../lib/rpcPrivacy';
 import { PublicKey } from '@solana/web3.js';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   addressLine,
@@ -136,7 +136,7 @@ function ApprovalCard({
   const [dateError, setDateError] = useState<string | null>(null);
   const [openedAt] = useState(() => Date.now());
   const [book, setBook] = useState<Record<string, string>>({});
-  const [revealed, setRevealed] = useState({ agent: false, payee: false });
+  const [revealed, setRevealed] = useState({ agent: false });
   const [naming, setNaming] = useState<'agent' | 'payee' | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -144,6 +144,9 @@ function ApprovalCard({
   const [formError, setFormError] = useState<string | null>(null);
   const [openedAddress, setOpenedAddress] = useState<string | null>(null);
   const openingRef = useRef(false);
+  const readVersion = useRef(0);
+  const [focused, setFocused] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,40 +187,41 @@ function ApprovalCard({
   const readKey = `${chain.config?.rpcUrl ?? ''}|${wallet.ownerPublicKey ?? ''}|${mintText ?? ''}|${payeeCanonical ?? ''}`;
   const liveObservation = observation?.key === readKey ? observation.value : null;
 
-  useEffect(() => {
+  const refreshChecks = useCallback(async () => {
+    const version = ++readVersion.current;
     if (!chain.config || !wallet.ownerPublicKey || !mintText) {
+      setRefreshing(false);
       return;
     }
-    let mint: PublicKey;
+    setRefreshing(true);
     try {
-      mint = new PublicKey(mintText);
-    } catch {
-      return;
-    }
-    let cancelled = false;
-    const key = `${chain.config.rpcUrl}|${wallet.ownerPublicKey}|${mintText}|${payeeCanonical ?? ''}`;
-    const client = createClient(chain.config);
-    void observePresign({
-      connection: client.connection,
-      owner: new PublicKey(wallet.ownerPublicKey),
-      payee: payeeCanonical ? new PublicKey(payeeCanonical) : null,
-      mint,
-      cluster: chain.config.explorerCluster,
-    })
-      .then((next) => {
-        if (!cancelled) {
-          setObservation({ key, value: next });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setObservation(null);
-        }
+      const client = createClient(chain.config);
+      const next = await observePresign({
+        connection: client.connection,
+        owner: new PublicKey(wallet.ownerPublicKey),
+        payee: payeeCanonical ? new PublicKey(payeeCanonical) : null,
+        mint: new PublicKey(mintText),
+        cluster: chain.config.explorerCluster,
       });
+      // A previous wallet, payee or focus session must not replace newer checks.
+      if (version === readVersion.current) {
+        setObservation({ key: readKey, value: next });
+      }
+    } catch {
+      if (version === readVersion.current) setObservation(null);
+    } finally {
+      if (version === readVersion.current) setRefreshing(false);
+    }
+  }, [chain.config, mintText, payeeCanonical, readKey, wallet.ownerPublicKey]);
+
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    void refreshChecks();
     return () => {
-      cancelled = true;
+      setFocused(false);
+      readVersion.current += 1;
     };
-  }, [chain.config, mintText, payeeCanonical, wallet.ownerPublicKey]);
+  }, [refreshChecks]));
 
   const decimals = liveObservation?.mintReadable ? liveObservation.decimals : null;
   const seeded = !request && template && decimals != null ? templateLimits(template, decimals) : null;
@@ -307,13 +311,22 @@ function ApprovalCard({
       : null;
 
   const checks =
-    liveObservation && cap != null
+    liveObservation
       ? evaluatePresign({
           ...liveObservation,
-          cap,
+          cap: cap ?? 0n,
           payeeHasTokenAccount: payeeFieldReady(payeeText) ? liveObservation.payeeHasTokenAccount : null,
         })
       : [];
+  const needsRetry = !liveObservation || checks.some(
+    (check) => !check.ok && (check.id !== 'payee' || payeeFieldReady(payeeText)),
+  );
+  useEffect(() => {
+    if (!focused || refreshing || !needsRetry || !chain.config || !wallet.ownerPublicKey || !mintText) return;
+    const timer = setInterval(() => { void refreshChecks(); }, 10_000);
+    return () => clearInterval(timer);
+  }, [focused, refreshing, needsRetry, chain.config, wallet.ownerPublicKey, mintText, refreshChecks]);
+
   const showFaucet =
     wallet.ownerPublicKey != null &&
     showDevnetUsdcFaucet({
@@ -525,7 +538,10 @@ function ApprovalCard({
   };
 
   return (
-    <RuleScreen footer={footer}>
+    <RuleScreen
+      footer={footer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshChecks} />}
+    >
       {firstRun ? (
         <ProgressStrip current="approve" done={['learn', 'connect', 'agent']} />
       ) : (
@@ -678,28 +694,37 @@ function ApprovalCard({
           </>
         ) : null}
 
-        <PartyBlock
-          role="Payee"
-          party={payeeParty}
-          revealed={revealed.payee}
-          onReveal={() => setRevealed((prev) => ({ ...prev, payee: !prev.payee }))}
-          onSave={() => {
-            setNaming('payee');
-            setNameDraft('');
-            setNameError(null);
-          }}
-        />
-        {!request ? (
-          <>
-            <Field
-              label="Payee"
-              value={payeeText}
-              onChangeText={setPayeeText}
-              placeholder="scan or paste the payee address"
-            />
-            <AddressActions target="payee" onAddress={setPayeeText} onInvalid={setFormError} />
-          </>
-        ) : null}
+        <View testID="payee-block" style={styles.block}>
+          {request ? <Text style={styles.eyebrow}>Payee</Text> : (
+            <>
+              <Field
+                label="Payee"
+                value={payeeText}
+                onChangeText={setPayeeText}
+                placeholder="scan or paste the payee address"
+              />
+              <AddressActions target="payee" onAddress={setPayeeText} onInvalid={setFormError} />
+            </>
+          )}
+          {payeeParty.savedName ? <Text style={styles.name}>{payeeParty.savedName}</Text> : null}
+          {payeeParty.claim ? <Text style={styles.claim}>{payeeParty.claim}</Text> : null}
+          {payeeCanonical ? (
+            <>
+              <Text selectable style={styles.body}>{payeeCanonical}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Save a name for the payee"
+                onPress={() => {
+                  setNaming('payee');
+                  setNameDraft('');
+                  setNameError(null);
+                }}
+              >
+                <Text style={styles.link}>Save a name</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </View>
 
         {naming && (naming === 'agent' ? agentCanonical : payeeCanonical) ? (
           <View style={styles.block}>

@@ -27,7 +27,7 @@ run_refused() {
 if out="$(run_refused env -u VETO_RPC "$SCRIPT" 2>&1)"; then
   bad "unset VETO_RPC must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_RPC" && [[ -z "$(ls -A "$TMP")" ]]; then
+  if printf '%s' "$out" | grep "missing VETO_RPC" >/dev/null && [[ -z "$(ls -A "$TMP")" ]]; then
     pass "refuses without VETO_RPC"
   else
     bad "unset VETO_RPC message: ${out}"
@@ -37,7 +37,7 @@ fi
 if out="$(run_refused env VETO_RPC= "$SCRIPT" 2>&1)"; then
   bad "empty VETO_RPC must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_RPC"; then
+  if printf '%s' "$out" | grep "missing VETO_RPC" >/dev/null; then
     pass "refuses an empty VETO_RPC"
   else
     bad "empty VETO_RPC message: ${out}"
@@ -47,7 +47,7 @@ fi
 if out="$(run_refused env VETO_RPC=https://api.mainnet-beta.solana.com "$SCRIPT" 2>&1)"; then
   bad "mainnet url must refuse"
 else
-  if printf '%s' "$out" | grep -F -q "refusing to run against mainnet (url=https://api.mainnet-beta.solana.com)"; then
+  if printf '%s' "$out" | grep -F "refusing to run against mainnet (url=https://api.mainnet-beta.solana.com)" >/dev/null; then
     pass "refuses a mainnet url"
   else
     bad "mainnet url message: ${out}"
@@ -61,9 +61,9 @@ if out="$(env VETO_KEYS_DIR="$TMP" VETO_RPC="$keyed" "$SCRIPT" 2>&1)"; then
   bad "mainnet url with an api key must refuse"
 else
   redacted="$(printf '%s' "$out" | sed "s/${secret}/[redacted]/g; s/sentinelKeyMaterial9f3c/[redacted]/g")"
-  if printf '%s' "$out" | grep -q "refusing to run against mainnet" \
-    && ! printf '%s' "$out" | grep -F -q "$secret" \
-    && ! printf '%s' "$out" | grep -F -q "sentinelKeyMaterial9f3c"; then
+  if printf '%s' "$out" | grep "refusing to run against mainnet" >/dev/null \
+    && ! printf '%s' "$out" | grep -F "$secret" >/dev/null \
+    && ! printf '%s' "$out" | grep -F "sentinelKeyMaterial9f3c" >/dev/null; then
     pass "refuses mainnet without printing an api key or a key file"
   else
     bad "mainnet api key message: ${redacted}"
@@ -73,7 +73,7 @@ fi
 if out="$(run_refused env VETO_RPC=https://api.devnet.solana.com SOLANA_CLUSTER=mainnet "$SCRIPT" 2>&1)"; then
   bad "SOLANA_CLUSTER=mainnet must refuse"
 else
-  if printf '%s' "$out" | grep -q "SOLANA_CLUSTER/CLUSTER points at mainnet; refusing to run"; then
+  if printf '%s' "$out" | grep "SOLANA_CLUSTER/CLUSTER points at mainnet; refusing to run" >/dev/null; then
     pass "refuses when SOLANA_CLUSTER names mainnet"
   else
     bad "SOLANA_CLUSTER message: ${out}"
@@ -92,7 +92,7 @@ if out="$(
 )"; then
   bad "testnet url must refuse"
 else
-  if printf '%s' "$out" | grep -q "neither devnet nor local"; then
+  if printf '%s' "$out" | grep "neither devnet nor local" >/dev/null; then
     pass "refuses a url that is neither devnet nor local"
   else
     bad "testnet url message: ${out}"
@@ -118,7 +118,7 @@ fi
 shown="$(display_url "https://devnet.example.test/?api-key=${secret}")"
 path_shown="$(display_url "https://devnet.example.test/${secret}")"
 if [[ "$shown" == "[redacted rpc]" && "$path_shown" == "[redacted rpc]" ]] \
-  && ! printf '%s' "$shown$path_shown" | grep -F -q "$secret"; then
+  && ! printf '%s' "$shown$path_shown" | grep -F "$secret" >/dev/null; then
   pass "display_url redacts an api key"
 else
   bad "display_url redacts an api key"
@@ -250,7 +250,7 @@ else
 fi
 
 # The original lines of a file that already had a trailing newline stay put.
-if [[ "$(printf '%s\n' "$before" | head -n 4)" == "$(head -n 4 "$env_file")" ]]; then
+if [[ "$(printf '%s\n' "$before" | sed -n '1,4p')" == "$(head -n 4 "$env_file")" ]]; then
   pass "leaves MINT and MERCHANT_TOKEN_ACCOUNT untouched"
 else
   bad "leaves MINT and MERCHANT_TOKEN_ACCOUNT untouched"

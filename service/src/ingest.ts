@@ -15,8 +15,9 @@ const whereKey = 'signature = $1 AND instruction_index = $2 AND inner_index = $3
 const counters = ['requests', 'paid', 'outside', 'allowances', 'declines'] as const;
 type Delta = Record<typeof counters[number], string> & { rule: string; agent: string };
 
-async function apply(tx: Tx, delta: Delta, sign: bigint) {
+async function apply(tx: Tx, delta: Delta, sign: bigint, ruleKind: Decision['rule_kind']) {
   for (const [table, key] of [['rule_stats', 'rule'], ['agent_stats', 'agent']] as const) {
+    if (key === 'agent' && ruleKind === 'hold') continue;
     await tx.query(`INSERT INTO ${table} (${key}) VALUES ($1) ON CONFLICT DO NOTHING`, [delta[key]]);
     await tx.query(`UPDATE ${table} SET ${counters.map((c, i) => `${c} = ${c} + $${i + 2}`).join(', ')}, updated_at = now() WHERE ${key} = $1`,
       [delta[key], ...counters.map(c => (BigInt(delta[c]) * sign).toString())]);
@@ -36,7 +37,7 @@ async function recomputeNonce(tx: Tx, rule: string, nonce: string) {
     const previous = (await tx.query(`SELECT * FROM deltas WHERE ${whereKey}`, keys(row))).rows[0] as Delta | undefined;
     const difference = { ...next };
     for (const c of counters) difference[c] = (BigInt(next[c]) - BigInt(previous?.[c] ?? '0')).toString();
-    await apply(tx, difference, 1n);
+    await apply(tx, difference, 1n, row.rule_kind);
     await tx.query(`INSERT INTO deltas (signature, instruction_index, inner_index, rule, agent, ${counters.join(', ')})
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (signature, instruction_index, inner_index)
       DO UPDATE SET ${counters.map(c => `${c} = EXCLUDED.${c}`).join(', ')}`,
@@ -54,7 +55,7 @@ async function bumpExtrema(tx: Tx, key: 'rule' | 'agent', value: string, row: De
     WHERE ${key} = $1`, [value, row.kind, row.block_time, row.slot]);
 }
 
-interface RemovedRow { nonce: string; kind: number; slot: string; block_time: string | Date }
+interface RemovedRow { rule_kind: Decision['rule_kind']; nonce: string; kind: number; slot: string; block_time: string | Date }
 
 async function rescanExtrema(tx: Tx, key: 'rule' | 'agent', value: string, removed: RemovedRow) {
   const table = key === 'rule' ? 'rule_stats' : 'agent_stats';
@@ -62,17 +63,18 @@ async function rescanExtrema(tx: Tx, key: 'rule' | 'agent', value: string, remov
   if (!stats) return;
   const removedTs = new Date(removed.block_time).getTime();
   const assignments: string[] = [];
+  const agentFilter = key === 'agent' ? " AND rule_kind <> 'hold'" : '';
   if (removed.kind === 0 && stats.first_open_ts instanceof Date && stats.first_open_ts.getTime() === removedTs) {
-    assignments.push(`first_open_ts = (SELECT min(block_time) FROM decisions WHERE ${key} = $1 AND kind = 0 AND block_time > '1970-01-01Z')`);
+    assignments.push(`first_open_ts = (SELECT min(block_time) FROM decisions WHERE ${key} = $1${agentFilter} AND kind = 0 AND block_time > '1970-01-01Z')`);
   }
   if (stats.first_ts instanceof Date && stats.first_ts.getTime() === removedTs && removedTs > 0) {
-    assignments.push(`first_ts = (SELECT min(block_time) FROM decisions WHERE ${key} = $1 AND block_time > '1970-01-01Z')`);
+    assignments.push(`first_ts = (SELECT min(block_time) FROM decisions WHERE ${key} = $1${agentFilter} AND block_time > '1970-01-01Z')`);
   }
   if (stats.last_ts instanceof Date && stats.last_ts.getTime() === removedTs) {
-    assignments.push(`last_ts = (SELECT max(block_time) FROM decisions WHERE ${key} = $1)`);
+    assignments.push(`last_ts = (SELECT max(block_time) FROM decisions WHERE ${key} = $1${agentFilter})`);
   }
   if (stats.last_slot !== null && BigInt(stats.last_slot) === BigInt(removed.slot)) {
-    assignments.push(`last_slot = (SELECT max(slot) FROM decisions WHERE ${key} = $1)`);
+    assignments.push(`last_slot = (SELECT max(slot) FROM decisions WHERE ${key} = $1${agentFilter})`);
   }
   await tx.query(`UPDATE ${table} SET ${[...assignments, 'updated_at = now()'].join(', ')} WHERE ${key} = $1`, [value]);
 }
@@ -94,7 +96,7 @@ export async function insertDecision(tx: Tx, row: Decision): Promise<boolean> {
   if (!decision.rowCount) throw new Error('Decision key exists without a newly inserted decision');
   await recomputeNonce(tx, row.rule, row.nonce);
   await bumpExtrema(tx, 'rule', row.rule, row);
-  await bumpExtrema(tx, 'agent', row.agent, row);
+  if (row.rule_kind !== 'hold') await bumpExtrema(tx, 'agent', row.agent, row);
   return true;
 }
 
@@ -106,14 +108,14 @@ export async function reverseDecision(txOrRow: Tx | DecisionKey, row?: DecisionK
   await tx.query('SELECT pg_advisory_xact_lock(762042)');
   const delta = (await tx.query(`SELECT * FROM deltas WHERE ${whereKey}`, keys(row))).rows[0] as Delta | undefined;
   if (!delta) return false;
-  const removed = (await tx.query(`SELECT nonce, kind, slot, block_time FROM decisions WHERE ${whereKey}`, keys(row))).rows[0] as RemovedRow | undefined;
+  const removed = (await tx.query(`SELECT rule_kind, nonce, kind, slot, block_time FROM decisions WHERE ${whereKey}`, keys(row))).rows[0] as RemovedRow | undefined;
   if (!removed) throw new Error('Delta exists without a decision');
-  await apply(tx, delta, -1n);
+  await apply(tx, delta, -1n, removed.rule_kind);
   await tx.query(`DELETE FROM deltas WHERE ${whereKey}`, keys(row));
   await tx.query(`DELETE FROM decisions WHERE ${whereKey}`, keys(row));
   await tx.query(`DELETE FROM decision_keys WHERE ${whereKey}`, keys(row));
   await recomputeNonce(tx, delta.rule, removed.nonce);
   await rescanExtrema(tx, 'rule', delta.rule, removed);
-  await rescanExtrema(tx, 'agent', delta.agent, removed);
+  if (removed.rule_kind !== 'hold') await rescanExtrema(tx, 'agent', delta.agent, removed);
   return true;
 }

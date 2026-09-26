@@ -123,6 +123,7 @@ async function processAt(at: Date): Promise<ProcessResult> {
       submit,
       kwhMilli: cfg.kwhMilli,
       mintDecimals: cfg.mintDecimals,
+      calibration: cfg.calibration,
       quoteCurrency: cfg.quoteCurrency,
       fx,
       reader: {
@@ -153,6 +154,7 @@ async function processDue(now: Date, announceIdle = false): Promise<boolean> {
         submit,
         kwhMilli: cfg.kwhMilli,
         mintDecimals: cfg.mintDecimals,
+        calibration: cfg.calibration,
         quoteCurrency: cfg.quoteCurrency,
         fx,
         reader: {

@@ -46,7 +46,7 @@ fake_key "$KEY"
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" "$SCRIPT" --check 2>&1)"; then
   bad "missing AGENT_KEY_PATH must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing AGENT_KEY_PATH"; then
+  if printf '%s' "$out" | grep "missing AGENT_KEY_PATH" >/dev/null; then
     pass "missing AGENT_KEY_PATH refuses before any deploy"
   else
     bad "missing AGENT_KEY_PATH message: ${out}"
@@ -56,7 +56,7 @@ fi
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="${DIR}/no-such.json" "${IDENTITIES[@]}" "$SCRIPT" --check 2>&1)"; then
   bad "missing agent key file must refuse"
 else
-  if printf '%s' "$out" | grep -q "agent key file not found"; then
+  if printf '%s' "$out" | grep "agent key file not found" >/dev/null; then
     pass "missing agent key file refuses before any deploy"
   else
     bad "missing agent key file message: ${out}"
@@ -67,8 +67,8 @@ printf '%s\n' '{"not":"a keypair"}' > "${DIR}/bad.json"
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="${DIR}/bad.json" "${IDENTITIES[@]}" "$SCRIPT" --check 2>&1)"; then
   bad "invalid agent key file must refuse"
 else
-  if printf '%s' "$out" | grep -q "not a JSON keypair array" \
-    && ! printf '%s' "$out" | grep -q 'not":"a keypair'; then
+  if printf '%s' "$out" | grep "not a JSON keypair array" >/dev/null \
+    && ! printf '%s' "$out" | grep 'not":"a keypair' >/dev/null; then
     pass "invalid agent key file refuses without printing the file"
   else
     bad "invalid agent key file message: ${out}"
@@ -78,7 +78,7 @@ fi
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" VETO_PROGRAM_ID=Prog VETO_MINT=Mint VETO_OWNER=Owner VETO_OWNER_TOKEN=OwnerToken VETO_MERCHANT=Merchant VETO_MERCHANT_TOKEN=MerchantToken VETO_AGENT=Agent "$SCRIPT" --check 2>&1)"; then
   bad "missing VETO_RPC must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_RPC"; then
+  if printf '%s' "$out" | grep "missing VETO_RPC" >/dev/null; then
     pass "missing VETO_RPC refuses before any deploy"
   else
     bad "missing VETO_RPC message: ${out}"
@@ -88,7 +88,7 @@ fi
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" BUCKET="" "${IDENTITIES[@]}" "$SCRIPT" --check 2>&1)"; then
   bad "missing BUCKET must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing BUCKET"; then
+  if printf '%s' "$out" | grep "missing BUCKET" >/dev/null; then
     pass "missing BUCKET refuses before any deploy"
   else
     bad "missing BUCKET message: ${out}"
@@ -96,7 +96,7 @@ else
 fi
 
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" "${IDENTITIES[@]}" "$SCRIPT" --check 2>&1)"; then
-  if printf '%s' "$out" | grep -q "check ok"; then
+  if printf '%s' "$out" | grep "check ok" >/dev/null; then
     pass "check succeeds when every required input is present"
   else
     bad "check success message: ${out}"
@@ -107,7 +107,7 @@ fi
 
 if out1="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" "${IDENTITIES[@]}" "$SCRIPT" --check 2>&1)" \
   && out2="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" "${IDENTITIES[@]}" "$SCRIPT" --check 2>&1)"; then
-  if printf '%s' "$out1" | grep -q "check ok" && printf '%s' "$out2" | grep -q "check ok"; then
+  if printf '%s' "$out1" | grep "check ok" >/dev/null && printf '%s' "$out2" | grep "check ok" >/dev/null; then
     pass "check is safe to run twice"
   else
     bad "second check output: ${out2}"
@@ -131,7 +131,7 @@ fi
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" VETO_RPC=http://rpc.test VETO_MINT=Mint VETO_OWNER=Owner VETO_OWNER_TOKEN=OwnerToken VETO_MERCHANT=Merchant VETO_MERCHANT_TOKEN=MerchantToken VETO_AGENT=Agent "$SCRIPT" --check 2>&1)"; then
   bad "missing VETO_PROGRAM_ID must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_PROGRAM_ID"; then
+  if printf '%s' "$out" | grep "missing VETO_PROGRAM_ID" >/dev/null; then
     pass "missing VETO_PROGRAM_ID refuses before any deploy"
   else
     bad "missing VETO_PROGRAM_ID message: ${out}"
@@ -141,7 +141,7 @@ fi
 if out="$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" AGENT_KEY_PATH="$KEY" VETO_RPC=http://rpc.test VETO_PROGRAM_ID=Prog VETO_OWNER=Owner VETO_OWNER_TOKEN=OwnerToken VETO_MERCHANT=Merchant VETO_MERCHANT_TOKEN=MerchantToken VETO_AGENT=Agent "$SCRIPT" --check 2>&1)"; then
   bad "missing VETO_MINT must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_MINT"; then
+  if printf '%s' "$out" | grep "missing VETO_MINT" >/dev/null; then
     pass "missing VETO_MINT refuses before any deploy"
   else
     bad "missing VETO_MINT message: ${out}"
@@ -180,10 +180,10 @@ DRY_ENV=(
 )
 if out1="$("${DRY_ENV[@]}" "$SCRIPT" --dry-run 2>&1)" \
   && out2="$("${DRY_ENV[@]}" "$SCRIPT" --dry-run 2>&1)"; then
-  if printf '%s\n' "$out1" "$out2" | grep -qE 'storage rm|buckets delete|secrets delete|jobs delete' ; then
+  if printf '%s\n' "$out1" "$out2" | grep -E 'storage rm|buckets delete|secrets delete|jobs delete' >/dev/null ; then
     bad "dry-run twice must not delete the journal, secret, or jobs"
-  elif printf '%s' "$out1" | grep -q 'dry-run:' && printf '%s' "$out2" | grep -q 'dry-run:'; then
-    if printf '%s' "$out1$out2" | grep -q '\[0, 0, 0'; then
+  elif printf '%s' "$out1" | grep 'dry-run:' >/dev/null && printf '%s' "$out2" | grep 'dry-run:' >/dev/null; then
+    if printf '%s' "$out1$out2" | grep '\[0, 0, 0' >/dev/null; then
       bad "dry-run printed key bytes"
     else
       pass "dry-run twice is safe (no delete, no key bytes)"
@@ -192,14 +192,14 @@ if out1="$("${DRY_ENV[@]}" "$SCRIPT" --dry-run 2>&1)" \
     bad "dry-run twice output missing dry-run prefix: ${out2}"
   fi
 else
-  if printf '%s' "${out1-}${out2-}" | grep -q 'env_file: unbound variable'; then
+  if printf '%s' "${out1-}${out2-}" | grep 'env_file: unbound variable' >/dev/null; then
     bad "EXIT trap references local env_file after deploy returns; script exits 1 after printing deployed"
   else
     bad "dry-run twice must succeed: ${out1-}${out2-}"
   fi
 fi
 
-if printf '%s' "$out1" | grep -q "storage cp" && printf '%s' "$out1" | grep -q "decisions.jsonl"; then
+if printf '%s' "$out1" | grep "storage cp" >/dev/null && printf '%s' "$out1" | grep "decisions.jsonl" >/dev/null; then
   bad "dry-run with an existing journal object must not upload a replacement"
 else
   pass "dry-run does not wipe an existing journal object"
@@ -335,8 +335,8 @@ write_mode_gcloud
 if out="$(run_deploy default-can-read --dry-run 2>&1)"; then
   bad "default compute account with secretAccessor must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' \
-    && printf '%s' "$out" | grep -q 'found: roles/secretmanager.secretAccessor on project policy'; then
+  if printf '%s' "$out" | grep 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' >/dev/null \
+    && printf '%s' "$out" | grep 'found: roles/secretmanager.secretAccessor on project policy' >/dev/null; then
     if grep -E 'secrets create|secrets versions add' "$FAKE_LOG"; then
       bad "default compute secretAccessor must stop before secrets create/add; gcloud log still has a secret write"
     else
@@ -350,8 +350,8 @@ fi
 if out="$(run_deploy default-can-read-secret --dry-run 2>&1)"; then
   bad "default compute account with secret-level secretAccessor must stop deploy"
 else
-  if printf '%s' "$out" | grep -q 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' \
-    && printf '%s' "$out" | grep -q 'found: roles/secretmanager.secretAccessor on secret veto-agent-keypair policy'; then
+  if printf '%s' "$out" | grep 'default compute account 123456789-compute@developer.gserviceaccount.com can read a secret version' >/dev/null \
+    && printf '%s' "$out" | grep 'found: roles/secretmanager.secretAccessor on secret veto-agent-keypair policy' >/dev/null; then
     if grep -E 'secrets create|secrets versions add' "$FAKE_LOG"; then
       bad "secret-level secretAccessor must stop before secrets create/add; gcloud log still has a secret write"
     else
@@ -365,7 +365,7 @@ fi
 if out="$(run_deploy pap-update-fail 2>&1)"; then
   bad "existing bucket that cannot take public access prevention must fail"
 else
-  if printf '%s' "$out" | grep -q 'could not set public access prevention to enforced'; then
+  if printf '%s' "$out" | grep 'could not set public access prevention to enforced' >/dev/null; then
     if grep -E 'secrets create|secrets versions add' "$FAKE_LOG"; then
       bad "PAP failure must happen before the secret is created"
     else
@@ -379,7 +379,7 @@ fi
 if out="$(run_deploy pap-not-enforced 2>&1)"; then
   bad "bucket whose public access prevention stays inherited must fail"
 else
-  if printf '%s' "$out" | grep -q "public access prevention on gs://veto-watcher-260921-journal is 'inherited', wanted enforced"; then
+  if printf '%s' "$out" | grep "public access prevention on gs://veto-watcher-260921-journal is 'inherited', wanted enforced" >/dev/null; then
     pass "bucket that does not report PAP enforced fails"
   else
     bad "PAP not-enforced message: ${out}"
@@ -389,8 +389,8 @@ fi
 if out="$(run_deploy pap-create-fail 2>&1)"; then
   bad "create that cannot set public access prevention must fail"
 else
-  if printf '%s' "$out" | grep -q 'could not create gs://veto-watcher-260921-journal with public access prevention enforced' \
-    || printf '%s' "$out" | grep -q 'could not set public access prevention to enforced'; then
+  if printf '%s' "$out" | grep 'could not create gs://veto-watcher-260921-journal with public access prevention enforced' >/dev/null \
+    || printf '%s' "$out" | grep 'could not set public access prevention to enforced' >/dev/null; then
     pass "create that cannot set public access prevention fails"
   else
     bad "PAP create failure message: ${out}"
@@ -398,8 +398,8 @@ else
 fi
 
 if out="$(run_deploy bucket-missing --dry-run 2>&1)"; then
-  if printf '%s' "$out" | grep -q 'storage buckets create' \
-    && printf '%s' "$out" | grep -q 'public-access-prevention'; then
+  if printf '%s' "$out" | grep 'storage buckets create' >/dev/null \
+    && printf '%s' "$out" | grep 'public-access-prevention' >/dev/null; then
     pass "bucket create includes public access prevention"
   else
     bad "dry-run create missing --public-access-prevention: ${out}"
@@ -443,14 +443,14 @@ quote_env_body() {
 }
 
 unset_body="$(quote_env_body)"
-if printf '%s\n' "$unset_body" | grep -q 'VETO_QUOTE_CURRENCY'; then
+if printf '%s\n' "$unset_body" | grep 'VETO_QUOTE_CURRENCY' >/dev/null; then
   bad "unset VETO_QUOTE_CURRENCY must not be written into the job env file"
 else
   pass "unset VETO_QUOTE_CURRENCY is omitted from the job env file"
 fi
 
 usd_body="$(quote_env_body USD)"
-if printf '%s\n' "$usd_body" | grep -qx 'VETO_QUOTE_CURRENCY: "USD"'; then
+if printf '%s\n' "$usd_body" | grep -x 'VETO_QUOTE_CURRENCY: "USD"' >/dev/null; then
   pass "VETO_QUOTE_CURRENCY=USD is written into the job env file"
 else
   bad "USD env file missing the quote currency line: ${usd_body}"

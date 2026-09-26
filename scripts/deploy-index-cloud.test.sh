@@ -215,7 +215,7 @@ run_full() {
 if out="$(run_script existing --check 2>&1)"; then
   bad "missing PROJECT must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing PROJECT"; then
+  if printf '%s' "$out" | grep "missing PROJECT" >/dev/null; then
     pass "missing PROJECT refuses; the project has no default"
   else
     bad "missing PROJECT message: ${out}"
@@ -225,7 +225,7 @@ fi
 if out="$(env -i PATH="${FAKE_BIN}:${PATH}" HOME="${DIR}" PROJECT=test-project INDEX_WEBHOOK_AUTH=test-auth-header-SECRETVALUE VETO_RPC=https://rpc.test/SECRETKEY123 "$SCRIPT" --check 2>&1)"; then
   bad "missing REGION must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing REGION"; then
+  if printf '%s' "$out" | grep "missing REGION" >/dev/null; then
     pass "missing REGION refuses; the region has no default"
   else
     bad "missing REGION message: ${out}"
@@ -235,7 +235,7 @@ fi
 if out="$(FAKE_GIT_MODE=dirty run_full existing --check 2>&1)"; then
   bad "dirty working tree must refuse"
 else
-  if printf '%s' "$out" | grep -qi "working tree"; then
+  if printf '%s' "$out" | grep -i "working tree" >/dev/null; then
     pass "dirty working tree refuses before any deploy"
   else
     bad "dirty working tree message: ${out}"
@@ -245,7 +245,7 @@ fi
 if out="$(env -i PATH="${FAKE_BIN}:${PATH}" HOME="${DIR}" PROJECT=test-project REGION=test-region VETO_RPC=https://rpc.test/SECRETKEY123 "$SCRIPT" --check 2>&1)"; then
   bad "missing INDEX_WEBHOOK_AUTH must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing INDEX_WEBHOOK_AUTH"; then
+  if printf '%s' "$out" | grep "missing INDEX_WEBHOOK_AUTH" >/dev/null; then
     pass "missing INDEX_WEBHOOK_AUTH refuses before any deploy"
   else
     bad "missing INDEX_WEBHOOK_AUTH message: ${out}"
@@ -255,7 +255,7 @@ fi
 if out="$(env -i PATH="${FAKE_BIN}:${PATH}" HOME="${DIR}" PROJECT=test-project REGION=test-region INDEX_WEBHOOK_AUTH=test-auth-header-SECRETVALUE "$SCRIPT" --check 2>&1)"; then
   bad "missing VETO_RPC must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_RPC"; then
+  if printf '%s' "$out" | grep "missing VETO_RPC" >/dev/null; then
     pass "missing VETO_RPC refuses before any deploy"
   else
     bad "missing VETO_RPC message: ${out}"
@@ -263,7 +263,7 @@ else
 fi
 
 if out="$(run_full existing --check 2>&1)"; then
-  if printf '%s' "$out" | grep -q "check ok"; then
+  if printf '%s' "$out" | grep "check ok" >/dev/null; then
     pass "check succeeds when every required input is present"
   else
     bad "check success message: ${out}"
@@ -273,7 +273,7 @@ else
 fi
 
 if out1="$(run_full existing --check 2>&1)" && out2="$(run_full existing --check 2>&1)"; then
-  if printf '%s' "$out1" | grep -q "check ok" && printf '%s' "$out2" | grep -q "check ok"; then
+  if printf '%s' "$out1" | grep "check ok" >/dev/null && printf '%s' "$out2" | grep "check ok" >/dev/null; then
     pass "check is safe to run twice"
   else
     bad "second check output: ${out2}"
@@ -292,7 +292,7 @@ fi
 
 : >"$FAKE_LOG"
 if out="$(run_full fresh --dry-run 2>&1)"; then
-  if printf '%s' "$out" | grep -q 'dry-run:'; then
+  if printf '%s' "$out" | grep 'dry-run:' >/dev/null; then
     pass "dry-run prints planned commands"
   else
     bad "dry-run output missing dry-run prefix: ${out}"
@@ -303,31 +303,31 @@ fi
 
 dry="$(run_full fresh --dry-run 2>&1)"
 
-if printf '%s' "$dry" | grep -F 'sql instances create' | grep -q 'POSTGRES_16' \
-  && printf '%s' "$dry" | grep -F 'sql instances create' | grep -q 'db-f1-micro'; then
+if printf '%s' "$dry" | grep -F 'sql instances create' | grep 'POSTGRES_16' >/dev/null \
+  && printf '%s' "$dry" | grep -F 'sql instances create' | grep 'db-f1-micro' >/dev/null; then
   pass "dry-run plans a Postgres 16 instance on the smallest tier"
 else
   bad "dry-run missing Postgres 16 instance create: ${dry}"
 fi
 
-if printf '%s' "$dry" | grep -F 'sql users create' | grep -qE -- '--password=\\\*\\\*\\\*' \
-  && ! printf '%s' "$dry" | grep -E -- '--password=[0-9a-f]' | grep -q .; then
+if printf '%s' "$dry" | grep -F 'sql users create' | grep -E -- '--password=\\\*\\\*\\\*' >/dev/null \
+  && ! printf '%s' "$dry" | grep -E -- '--password=[0-9a-f]' | grep . >/dev/null; then
   pass "dry-run masks the generated database password"
 else
   bad "dry-run leaks the database password: $(printf '%s' "$dry" | grep -F 'sql users create')"
 fi
 
-if printf '%s' "$dry" | grep -q 'SECRETVALUE' \
-  || printf '%s' "$dry" | grep -q 'SECRETKEY123' \
-  || printf '%s' "$dry" | grep -q 'postgresql://'; then
+if printf '%s' "$dry" | grep 'SECRETVALUE' >/dev/null \
+  || printf '%s' "$dry" | grep 'SECRETKEY123' >/dev/null \
+  || printf '%s' "$dry" | grep 'postgresql://' >/dev/null; then
   bad "dry-run printed a secret value"
 else
   pass "dry-run never prints the webhook auth, RPC URL, or database URL"
 fi
 
-migrate_line="$(printf '%s' "$dry" | grep -nF 'run jobs execute' | head -1 | cut -d: -f1)"
-api_line="$(printf '%s' "$dry" | grep -nF 'run deploy veto-index ' | head -1 | cut -d: -f1)"
-migrate_deploy_line="$(printf '%s' "$dry" | grep -nF 'run jobs deploy veto-index-migrate' | head -1 | cut -d: -f1)"
+migrate_line="$(printf '%s' "$dry" | grep -nF 'run jobs execute' | sed -n '1p' | cut -d: -f1)"
+api_line="$(printf '%s' "$dry" | grep -nF 'run deploy veto-index ' | sed -n '1p' | cut -d: -f1)"
+migrate_deploy_line="$(printf '%s' "$dry" | grep -nF 'run jobs deploy veto-index-migrate' | sed -n '1p' | cut -d: -f1)"
 if [[ -n "$migrate_deploy_line" && -n "$migrate_line" && -n "$api_line" ]] \
   && [[ "$migrate_deploy_line" -lt "$migrate_line" && "$migrate_line" -lt "$api_line" ]]; then
   pass "migrations job is deployed and executed before the new revision serves"
@@ -335,47 +335,47 @@ else
   bad "migration ordering wrong: deploy=${migrate_deploy_line:-none} execute=${migrate_line:-none} api=${api_line:-none}"
 fi
 
-api_deploy="$(printf '%s' "$dry" | grep -F 'run deploy veto-index ' | head -1)"
-if printf '%s' "$api_deploy" | grep -q 'min-instances=1' \
-  && printf '%s' "$api_deploy" | grep -q 'add-cloudsql-instances' \
-  && printf '%s' "$api_deploy" | grep -q 'DATABASE_URL=veto-index-database-url:latest' \
-  && printf '%s' "$api_deploy" | grep -q 'VETO_RPC=veto-index-rpc-url:latest' \
-  && printf '%s' "$api_deploy" | grep -q 'service-account=veto-index@test-project.iam.gserviceaccount.com' \
-  && printf '%s' "$api_deploy" | grep -q 'allow-unauthenticated'; then
+api_deploy="$(printf '%s' "$dry" | grep -F 'run deploy veto-index ' | sed -n '1p')"
+if printf '%s' "$api_deploy" | grep 'min-instances=1' >/dev/null \
+  && printf '%s' "$api_deploy" | grep 'add-cloudsql-instances' >/dev/null \
+  && printf '%s' "$api_deploy" | grep 'DATABASE_URL=veto-index-database-url:latest' >/dev/null \
+  && printf '%s' "$api_deploy" | grep 'VETO_RPC=veto-index-rpc-url:latest' >/dev/null \
+  && printf '%s' "$api_deploy" | grep 'service-account=veto-index@test-project.iam.gserviceaccount.com' >/dev/null \
+  && printf '%s' "$api_deploy" | grep 'allow-unauthenticated' >/dev/null; then
   pass "API service deploys with min instances 1, connector, secrets, and its own account"
 else
   bad "API service deploy line wrong: ${api_deploy}"
 fi
 
-webhook_deploy="$(printf '%s' "$dry" | grep -F 'run deploy veto-index-webhook' | head -1)"
-if printf '%s' "$webhook_deploy" | grep -q 'INDEX_WEBHOOK_AUTH=veto-index-webhook-auth:latest' \
-  && printf '%s' "$webhook_deploy" | grep -q 'add-cloudsql-instances'; then
+webhook_deploy="$(printf '%s' "$dry" | grep -F 'run deploy veto-index-webhook' | sed -n '1p')"
+if printf '%s' "$webhook_deploy" | grep 'INDEX_WEBHOOK_AUTH=veto-index-webhook-auth:latest' >/dev/null \
+  && printf '%s' "$webhook_deploy" | grep 'add-cloudsql-instances' >/dev/null; then
   pass "webhook service carries the webhook auth secret and the connector"
 else
   bad "webhook service deploy line wrong: ${webhook_deploy}"
 fi
 
-if printf '%s' "$dry" | grep -qF 'run jobs deploy veto-index-backfill' \
-  && printf '%s' "$dry" | grep -q 'scheduler jobs create http'; then
+if printf '%s' "$dry" | grep -F 'run jobs deploy veto-index-backfill' >/dev/null \
+  && printf '%s' "$dry" | grep 'scheduler jobs create http' >/dev/null; then
   pass "backfill job and its schedule are planned"
 else
   bad "backfill job or scheduler missing from dry-run: ${dry}"
 fi
 
-if printf '%s' "$dry" | grep -q '/v1/health'; then
+if printf '%s' "$dry" | grep '/v1/health' >/dev/null; then
   pass "dry-run plans the smoke check against /v1/health"
 else
   bad "dry-run does not mention the smoke check: ${dry}"
 fi
 
-if printf '%s' "$dry" | grep -q 'service/Dockerfile'; then
+if printf '%s' "$dry" | grep 'service/Dockerfile' >/dev/null; then
   pass "image build uses service/Dockerfile"
 else
   bad "dry-run build does not reference service/Dockerfile: ${dry}"
 fi
 
 if out1="$(run_full fresh --dry-run 2>&1)" && out2="$(run_full fresh --dry-run 2>&1)"; then
-  if printf '%s\n' "$out1" "$out2" | grep -qE 'instances delete|services delete|jobs delete|secrets delete|databases delete|repositories delete'; then
+  if printf '%s\n' "$out1" "$out2" | grep -E 'instances delete|services delete|jobs delete|secrets delete|databases delete|repositories delete' >/dev/null; then
     bad "dry-run twice must not delete anything"
   else
     pass "dry-run twice is safe (no deletes)"
@@ -386,7 +386,7 @@ fi
 
 : >"$FAKE_LOG"; : >"$CURL_LOG"
 if out="$(run_full existing 2>&1)"; then
-  if printf '%s' "$out" | grep -q 'smoke check ok' && printf '%s' "$out" | grep -q 'deployed'; then
+  if printf '%s' "$out" | grep 'smoke check ok' >/dev/null && printf '%s' "$out" | grep 'deployed' >/dev/null; then
     pass "deploy against existing resources succeeds and smoke checks"
   else
     bad "deploy output missing smoke or deployed: ${out}"
@@ -395,8 +395,8 @@ else
   bad "deploy against existing resources should succeed: ${out}"
 fi
 
-exec_line="$(grep -nF 'run jobs execute' "$FAKE_LOG" | head -1 | cut -d: -f1 || true)"
-svc_line="$(grep -nF 'run deploy veto-index ' "$FAKE_LOG" | head -1 | cut -d: -f1 || true)"
+exec_line="$(grep -nF 'run jobs execute' "$FAKE_LOG" | sed -n '1p' | cut -d: -f1 || true)"
+svc_line="$(grep -nF 'run deploy veto-index ' "$FAKE_LOG" | sed -n '1p' | cut -d: -f1 || true)"
 if [[ -n "$exec_line" && -n "$svc_line" && "$exec_line" -lt "$svc_line" ]]; then
   pass "migrations execute before the new revision is deployed"
 else
@@ -421,7 +421,7 @@ if out="$(run_full migrate-fail 2>&1)"; then
 else
   if grep -qF 'run deploy' "$FAKE_LOG"; then
     bad "services were deployed even though migrations failed"
-  elif printf '%s' "$out" | grep -qi 'migrat'; then
+  elif printf '%s' "$out" | grep -i 'migrat' >/dev/null; then
     pass "failed migrations stop the deploy before any service update"
   else
     bad "migration failure message: ${out}"
@@ -431,7 +431,7 @@ fi
 if out="$(FAKE_CURL_MODE=fail run_full existing 2>&1)"; then
   bad "a failed smoke check must fail the deploy"
 else
-  if printf '%s' "$out" | grep -q 'smoke check failed'; then
+  if printf '%s' "$out" | grep 'smoke check failed' >/dev/null; then
     pass "smoke check failure fails the deploy"
   else
     bad "smoke failure message: ${out}"
@@ -441,7 +441,7 @@ fi
 if out="$(run_full user-no-secret 2>&1)"; then
   bad "database user without a database-url secret must refuse"
 else
-  if printf '%s' "$out" | grep -q 'veto-index-database-url'; then
+  if printf '%s' "$out" | grep 'veto-index-database-url' >/dev/null; then
     pass "database user without the database-url secret refuses to guess"
   else
     bad "user-without-secret message: ${out}"

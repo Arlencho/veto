@@ -2,15 +2,15 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProgressStrip } from '../components/backglass/ProgressStrip';
 import { ClusterPill } from '../components/daily/ClusterPill';
 import { ScanFrame } from '../components/daily/ScanFrame';
+import { Field } from '../components/Field';
 import { RuleScreen } from '../components/RuleScreen';
 import { TopBar } from '../components/TopBar';
 import { colors, fonts, radii, space } from '../components/theme';
-import { readScannedText, ruleRequestHref } from '../lib/ruleRequest';
+import { canonicalAddress, readScannedText, ruleRequestHref } from '../lib/ruleRequest';
 import { stageAddressScan, stageWriteRule, type AddressScanTarget } from '../lib/scanHandoff';
 import { useWallet } from '../lib/useWallet';
 
@@ -20,12 +20,62 @@ export default function ScanScreen() {
   const wallet = useWallet();
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState<string | null>(null);
+  const [paste, setPaste] = useState('');
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const [torch, setTorch] = useState(false);
   const handled = useRef(false);
   const target: AddressScanTarget | 'request' =
     params.target === 'agent' || params.target === 'payee' ? params.target : 'request';
   const cluster = wallet.cluster ?? undefined;
   const requestScan = target === 'request';
+
+  function returnAddress(field: AddressScanTarget, address: string) {
+    // Resume the existing draft, including its agent and first-run state.
+    // A single address is a field edit, never a rule request.
+    stageAddressScan(field, address);
+    router.back();
+  }
+
+  const fallback = target === 'payee' ? (
+    <View style={styles.paste}>
+      <Field
+        label="Payee address"
+        value={paste}
+        onChangeText={(text) => {
+          setPaste(text);
+          setPasteError(null);
+        }}
+        placeholder="Paste the payee address"
+      />
+      {pasteError ? <Text accessibilityRole="alert" style={styles.error}>{pasteError}</Text> : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Use payee address"
+        style={styles.ghost}
+        onPress={() => {
+          if (handled.current) return;
+          const address = canonicalAddress(paste.trim());
+          if (!address) {
+            setPasteError('Enter a valid payee address.');
+            return;
+          }
+          handled.current = true;
+          returnAddress('payee', address);
+        }}
+      >
+        <Text style={styles.ghostText}>Use payee address</Text>
+      </Pressable>
+    </View>
+  ) : (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="No code? Write the rule yourself"
+      onPress={() => router.push('/rule/new')}
+      style={styles.ghost}
+    >
+      <Text style={styles.ghostText}>No code? Write the rule yourself</Text>
+    </Pressable>
+  );
 
   if (!permission) {
     return (
@@ -36,6 +86,7 @@ export default function ScanScreen() {
           accessory={cluster ? <ClusterPill cluster={cluster} /> : null}
         />
         <Text style={styles.body}>Checking the camera.</Text>
+        {target === 'payee' ? fallback : null}
       </RuleScreen>
     );
   }
@@ -71,20 +122,13 @@ export default function ScanScreen() {
             </Pressable>
           ) : null}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="No code? Write the rule yourself"
-          onPress={() => router.push('/rule/new')}
-          style={styles.ghost}
-        >
-          <Text style={styles.ghostText}>No code? Write the rule yourself</Text>
-        </Pressable>
+        {fallback}
       </RuleScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <RuleScreen>
       <View style={styles.header}>
         <TopBar
           back="Close"
@@ -104,7 +148,7 @@ export default function ScanScreen() {
               }
               handled.current = true;
               const read = readScannedText(result.data);
-              if (read.kind === 'request') {
+              if (read.kind === 'request' && target !== 'payee') {
                 const href = ruleRequestHref(read.url);
                 if (href) {
                   router.replace(href as Href);
@@ -117,8 +161,7 @@ export default function ScanScreen() {
                   router.replace('/rule/new' as Href);
                   return;
                 }
-                stageAddressScan(target, read.address);
-                router.back();
+                returnAddress(target, read.address);
                 return;
               }
               setError(
@@ -149,33 +192,25 @@ export default function ScanScreen() {
             : "Point the camera at your agent's rule request code."}
         </Text>
         <Text style={styles.body}>
-          Your agent shows the code where it runs. It holds the rule your agent asks for. You still
-          check and approve it on the next screen.
+          {target === 'payee'
+            ? 'Scan the payee address or paste it below to return to your rule.'
+            : 'Your agent shows the code where it runs. It holds the rule your agent asks for. You still check and approve it on the next screen.'}
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="No code? Write the rule yourself"
-          onPress={() => router.push('/rule/new')}
-          style={styles.ghost}
-        >
-          <Text style={styles.ghostText}>No code? Write the rule yourself</Text>
-        </Pressable>
+        {fallback}
         <Text style={styles.footer}>
           Scanning moves no money. You approve the rule yourself, in Seed Vault.
         </Text>
       </View>
-    </SafeAreaView>
+    </RuleScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
+  paste: {
+    gap: space.md,
   },
   header: {
-    paddingHorizontal: space.screen,
     paddingTop: space.xxxl,
     gap: space.xl,
   },

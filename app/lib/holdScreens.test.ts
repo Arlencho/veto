@@ -348,7 +348,7 @@ test('a held withdrawal shows the chain countdown and Stop as the main action', 
       waitLabel: '2 days',
       countdown,
       untilLabel: 'Sun 27 Sep, 14:12, unless stopped. Blockchain clock.',
-      reasons: ['1,000 is over your 50 a day', 'New address', '100% of your vault'],
+      reasons: ['1,000 test tokens is over your 50 test tokens a day', 'New address', '100% of your vault'],
       toldLine: 'Both phones were told at 14:12. Reminders follow at 1 hour, at 12 hours, every 12 hours, then 6 hours and 1 hour before it goes.',
       dailyLabel: '50',
       onClose() {},
@@ -363,7 +363,7 @@ test('a held withdrawal shows the chain countdown and Stop as the main action', 
   assert.match(text, /1,000 test tokens/);
   assert.match(text, /8xQf\.\.\.Tz9A/);
   assert.match(text, /Blockchain clock/);
-  assert.match(text, /1,000 is over your 50 a day/);
+  assert.match(text, /1,000 test tokens is over your 50 test tokens a day/);
   assert.match(text, /New address/);
   assert.match(text, /100% of your vault/);
   assert.ok(
@@ -1084,33 +1084,17 @@ test('safe wallet setup requires entry, refuses the guardian, and reviews the fu
   await act(async () => root.unmount());
 });
 
-test('owner recovery needs explicit confirmation and editing clears consent and review', async () => {
+test('owner recovery is refused without offering a risk override', async () => {
   const { GuardianScreen } = await import('../components/hold/GuardianScreen');
   const owner = Keypair.generate().publicKey.toBase58();
-  const guardian = Keypair.generate().publicKey.toBase58();
-  let accepted: boolean | undefined;
-  function Setup() {
-    const [address, setAddress] = useState(owner);
-    return createElement(GuardianScreen, {
-      network: 'Devnet', status: 'ready', owner, phoneKey: null, days: 2,
-      mode: 'seeker', guardianText: guardian, safeText: address,
-      onMode() {}, onGuardian() {}, onSafe: setAddress, onBack() {},
-      onSign: async (confirmed) => { accepted = confirmed; },
-    });
-  }
-  const root = await mount(createElement(Setup));
-  assert.match(textOf(root), /stolen owner key would also reach the safe address/);
+  const root = await mount(createElement(GuardianScreen, {
+    network: 'Devnet', status: 'ready', owner, phoneKey: null, days: 2,
+    mode: 'seeker', guardianText: Keypair.generate().publicKey.toBase58(), safeText: owner,
+    onMode() {}, onGuardian() {}, onSafe() {}, onBack() {}, onSign: async () => {},
+  }));
+  assert.match(textOf(root), /Your safe address must be a different wallet from the one you sign with\./);
   assert.equal(pressable(root, 'Review safe address').props.disabled, true);
-  await act(async () => pressable(root, 'I accept the owner wallet recovery risk').props.onPress());
-  await act(async () => pressable(root, 'Review safe address').props.onPress());
-  assert.ok(textOf(root).includes(owner));
-  await act(async () => pressable(root, 'Press and hold to sign').props.onLongPress());
-  assert.equal(accepted, true);
-  const input = () => root.root.findAll((n) => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Safe address')[0];
-  await act(async () => input().props.onChangeText(''));
-  await act(async () => input().props.onChangeText(owner));
-  assert.equal(pressable(root, 'Review safe address').props.disabled, true);
-  assert.doesNotMatch(textOf(root), /Confirm your safe address/);
+  assert.doesNotMatch(textOf(root), /accept the owner wallet recovery risk|Confirm your safe address/);
   await act(async () => root.unmount());
 });
 

@@ -221,6 +221,33 @@ export function heldReasonChips(args: {
   return lines;
 }
 
+export const HOLD_GONE_FALLBACK =
+  'This withdrawal is no longer waiting. Nothing moves unless another request is held.';
+
+/**
+ * Empty-state line for the held screen when the withdrawal is gone. The chain
+ * record for a stop does not say which key stopped it, so the stopped line
+ * stays neutral.
+ */
+export function heldGoneCopy(
+  entries: readonly { withdrawalId: bigint; kind: number }[],
+  idText: string,
+): string {
+  if (!idText) return HOLD_GONE_FALLBACK;
+  let id: bigint;
+  try {
+    id = BigInt(idText);
+  } catch {
+    return HOLD_GONE_FALLBACK;
+  }
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i];
+    if (!entry || entry.withdrawalId !== id) continue;
+    return entry.kind === HOLD_KIND_STOPPED ? 'Stopped. Nothing left the vault.' : HOLD_GONE_FALLBACK;
+  }
+  return HOLD_GONE_FALLBACK;
+}
+
 export function secondSeedVaultAccount(owner: string, accounts: readonly string[]): string | null {
   for (const account of accounts) {
     if (account.length === 0 || account === owner) continue;

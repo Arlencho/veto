@@ -246,7 +246,7 @@ function HoldToApproveGesture({
     <View style={styles.wrap}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}. ${hint}`}
+        accessibilityLabel={`${label.replace(/\.+$/, '')}. ${hint}`}
         accessibilityHint={gestureHint}
         accessibilityState={{ disabled }}
         accessibilityActions={[{ name: 'longpress', label: HOLD_A11Y_ACTION }]}

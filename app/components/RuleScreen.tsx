@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactElement, type ReactNode } from 'react';
 import {
   findNodeHandle,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  type RefreshControlProps,
   ScrollView,
   StyleSheet,
   UIManager,
@@ -19,7 +20,11 @@ export function useScrollFocusedField(): (target: number) => void {
   return useContext(RuleFieldFocusContext);
 }
 
-export function RuleScreen({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+export function RuleScreen({ children, footer, refreshControl }: {
+  children: ReactNode;
+  footer?: ReactNode;
+  refreshControl?: ReactElement<RefreshControlProps>;
+}) {
   const scrollRef = useRef<ScrollView>(null);
   const lastTarget = useRef<number | null>(null);
 
@@ -59,6 +64,7 @@ export function RuleScreen({ children, footer }: { children: ReactNode; footer?:
         <RuleFieldFocusContext.Provider value={scrollToTarget}>
           <ScrollView
             ref={scrollRef}
+            refreshControl={refreshControl}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.content}
           >

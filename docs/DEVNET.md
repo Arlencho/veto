@@ -154,6 +154,248 @@ Length: 36 (0x24) bytes
 
 ## Upgrades
 
+### Hold migration and safe-address upgrade, 2026-09-26
+
+The lead already upgraded the program from main commit
+`e2a66dbd4bc6aa9e7b68011f6c9973650eaef79d` (`e2a66db`), containing
+[PR 342](https://github.com/Arlencho/veto/pull/342) and
+[PR 344](https://github.com/Arlencho/veto/pull/344). The following deployment
+facts were initially supplied by the lead. The continuation below
+independently verifies the deployed bytes:
+
+- Build: 631392 bytes; SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`.
+- Program data was extended from 592720 bytes before the upgrade.
+- Upgrade signature: `5WjvHviV8z3HrECQ5fmpSQ5UtejYMk319Vse92cujx1MXmgHGj6agU6Hbv7bXAkUksENnqXmyURhhqeXw85gPb1f` ([transaction](https://explorer.solana.com/tx/5WjvHviV8z3HrECQ5fmpSQ5UtejYMk319Vse92cujx1MXmgHGj6agU6Hbv7bXAkUksENnqXmyURhhqeXw85gPb1f?cluster=devnet)).
+- Dumped program was byte-identical over 631392 bytes, with zero padding after.
+
+This verification run used `VETO_RPC=https://api.devnet.solana.com` for every
+command. It did not upload, deploy, create a buffer, or access a phone.
+`make test` ran from the clean source commit above and passed 146 tests,
+0 failed: unit 4, Hold 31, Hold red-team 23, payment red-team 20, refusal
+recording 6, SKR mint 2, token-swap fixture 3, trade 27, trade red-team 30;
+doc-tests 0. This target builds SBPF v0 for LiteSVM, not the deployment binary.
+
+A read-only `getAccountInfo` at confirmed slot 504528805 found legacy vault
+`8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` still 1291 bytes, owned by
+the Veto program. Its HoldVault owner field is the founder device key
+`GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`. The vault was not changed.
+It will be migrated and closed by its owner later, with his Seed Vault
+signature, following [Hold migrations](HOLD_MIGRATIONS.md).
+
+#### Verification resumed, 2026-09-26
+
+The continuation sets `VETO_KEYS_DIR` to the maintainer's existing key directory
+and `VETO_E2E_FUNDER` and `VETO_FUNDER_KEYPAIR` to its `deployer.json`.
+The key files are read in place, never copied, printed or changed. A temporary
+gitignored `keys` symlink served the trade target's fixed relative paths
+and was removed after that check.
+Every network command uses `VETO_RPC=https://api.devnet.solana.com`.
+A temporary fetch preload paces public RPC calls by 450 ms and retries HTTP
+429 with 15, 30, 60 and 120 second back-offs. The preload also suppresses the
+payment journey's automatic Markdown reports; stdout supplies the evidence.
+No deployment or device operation was performed, and the legacy vault was
+not accessed during this continuation.
+
+The default `make e2e-devnet` now loads the signer, but its prerequisite
+check fails before transactions because the funder holds only 235810 USDC
+base units and the journey needs 3000000. Summary lines:
+
+```text
+setup: check journey prerequisites: fail: Funder GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1 holds 235810 USDC base units; this journey needs 3000000 USDC base units.
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+make: *** [e2e-devnet] Error 1
+```
+
+The funding blocker above was resolved by the completed USDC rerun recorded
+below under Final USDC and trade verification.
+
+#### Payment journey with VTEST
+
+The supported test-token variant,
+`make e2e-devnet EXPO_PUBLIC_VETO_MINT=2dV6DLAUF63ugfD1sgNF8fUmQKr9pMDzeLxJGSwkMcCU`,
+exited 0. This verifies the upgraded program with VTEST, not USDC. It opened
+rules `BaZE93eqcVHiKPYn7ttaqZZZ2tFzVbdJz5CcKihPtgA6` and
+`4um4KdLcoC8EkizDui4K2u6NqJKN7vwyVeDt7T4V1NMz`, paid, refused, overrode,
+revoked and closed them. All six exports returned `VERDICT: CONFIRMED`;
+the deliberately changed amount returned `VERDICT: REJECTED`.
+Cleanup returned 4250000 VTEST base units plus remaining SOL and token-account
+rent to the deployer, signature
+`4jByQupPPsW2rWL2Tpv5psqC5z8L7HtyU1AbqyWJKTeVJDM9MM8KUrCxXENBHGYy1cRDMp5njoN3SGoEfEQBWPhS`.
+Summary lines:
+
+```text
+✔ devnet journey opens two rules, pays, refuses, overrides, revokes, closes, and verifies every decision (228468.10125ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+An earlier VTEST attempt and Hold attempt collided during concurrent SDK
+`npm ci` installs and failed before their journeys ran. Both targets were
+then rerun sequentially with complete dependency installs.
+
+#### Hold journey
+
+`make hold-e2e-devnet` exited 0 on a fresh vault. Exact summary lines:
+
+```text
+cluster: devnet https://api.devnet.solana.com
+vault: 6s5wzKHau6LgLjFN7H1vZeQcK74JSoTS8DPN3aRE71j7
+mint: 4thsyyjvf4ATccecnK3MXUpGvbGDfGzrdk7HbjmYZvfL
+init: guardian and safe address set
+deposit: 1000000000
+everyday paid at once: 10000000 to BBzfvQwzsbDwZ8oggy6Crgoy1zKRS2u6znoFwBGkwmZi
+big withdrawal held: 300000000, unlock 1790541143
+execute before unlock: refused, balances unchanged
+execute after unlock: not run (devnet does not warp; unlock is one day out)
+guardian stopped held withdrawal 3
+freeze: guardian
+recover while frozen: 989000000 to safe DM7KQ7UFxuweMM2QTVo4cJRMcMMFaTQJhqaPbctr9npj
+unfreeze: owner and guardian
+loosening share to 5000 waits until 1790541167
+tightening daily limit applied at once: 40000000
+✔ a Hold vault pays a known everyday withdrawal at once, holds a big one, and lets the guardian stop, freeze, and recover (60284.534541ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+Payment after the one-day delay and applying the queued loosening after
+its delay were not exercised on devnet. The test did not warp the clock.
+This vault is separate from the legacy vault reserved for its owner's
+migration and closure.
+
+#### Trade demo result
+
+`make trade-demo-devnet TRADE_DEMO_AMOUNT=1000000` exited 2. The existing
+fixture refused the first expected honest trade because the current pool
+quote is below its configured price floor. Exact summary:
+
+```text
+refused amount_in=1000000 amount_out=0 reason=14 quote below floor suggested_override=0 signature=2AHCniirT2viCPUQRSLs9aRoJihbhKCXfFHJ1kKpsjBYJgirsm9feFfGpjkMZjPXeouK9wyuUExMqjk6t3vzDUpE slot=504532748
+expected reason 0, got refused reason 14
+make: *** [trade-demo-devnet] Error 1
+```
+
+The target stopped before the hostile-agent sequence. No successful trade
+or hostile sequence was established by that attempt. Existing key-directory
+fixtures were left unchanged; the rule's price protection was not loosened.
+A complete trade rerun needs a fixture whose floor and remaining daily
+allowance support the current pool, as noted in the previous upgrade record. The fresh-rule rerun below resolves this.
+
+#### Final USDC and trade verification, 2026-09-26
+
+After the deployer was funded, `make e2e-devnet` with the default Circle devnet
+USDC mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` exited 0.
+Rule A `BSK4K9uSpATApYfF5RWspWem89RX41UuhHV6zhEY7tQw` and rule B
+`CAHm3TDUKzyCCAqzh8TXvGfHAip6DPAEWWgfqGW2S1yX` opened, paid, refused,
+overrode, revoked and closed as expected. All six decision exports were
+`VERDICT: CONFIRMED`; the tampered amount was `VERDICT: REJECTED`.
+Cleanup returned 2250000 USDC base units and remaining SOL to the deployer,
+signature `p7veBbVbCrVJJLnZnykJh1p9Ko22Ri2toQWmKhgwFGmVVqvjf41CJBF4EZ7ASeo7yKd9kVBG3GXgTBqfLaNLNsX`.
+Exact summary:
+
+```text
+✔ devnet journey opens two rules, pays, refuses, overrides, revokes, closes, and verifies every decision (239911.482875ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+The fresh trade rule was opened with `keys/owner.json`, owner
+`EGQdANFMq6xVjKcSrij4gWiH91q8TvhdY5e87KjjF2yc`, on pool
+`DTFPL7GmcFN9yc6Yv2FZrq158gRhM8JG1v6svgcNNjxL`.
+At 2026-09-26T20:44:41.550Z, the pool held 188044036 wSOL base units and
+17767984 USDC base units. The floor is exactly 90 percent of that spot
+ratio: `159911856/1880440360` in output/input base units.
+The limits remain per trade 0.002 SOL, per day 0.01 SOL, cap 0.05 SOL,
+and 30 days (`expires_at=1793047481`).
+
+| Fresh fixture | Public address |
+|---|---|
+| Rule | `5Tjmm2QueaRAnxDKbF39NxCwEsixRSZTZDrYFHv2Nd4n` |
+| Ledger | `BhL3TaWeN2d838zZzbJw28yfPrrx2YCHNqNHTvgQ6419` |
+| Source | `FoCU6rSJ9ZqY493UjeUovNyCzoW4m4yN5o273ij8haG2` |
+| Destination | `HcyMqQuodBgL9RzMMbEwAM6zYZhoFrSnoPuVbqVh6wgg` |
+| Agent | `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` |
+
+Open signature: `5U3mkG6JP5cdJFADDP9WLQ6AFp6uAPNjxqXBy7fMv37SXpSoKWXsnswJ6g9HuwLpzftoTiiY68CLJe3Gj9hFtvMw`. This is an open instruction,
+so it has no recorded trade reason. The second trader received 10030498
+lamports to restore its fee and swap budget to 0.3 SOL, signature
+`34E44NcdWn6MszmkfRj9RoUiKECRPsnwUU4S8eByZS2bjhzLKdKMBjXnLqTSa9DCesiLmcEEZ88D3MMPbKw2vbjg`; this funding transfer has no trade reason.
+
+`VETO_KEYS_DIR` points to the supplied directory, read-only. Existing signer
+files are read through symlinks, never copied, printed or changed. The new
+public fixture is written to this worktree's gitignored `keys/trade-config.json`;
+the source directory's config remains unchanged. Every live command uses
+`VETO_RPC=https://api.devnet.solana.com`, paced requests, and HTTP 429
+back-off of 15, 30, 60 and 120 seconds. No deployment, device operation,
+or access to the old Hold vault occurred in this final verification.
+
+`make trade-demo-devnet TRADE_DEMO_AMOUNT=1000000` exited 0 on the fresh
+rule. Every trade decision below includes the reason decoded from its
+confirmed transaction. The first line is `trade-once`; subsequent lines
+are the hostile-agent sequence. Exact output:
+
+```text
+traded amount_in=999999 amount_out=93708 reason=0 ok suggested_override=0 signature=5JAXFBaG1vm5nPk7xki7qjRT4UqT55wm5K95Y2hZ5ywLxFgKg1oeWvjQs4XqoLKnC9RCPpP8r1uw4JET6QgY58XP slot=504536589
+a.destination refused amount_in=1000000 amount_out=0 reason=11 output account not allowed suggested_override=0 signature=4bCeLFR8eDNTMHGkfYYkB7ee4AxBpaJM81ZZBQdXbj9UNcto4hroozWFuCoM1QZHu5EvUNEMHw52FPfPpq6Xfdea slot=504536628
+b.pool refused amount_in=1000000 amount_out=0 reason=12 pool account not allowed suggested_override=0 signature=S1soTkQDrBivSzetPwf4R31GNtJYhbCGZxnCGdhKew5q6BUTV5p5GuUYvhGkfcyyoAN4nMAnFbCzpA1PmHaHsQu slot=504536704
+c.per_trade refused amount_in=2000001 amount_out=0 reason=5 over per-payment maximum suggested_override=2000001 signature=3xQQKBhPSgdJUZvMBNimqWiso1Hv43cQ8r6UGZTSyLseJ9x34pF4VLkMLwEAFTnHjscEwqWYqZJ1VJ74K5evjBey slot=504536715
+d.floor refused amount_in=1000000 amount_out=0 reason=14 quote below floor suggested_override=0 signature=2WPoHBRJrLde5QjdP2qvBv5xPqZuDhBCuLcg85duqRunxLtCB9cNpFt8BcgUmFuFMHoi22kcX1HCPX8Gsh2s5QQt slot=504536756
+e.honest traded amount_in=999999 amount_out=92447 reason=0 ok suggested_override=0 signature=5EHddFNd47rvvmCzWMLmBMmzkmWAKvcM9vbs5BpJHDLd7nvatiMxXgobiyQFv2Xdo2bjx5t9yHdho1HWS8qwYyMf slot=504536786
+f.fill traded amount_in=1999999 amount_out=182020 reason=0 ok suggested_override=0 signature=4vrBwW9kmVbcNNWGqzq3puSCHMVUfkDzDydcmCJSwuSeLFCcKPFq5W6kD79ivSJhULgURiybQEkCTaUZMd61jXYQ slot=504536798
+f.fill traded amount_in=1999996 amount_out=178284 reason=0 ok suggested_override=0 signature=3RMZ5EUaWh9ZAi4y5wK8qLqJbBFjoVaqZceTLpyJ5sAUfQzRbhBrT1DBfDw5cQVjYnVAuCkk7AgCsbpn5ZZ12qrA slot=504536811
+f.fill traded amount_in=1999993 amount_out=174662 reason=0 ok suggested_override=0 signature=5oaNQ7EM1DN7oaMpgLr2i7N5uoYUxi1aPTBDj1455Ha13StF8omrUGkPfTa9E3WNMr5FZBzo936ZD4Ny2KoSPoyV slot=504536824
+f.fill traded amount_in=1000014 amount_out=86008 reason=0 ok suggested_override=0 signature=4AnkKFVXNuANtNrsLzJ8sriDJ4m9B4FCLn4PE2WHgsnixDqfc3FgwWmWQ2V9b1d11mCBg9HNoh8yzLkUawYXyXyX slot=504536837
+f.daily refused amount_in=2000000 amount_out=0 reason=13 over daily limit suggested_override=0 signature=musrxe3ReagFwvZ7faHGsm2iGwdVcEdCp91tZYmp5itpaz8SKdpVt5L9Zj9eFGCyva4TKMawxbu9CfQxyDrnPDX slot=504536850
+```
+
+Every auxiliary signature emitted by the demo is also recorded below.
+These token-account, decoy-pool and direct pool-swap transactions have no
+Veto trade decision and therefore no recorded trade reason. `setup=lower`
+funds the second trader's wrapped SOL account; the two `third_party_swap`
+rows move and restore the pool price.
+
+```text
+setup=bad_pool signature=2moDVTkmRjDgThxgZgi7bSDPkyfUYMgt9eQA8vhBRSjzrnfGMVGd3ShYpfyLBqnxFWyvkRH9sBN2hB43Ru9NrNa
+setup=bad_pool signature=5vJxvTyekGw58yWLZY3xpdJGb9GYqNGkAGvwe2ebiGJ6rV6WDm73X25SZxrRxiEN8e3qbpGLHyAeAdgw8VFyRDNK
+setup=bad_pool signature=2j9AgzhURPYYg9ys2xZQLCf3yjMHtuKSt6c7uwXEreXEyTF9YabPh5A2F9GrUt5PuQ2Y7pPwbN8f6ThyCB5heth8
+setup=bad_pool signature=3D9Q5ePsMc4qsDYpZ5P4gEJbjWk7ioRq2HUUfHLMUPzTaUPjsnVogd6GnMNAmFseAxYBQavfkaqfN2eacveTojsV
+setup=bad_pool signature=2iJHyU3hfYkZmeVnUeBPDsxaa8zwxzSwB8WRFsEqoRy1MKSVB9XCpLSE79GktsxfgA7AY1D8ceryefnFVw1gz6Br
+setup=bad_pool signature=2WNe1WDBsR5CvKA5XoN4W3gT7PvLH7Y8AtGRrdBMNZ43cXMzsqeaXHVsbRuNDgAtyyPVREVvjY79W2J5YuGUba39
+setup=lower signature=FBMjtmhxR84gUPTeJbLcZTSTCTpp3D9rcfq8i8rsYAPeQCWrg1DDsKz1xyUhVPDQK1mPfedv9vc2q8pWiMc6LKK
+third_party_swap direction=lower signature=2vv63An2M2VUhPHYxq1qwHSAoPdYNxtPwPxpjQZks1TJaCLU7Mcjw6G3usPMNVMN9fRaMjLLZSiN9FtmstGELXNX
+third_party_swap direction=restore signature=XeYCUEsdq5GGDTRv2HN9hoh5g6oyweqoFJsPeSKYNSGUpFSknNeQr5KXEsmhneBWF798Pbu2VFTWeo1Hg6cBC95
+```
+
+#### IDL and deployed program verification
+
+A confirmed read of program data at slot 504531668 independently verified
+upgrade slot 504527739, the 631392-byte program SHA-256
+`58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`,
+and 1024 trailing zero bytes after the binary. This matches the lead's build.
+
+`anchor idl build -p veto -o /tmp/upgrade3-verification/idl.json -- --lib`
+generated 24 instructions, SHA-256
+`c6db6d11b218d68b9179856f97471e6bd19117313529490ca1b11e382b0370f6`.
+All four copies match byte for byte: `sdk/idl/veto.json`,
+`tools/idl/veto.json`, `watcher/idl/veto.json`, and `indexer/idl/veto.json`.
+`git diff e2a66db -- programs sdk/idl tools/idl watcher/idl indexer/idl`
+is empty. The fresh source IDL and independently verified deployed hash tie
+the client copies to the recorded deployment; no on-chain IDL publication
+is claimed.
+
+#### Local validation and review
+
+- `make test-scripts`: exit 0, all 32 script groups completed.
+- `bash -n scripts/devnet-setup.sh`, `shellcheck -S error scripts/devnet-setup.sh`, and `git diff --check`: exit 0.
+- `scripts/docs-phase2-191.critic-r2-pr209.test.sh`: 1 passed, 0 failed; `write_docs` renders this document byte for byte.
+- Independent DevOps Critic review: no findings; the recorded live results match the logs. The primary review service was unavailable, so the charter's fallback reviewer performed the review.
+- Script edits are confined to the `write_docs` template. No container, workflow or deployment behavior changed.
+
 ### Hold upgrade, 2026-09-26
 
 The lead completed the upgrade after the initial upload stopped on HTTP 429.
@@ -171,14 +413,13 @@ it did not deploy or roll back the program.
 
 #### Demo Hold replacement
 
-Old vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` cannot be closed:
-there is no Hold close instruction. It remains 1291 bytes, and the upgraded
-program requires 1691 bytes, including for Recover. Its token account
-`6ANFiGcMZgL9WbRcqRLc1Y4tTYyPVxNHnhh8m4vVQ9Ai` still held 5000000 base
-units (5 USDC) at confirmed slot 504441389. Recovery before the upgrade was
-missed. This run did not recover those tokens, reclaim rent, or roll back.
-Do not fund the old vault. Its 5 USDC remains stranded pending a separately
-authorized recovery procedure; replacement does not mean it was emptied.
+At the recorded upgrade, old vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
+remained 1291 bytes and its token account
+`6ANFiGcMZgL9WbRcqRLc1Y4tTYyPVxNHnhh8m4vVQ9Ai` held 5000000 base
+units (5 USDC) at confirmed slot 504441389. That run did not recover tokens
+or reclaim rent. The repository now provides owner-signed realloc migration
+and safe closure; see [Hold migrations](HOLD_MIGRATIONS.md). Deployment and
+owner execution are separate steps. Do not fund the old vault before migration.
 
 The replacement uses the available repository demo owner `keys/owner.json`,
 `EGQdANFMq6xVjKcSrij4gWiH91q8TvhdY5e87KjjF2yc`. The previous owner was the
@@ -377,6 +618,73 @@ Devnet USDC is Circle's test token. It has no value.
 
 The founder gets it from https://faucet.circle.com by pasting the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` and the deployer `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`. Nobody can mint this token. `scripts/devnet-usdc.sh` creates the merchant and deployer accounts when they are absent, and re-running it is a no-op.
 
+## Indexed USDC demo calibration (issue 105)
+
+This is an opt-in request-sizing mode for the existing spending rule
+`UsRHyKtm41XMpQUcFGevYKgdWJEHQUf44QDCxLjEGWh`: 20 USDC total,
+0.50 USDC per payment, opened for 40 days. It changes no on-chain limit.
+No Cloud Run deployment or live calibration switch was performed by this change.
+
+Set these environment variables on the watcher when separately enabling the demo:
+
+```text
+VETO_DEMO_CALIBRATION=1
+VETO_DEMO_CAP=20000000
+VETO_DEMO_PER_TX_MAX=500000
+VETO_DEMO_DAYS=40
+VETO_DEMO_REFUSAL_HOURS=6,18
+```
+
+Only the first line is required. The other lines are the defaults, in USDC
+base units (6 decimals), days, and Stockholm hours. Unset or `0` disables
+calibration and preserves the existing price arithmetic, including
+`VETO_KWH_MILLI=50000` and the existing `VETO_QUOTE_CURRENCY` selection.
+For USDC, retain `VETO_QUOTE_CURRENCY=USD` to convert SEK using the ECB rate.
+Missing or stale FX and missing prices still leave a gap, with no request.
+Negative and zero prices still skip; they never manufacture a refusal.
+
+There are four cadence slots: 00:00, 06:00, 12:00 and 18:00 in Stockholm.
+By default, two of four positive-price slots deliberately exceed the payment
+maximum: 06:00 and 18:00. The other two request payments within it. This is
+scheduled request shaping, not a claim that an uncontrolled price spike caused
+every refusal. The hours can select one to three distinct cadence hours.
+The existing nonce, journal and chain-history checks cover paid and refused
+slots, including restart recovery. Calibration sends one request per slot,
+not a payment followed by a refusal. Run a single watcher for this rule and
+retain its journal. It does not provide a distributed lock between workers.
+
+The original amount A still comes from SE3 spot times configured kWh, with
+ECB conversion when USD is selected. Integer request sizing is:
+
+- N = 4 * (days + 1), including a boundary day for partial days and clock changes.
+- B = min(per-payment maximum, floor((cap - maximum - 1) / (N + 1))).
+- Indexed amount = max(1, floor(A * B / (A + B))) for positive A.
+- Ordinary slot: request the indexed amount.
+- Scheduled refusal slot: request maximum + 1 + indexed amount.
+
+With the defaults, B is 118181 base units (0.118181 USDC). Each refusal is
+above 0.50 and at most 0.618182 USDC. Even if all N possible slots paid B,
+N * B plus the largest refusal remains within 20 USDC. Refusals move no
+USDC but still cost transaction fees. The normal request increases with the
+spot-derived amount, subject to integer rounding and this lifetime budget.
+The journal retains `spot_amount` and `calibration=indexed-demo-v1` alongside
+the actual requested amount, price and any FX metadata.
+
+The budget assumes these configured limits match the rule and no other agent
+or manual override spends its allowance. Before enabling on an already-used
+rule, check its remaining cap, expiry, active state, payee and any override.
+Prior spending reduces available headroom; the chain remains authoritative.
+Do not use an override to pay the scheduled above-limit requests. Changing
+the cap, lifetime or schedule midway requires rechecking remaining headroom.
+The mode neither renews the 40-day expiry nor replenishes spent USDC.
+
+For the video, collect actual paid and reason-5 refused transactions on this
+same rule across a real day. Recovered or catch-up rows are not evidence of
+six-hour wall-clock spacing. Disclose the scheduled oversized requests and
+that this is devnet test USDC paying our counterparty for an indexed bill;
+it buys no electricity. Roll back request shaping with
+`VETO_DEMO_CALIBRATION=0`, keeping the existing journal and rule identity.
+
 ## Demo pool
 
 Constant-product pool on the token-swap program `SwaPpA9LAaLfeLi3a68M4DjnLqgtticKg6CnyNwgAC8`. The pair is wrapped SOL (`So11111111111111111111111111111111111111112`, 9 decimals) and Circle devnet USDC (`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, 6 decimals).
@@ -446,44 +754,10 @@ use this rolling total, so a fixed-window reset cannot reopen that allowance.
 Execute and Skip still count releases without imposing the everyday limit
 on those doors.
 
-The decision for demo vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
-was to retire it and reopen after the upgrade, with no realloc migration.
-The replacement above is live, but the old vault was not emptied before the
-upgrade and still holds 5 USDC. The recovery procedure below was not executed.
-There is **no Hold close instruction** in the existing program. Neither the
-old nor the new binary can reclaim its account rent. Here, retiring means
-recovering all tokens to the configured safe address, leaving the old empty
-accounts, and opening a new vault with a different vault ID. Do not try to
-initialize the existing PDA again.
-
-Recovery procedure for a separately authorized release operator:
-
-1. Before upgrading, retain the actual currently deployed program binary and
-   its matching IDL/client. Read the demo vault with that client and record its
-   owner, vault ID, mint, safe address, guardian, daily limit, delay and share.
-   Derive a token account for the same mint owned by that safe address and
-   create it if absent. Verify its mint and owner on chain.
-2. While the old binary is still deployed, call the SDK's
-   `HoldVault.recover({ authority, owner, vaultId, destination, mint })`, signed
-   by the vault owner or guardian, with that safe token account as destination.
-   Recover works while frozen and clears pending withdrawals. Confirm the
-   transaction and verify the vault token balance is zero and the destination
-   received the full previous balance. Keep the old vault empty thereafter.
-3. Upgrade the program. The new binary rejects old 1291-byte vaults during
-   account deserialization, including Recover. If step 2 was missed, the
-   upgrade authority must temporarily restore the saved pre-upgrade binary,
-   perform step 2 using its matching client, then deploy the new binary again.
-   Do not send funds to the old PDA or attempt a direct owner token transfer;
-   its token authority is the program PDA.
-4. With the new client, call `initVault` with the recorded rules and a fresh
-   vault ID, then deposit from a token account controlled by the funding signer.
-   If the safe address differs from the owner, its signer must first return the
-   recovered tokens to the owner's funding account. Verify the new vault is
-   1691 bytes, its buckets are empty, and its owner, guardian, safe address and
-   rules match. Replace the demo address in app/watch configuration and these
-   docs with the confirmed new address. Known destinations must be learned
-   again through the normal delayed withdrawal flow.
-
-These recovery steps were not performed by this continuation. The completed
-upgrade and replacement funding are recorded above; no rollback is authorized
-by this record.
+The original demo replacement left 5 USDC in the legacy vault. The repository
+now supports `migrate_hold_vault` to reallocate it in place, preserving its
+rules, queued changes and release accounting. After the upgraded binary is
+deployed, the owner can migrate, resolve any holds and freeze, then call
+`close_hold_vault` to sweep tokens to the configured safe address and reclaim
+rent. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
+These instructions do not authorize or record a deployment or recovery transaction.

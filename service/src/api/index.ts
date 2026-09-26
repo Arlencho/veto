@@ -104,7 +104,7 @@ async function route(url: URL) {
     const column = match[1] === 'agents' ? 'agent' : 'owner';
     const { rows } = await pool.query(`SELECT ${ruleColumns} FROM rules WHERE ${column} = $1 ORDER BY rule`, [key]);
     if (!rows.length) {
-      found((await pool.query(`SELECT 1 FROM decisions WHERE ${column} = $1 LIMIT 1`, [key])).rows[0]);
+      found((await pool.query(`SELECT 1 FROM decisions WHERE ${column} = $1${column === 'agent' ? " AND rule_kind <> 'hold'" : ''} LIMIT 1`, [key])).rows[0]);
     }
     return { rules: rows };
   }

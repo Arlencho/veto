@@ -69,3 +69,16 @@ for (const [route, expected] of [
     }
   });
 }
+
+test('the Hold held route includes the token unit in the over-limit reason', async () => {
+  const { default: Route } = await import('../app/hold/held');
+  let root!: ReactTestRenderer;
+  await act(async () => { root = create(createElement(Route)); });
+  try {
+    const text = root.root.findAllByType('Text' as never)
+      .map((node) => node.children.filter((child) => typeof child === 'string').join('')).join('\n');
+    assert.ok(text.includes('2 USDC is over your 1 USDC a day'), text);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});

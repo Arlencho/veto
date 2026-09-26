@@ -22,7 +22,7 @@ bad() { printf 'not ok - %s\n' "$1"; fail=1; }
 [[ -f "${ROOT}/programs/veto/src/lib.rs" ]] || { echo "missing programs/veto/src/lib.rs"; exit 1; }
 
 id="$(declared_program_id)"
-expected="$(sed -n 's/^[[:space:]]*declare_id!("\([^"]*\)");/\1/p' "${ROOT}/programs/veto/src/lib.rs" | head -n1)"
+expected="$(sed -n 's/^[[:space:]]*declare_id!("\([^"]*\)");/\1/p' "${ROOT}/programs/veto/src/lib.rs" | sed -n '1p')"
 if [[ -n "$id" && "$id" == "$expected" ]]; then
   pass "declared_program_id reads lib.rs"
 else
@@ -39,9 +39,9 @@ fake="11111111111111111111111111111111"
 if out="$(assert_program_keypair_matches_declare_id "$fake" 2>&1)"; then
   bad "mismatch must refuse"
 else
-  if printf '%s' "$out" | grep -F -q "$fake" \
-    && printf '%s' "$out" | grep -F -q "$id" \
-    && printf '%s' "$out" | grep -q "the program keypair must be restored from backup"; then
+  if printf '%s' "$out" | grep -F "$fake" >/dev/null \
+    && printf '%s' "$out" | grep -F "$id" >/dev/null \
+    && printf '%s' "$out" | grep "the program keypair must be restored from backup" >/dev/null; then
     pass "mismatch names both ids and says restore from backup"
   else
     bad "mismatch message: ${out}"
@@ -53,9 +53,9 @@ PROGRAM_KP="${ROOT}/keys/does-not-exist-program.json"
 if out="$(require_backed_up_program_keypair 2>&1)"; then
   bad "missing program keypair must refuse"
 else
-  if printf '%s' "$out" | grep -q "keys/program.json is missing" \
-    && printf '%s' "$out" | grep -q "the program keypair must be restored from backup" \
-    && printf '%s' "$out" | grep -F -q "$id"; then
+  if printf '%s' "$out" | grep "keys/program.json is missing" >/dev/null \
+    && printf '%s' "$out" | grep "the program keypair must be restored from backup" >/dev/null \
+    && printf '%s' "$out" | grep -F "$id" >/dev/null; then
     pass "missing program keypair names declare_id and says restore from backup"
   else
     bad "missing keypair message: ${out}"
@@ -81,7 +81,7 @@ fi
 if out="$(env -u VETO_RPC "${ROOT}/scripts/devnet-setup.sh" 2>&1)"; then
   bad "unset VETO_RPC must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_RPC"; then
+  if printf '%s' "$out" | grep "missing VETO_RPC" >/dev/null; then
     pass "unset VETO_RPC names the variable"
   else
     bad "unset VETO_RPC message: ${out}"
@@ -91,7 +91,7 @@ fi
 if out="$(env VETO_RPC= "${ROOT}/scripts/devnet-setup.sh" 2>&1)"; then
   bad "empty VETO_RPC must refuse"
 else
-  if printf '%s' "$out" | grep -q "missing VETO_RPC"; then
+  if printf '%s' "$out" | grep "missing VETO_RPC" >/dev/null; then
     pass "empty VETO_RPC names the variable"
   else
     bad "empty VETO_RPC message: ${out}"

@@ -758,7 +758,8 @@ test("migration signs with the owner and funds rent using the IDL account order"
   const { ix } = opened(fake);
   assert.deepEqual(ix.data, disc("migrate_hold_vault"));
   assertMetas(ix, [[owner.publicKey, true, true],
-    [places(owner.publicKey, vaultId).vault, false, true], [SystemProgram.programId, false, false]]);
+    [places(owner.publicKey, vaultId).vault, false, true],
+    [places(owner.publicKey, vaultId).ledger, false, true], [SystemProgram.programId, false, false]]);
 });
 
 test("closure signs with the owner and supplies the safe destination and rent accounts", async () => {

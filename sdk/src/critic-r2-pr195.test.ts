@@ -127,7 +127,7 @@ test("R11 the README install line is the published package and the example usage
   assert.equal(pkg.license, "Apache-2.0");
   assert.equal(pkg.homepage, "https://github.com/Arlencho/veto");
   assert.equal(pkg.engines.node, ">=22");
-  assert.deepEqual(pkg.files, ["dist", "idl", "README.md"]);
+  assert.deepEqual(pkg.files, ["dist", "README.md"]);
   assert.equal(pkg.scripts.prepublishOnly, "npm run build && npm test");
   assert.match(pkg.repository.url, /github\.com\/Arlencho\/veto/);
   assert.equal(pkg.repository.directory, "sdk");

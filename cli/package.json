@@ -1,14 +1,13 @@
 {
   "name": "@veto-hq/veto",
   "version": "0.1.0",
-  "private": true,
-  "comment": "Depends on @veto-hq/agent-sdk by file:../sdk until that package is on npm.",
+  "private": false,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "bin": {
-    "veto": "./dist/index.js"
+    "veto": "./dist/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,19 +19,41 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "tsx --test src/*.test.ts"
+    "test": "tsx --test src/*.test.ts",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.1",
     "@solana/web3.js": "^1.98.4",
-    "@veto-hq/agent-sdk": "file:../sdk",
+    "@veto-hq/agent-sdk": "0.1.0",
     "qrcode-terminal": "0.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
     "tsx": "^4.19.4",
     "typescript": "~5.8.3"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arlencho/veto.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/Arlencho/veto",
+  "keywords": [
+    "veto",
+    "solana",
+    "agents",
+    "payments",
+    "cli"
+  ],
+  "description": "Companion CLI for pairing agents with Veto rules, payments, and MCP tools.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   }
 }

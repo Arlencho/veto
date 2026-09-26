@@ -26,9 +26,9 @@ appId: com.veto.app
 # No payee is set on the first-run review yet, so the approve button does not
 # render. Assert the review sentence instead; it names the placeholder payee.
 - extendedWaitUntil:
-    visible: "may pay the payee up to .* per payment and .* in total, until .*"
+    visible: ".* may pay the payee up to .* per payment and .* in total, until .*"
     timeout: 60000
-- assertVisible: "may pay the payee up to .* per payment and .* in total, until .*"
+- assertVisible: ".* may pay the payee up to .* per payment and .* in total, until .*"
 - scrollUntilVisible:
     element: "Most per payment"
     direction: DOWN

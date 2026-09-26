@@ -61,5 +61,5 @@ appId: com.veto.app
     visible: "Your rule is live."
     timeout: 90000
 - extendedWaitUntil:
-    visible: "can now ask to pay .* It can only ask. It cannot take."
+    visible: ".* can now ask to pay .* It can only ask. It cannot take."
     timeout: 60000

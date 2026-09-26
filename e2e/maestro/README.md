@@ -51,18 +51,32 @@ valid guardian address different from the owner and a safe wallet controlled
 independently of the owner. The Hold flow deliberately supplies the safe address
 and reviews it; it does not accept the owner-wallet recovery-risk exception.
 
-Run 02 first (it replays 01), then pause before approval flows. Copy the full account address
-from the fake wallet's authorization/account UI, not Veto's shortened display.
-Fund that account with devnet SOL for rent, fees and the trade rule's 0.20 SOL
-cap. A devnet faucet allocation of 1 SOL leaves room for these operations.
-Use the Solana devnet faucet or an already funded devnet wallet on the laptop.
-Fund the laptop agent with SOL for request transaction fees too.
+Run 02 first (it replays 01), then pause before approval flows. The fake
+wallet creates a new key each time it authorizes, so the flows that sign need
+that newest key funded. From the repository root, with the emulator running
+and `solana` on PATH configured for the devnet RPC, fund it with:
 
-Send the fake wallet at least 2 units of the configured payment/Hold token:
-flow 04 sets aside 1 token, and flow 06 deposits 1 token. With the standard
-USDC build, use the [Circle faucet](https://faucet.circle.com/) for devnet USDC.
-With a custom mint, transfer that exact mint from the existing funded devnet
-setup. The `OWNER` in the env file is not necessarily the fake wallet account.
+```bash
+e2e/maestro/helpers/fund-fake-wallet.sh emulator-5554 keys/owner.json 1 2
+```
+
+The helper requires an explicit `emulator-NNNN` serial and refuses any other,
+so it cannot address a physical phone. It refuses unless the configured RPC
+reports the devnet genesis hash. It reads only the public key of the newest
+row in the fake wallet key table through `adb exec-out run-as`, prints that
+key, and funds it from the given funder keypair with 1 SOL and 2 devnet USDC
+(mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`), passing
+`--fund-recipient` so the token account is created. One SOL covers rent, fees
+and the trade rule's 0.20 SOL cap; flow 04 sets aside 1 token and flow 06
+deposits 1 token. Fund the laptop agent with SOL for request transaction fees
+too.
+
+With a custom payment/Hold mint, fund the fake wallet manually instead: copy
+the full account address from the fake wallet's authorization/account UI, not
+Veto's shortened display, transfer that exact mint from the existing funded
+devnet setup, and add SOL from the Solana devnet faucet or an already funded
+devnet wallet on the laptop.
+The `OWNER` in the env file is not necessarily the fake wallet account.
 If the fake wallet account changes, reconnect Veto and fund the new account.
 
 ## Run each flow
@@ -91,15 +105,17 @@ also needs `PAYEE`, and 06 also needs `AGENT` and `PAYEE` for the replayed
 payment rule.
 
 Execute from the repository root, one flow per invocation, in any order.
-Funding still needs a pause: run 02 first (it replays 01), copy and fund the
-fake wallet account as described above, then run the approval flows. 07
+Funding still needs a pause: run 02 first (it replays 01), fund the fake
+wallet account with `helpers/fund-fake-wallet.sh` as described above, then
+run the approval flows. 07
 needs a refusal generated from the laptop against the newest rule of a
 previous invocation, as described below.
 
 ```bash
 maestro --device emulator-5554 test e2e/maestro/01-onboarding.yaml
 maestro --device emulator-5554 test e2e/maestro/02-connect.yaml
-# Pause here to fund the fake wallet account.
+# Pause here and fund the fake wallet account:
+e2e/maestro/helpers/fund-fake-wallet.sh emulator-5554 keys/owner.json 1 2
 maestro --device emulator-5554 test -e AGENT="$AGENT" e2e/maestro/03-add-agent-paste.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/04-payment-rule.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/05-trade-rule.yaml
@@ -217,6 +233,14 @@ without invoking Maestro or connecting to a device:
 ```bash
 ruby -ryaml -e 'Dir["e2e/maestro/**/*.yaml"].sort.each { |f| docs = YAML.load_stream(File.read(f)); abort "Invalid flow: #{f}" unless docs.size == 2 && docs[0]["appId"] == "com.veto.app" && docs[1].is_a?(Array); puts "OK #{f}" }'
 git diff --check
+```
+
+The funding helper is checked the same way, with adb, solana and spl-token
+stubbed so no device, emulator or cluster is touched:
+
+```bash
+e2e/maestro/helpers/fund-fake-wallet.test.sh
+shellcheck -S error e2e/maestro/helpers/fund-fake-wallet.sh e2e/maestro/helpers/fund-fake-wallet.test.sh
 ```
 
 This checks YAML syntax and document shape only. It does not verify Android

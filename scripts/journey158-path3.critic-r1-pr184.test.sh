@@ -8,6 +8,8 @@
 # Every check is red on main 68d372f and green on the fix branch.
 # No network, no cloud, no vendor CLIs: the live values were read from
 # devnet and from gcp-verify.sh on 2026-09-23 and are pinned here.
+# Piped checks must consume all input: quiet grep can close early and make
+# a successful match fail under pipefail when the writer receives SIGPIPE.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,7 +31,7 @@ fi
 
 # #175: the indexer-seed recipe passes VETO_RPC and VETO_PROGRAM_ID.
 recipe=$(awk '/^indexer-seed:/{getline; print}' "$ROOT/Makefile")
-if printf '%s' "$recipe" | grep -q 'VETO_RPC=' && printf '%s' "$recipe" | grep -q 'VETO_PROGRAM_ID='; then
+if printf '%s' "$recipe" | grep 'VETO_RPC=' >/dev/null && printf '%s' "$recipe" | grep 'VETO_PROGRAM_ID=' >/dev/null; then
     ok "#175 indexer-seed recipe names VETO_RPC and VETO_PROGRAM_ID"
 else
     bad "#175 indexer-seed recipe is '$recipe'; it names neither VETO_RPC nor VETO_PROGRAM_ID"
@@ -47,7 +49,7 @@ else
 fi
 
 # #177: the DEVNET.md verify command must not require a gitignored keypair.
-if grep -E '^solana program show ' "$ROOT/docs/DEVNET.md" "$ROOT/scripts/devnet-setup.sh" | grep -q -- '-k keys/deployer.json'; then
+if grep -E '^solana program show ' "$ROOT/docs/DEVNET.md" "$ROOT/scripts/devnet-setup.sh" | grep -- '-k keys/deployer.json' >/dev/null; then
     bad "#177 solana program show still carries -k keys/deployer.json in docs/DEVNET.md or the devnet-setup.sh template"
 else
     ok "#177 solana program show runs without a key file in the doc and the template"
@@ -57,17 +59,17 @@ fi
 # same merchant, so a live owner or merchant balance in the doc goes stale.
 # The doc and the write_docs template state the payment and print no live figure.
 template=$(awk '/^write_docs\(\) \{/{p=1} p{print} p && /^\}$/{exit}' "$ROOT/scripts/devnet-setup.sh")
-if grep -E '^- Merchant token account' "$ROOT/docs/DEVNET.md" | grep -q 'holding zero'; then
+if grep -E '^- Merchant token account' "$ROOT/docs/DEVNET.md" | grep 'holding zero' >/dev/null; then
     bad "#178 docs/DEVNET.md says the merchant token account holds zero; the three charges paid 0.666"
-elif grep -q '999999\.334' "$ROOT/docs/DEVNET.md" || printf '%s\n' "$template" | grep -q '999999\.334'; then
+elif grep -q '999999\.334' "$ROOT/docs/DEVNET.md" || printf '%s\n' "$template" | grep '999999\.334' >/dev/null; then
     bad "#178 docs/DEVNET.md or the write_docs template prints the live owner balance 999999.334"
 elif ! grep -q 'paid 0\.666 of that supply to the merchant across three charges' "$ROOT/docs/DEVNET.md"; then
     bad "#178 docs/DEVNET.md does not state that 0.666 was paid across three charges"
-elif ! printf '%s\n' "$template" | grep -q 'paid 0\.666 of that supply to the merchant across three charges'; then
+elif ! printf '%s\n' "$template" | grep 'paid 0\.666 of that supply to the merchant across three charges' >/dev/null; then
     bad "#178 the write_docs template does not state that 0.666 was paid across three charges"
 elif ! grep -q 'A printed figure goes stale when a charge pays' "$ROOT/docs/DEVNET.md"; then
     bad "#178 docs/DEVNET.md does not say a printed figure goes stale"
-elif ! printf '%s\n' "$template" | grep -q 'A printed figure goes stale when a charge pays'; then
+elif ! printf '%s\n' "$template" | grep 'A printed figure goes stale when a charge pays' >/dev/null; then
     bad "#178 the write_docs template does not say a printed figure goes stale"
 else
     ok "#178 docs/DEVNET.md states 0.666 paid across three charges and no live balance"
@@ -98,7 +100,7 @@ else
     missing=""
     for a in $(grep -oE '\]\(#[a-z-]+\)' "$gdoc" | tr -d '](#)' | sort -u); do
         heading=$(grep -E '^## ' "$gdoc" | sed 's/^## //' | tr 'A-Z' 'a-z' | tr ' ' '-')
-        printf '%s\n' "$heading" | grep -qx "$a" || missing="$missing $a"
+        printf '%s\n' "$heading" | grep -x "$a" >/dev/null || missing="$missing $a"
     done
     for name in veto-watcher-260921-journal veto-agent-keypair veto-watcher-stale veto-watcher-cadence veto-watcher-stale-hourly 'passed: 30  failed: 6'; do
         grep -q -- "$name" "$gdoc" || missing="$missing $name"
@@ -113,7 +115,7 @@ fi
 # #182: terminal typechecks against ../../watcher/src, so the terminal-test
 # recipe has to install watcher deps the way ci.yml does.
 trecipe=$(awk '/^terminal-test:/{getline; print}' "$ROOT/Makefile")
-if printf '%s' "$trecipe" | grep -qE 'watcher && npm (ci|install)'; then
+if printf '%s' "$trecipe" | grep -E 'watcher && npm (ci|install)' >/dev/null; then
     ok "#182 terminal-test recipe installs watcher deps"
 else
     bad "#182 terminal-test recipe is '$trecipe'; it never installs watcher deps, so tsc fails on ../watcher/src"

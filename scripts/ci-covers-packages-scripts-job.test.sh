@@ -55,7 +55,7 @@ PY
 }
 
 guard_reason() {
-    "$1/scripts/$GUARD" 2>/dev/null | grep '^not ok' | head -1
+    "$1/scripts/$GUARD" 2>/dev/null | grep '^not ok' | sed -n '1p'
 }
 
 guard_passes() {

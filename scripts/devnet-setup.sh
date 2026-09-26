@@ -53,7 +53,7 @@ declared_program_id() {
   local src="${ROOT}/programs/veto/src/lib.rs"
   [[ -f "$src" ]] || die "missing ${src}"
   local id
-  id="$(sed -n 's/^[[:space:]]*declare_id!("\([^"]*\)");/\1/p' "$src" | head -n1)"
+  id="$(sed -n 's/^[[:space:]]*declare_id!("\([^"]*\)");/\1/p' "$src" | sed -n '1p')"
   [[ -n "$id" ]] || die "could not read declare_id from ${src}"
   printf '%s\n' "$id"
 }
@@ -81,7 +81,7 @@ need_cmd() {
 }
 
 is_mainnet_url() {
-  printf '%s' "$1" | grep -Eqi 'mainnet'
+  printf '%s' "$1" | grep -Ei 'mainnet' >/dev/null
 }
 
 assert_devnet() {
@@ -92,7 +92,7 @@ assert_devnet() {
   # Devnet or a local validator. Anything else is refused on purpose: this
   # script mints, funds and deploys, and none of that belongs on a network
   # nobody intended to touch.
-  printf '%s' "$url" | grep -Eqi 'devnet|127\.0\.0\.1|localhost' \
+  printf '%s' "$url" | grep -Ei 'devnet|127\.0\.0\.1|localhost' >/dev/null \
     || die "refusing to run against a url that is neither devnet nor local: ${url}"
 }
 

@@ -23,7 +23,7 @@ awk '/^write_docs\(\) \{/{p=1} p && /<<'"'"'PY'"'"'$/{q=1; next} q && /^PY$/{exi
 
 # Every substituted value comes from the doc itself, so the only thing under
 # test is the template text around them.
-cell() { grep -E "^\| $1 " "$DOC" | head -1 | perl -ne 'print $1 if /`([^`]+)`\s*\|\s*$/'; }
+cell() { grep -E "^\| $1 " "$DOC" | sed -n '1p' | perl -ne 'print $1 if /`([^`]+)`\s*\|\s*$/'; }
 when="$(perl -ne 'print $1 if /^Recorded by .* at (\S+) UTC/' "$DOC")"
 rpc="$(perl -ne 'print $1 if /^- RPC: `([^`]+)`/' "$DOC")"
 program="$(cell Program)"

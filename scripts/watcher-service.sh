@@ -71,7 +71,7 @@ PLIST_EOF
     echo "removed ${LABEL}"
     ;;
   status)
-    if launchctl list | grep -q "$LABEL"; then
+    if launchctl list | grep "$LABEL" >/dev/null; then
       echo "launchd: $(launchctl list | grep "$LABEL")"
     else
       echo "launchd: not installed"

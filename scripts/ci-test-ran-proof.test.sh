@@ -163,7 +163,7 @@ expect_count() {
     unit_log "$log" "$mode" || { bad "could not write $mode log"; rm -f "$log"; return; }
     run_assert "$name" "$log" "$unit_floors"
     printf 'job: %s\n' "$assert_out"
-    if [ "$assert_status" -eq 0 ] && printf '%s\n' "$assert_out" | grep -qx "$want"; then
+    if [ "$assert_status" -eq 0 ] && printf '%s\n' "$assert_out" | grep -x "$want" >/dev/null; then
         ok "$mode parses as $want"
     else
         bad "$mode parsed as '$assert_out' (exit $assert_status), wanted $want"
@@ -178,7 +178,7 @@ expect_below() {
     unit_log "$log" "$mode" || { bad "could not write $mode log"; rm -f "$log"; return; }
     run_assert "$name" "$log" "$unit_floors"
     printf 'job: %s\n' "$assert_out"
-    if [ "$assert_status" -ne 0 ] && printf '%s\n' "$assert_out" | grep -q 'tests is below the floor'; then
+    if [ "$assert_status" -ne 0 ] && printf '%s\n' "$assert_out" | grep 'tests is below the floor' >/dev/null; then
         ok "$mode is below the floor"
     else
         bad "$mode was accepted: $assert_out"
@@ -211,9 +211,9 @@ expect_strategy_refused() {
     fi
     run_guard "$dir"
     echo "----- $mode -----"
-    printf '%s\n' "$guard_out" | grep '^not ok' | head -3
+    printf '%s\n' "$guard_out" | grep '^not ok' | sed -n '1,3p'
     printf '%s\n' "$guard_out" | tail -n 1
-    if [ "$guard_status" -ne 0 ] && printf '%s\n' "$guard_out" | grep -q 'strategy disables the check'; then
+    if [ "$guard_status" -ne 0 ] && printf '%s\n' "$guard_out" | grep 'strategy disables the check' >/dev/null; then
         ok "guard refuses $mode"
     else
         bad "guard does not refuse $mode (exit $guard_status)"
@@ -234,7 +234,7 @@ printf '%s\n' "$guard_out" | tail -n 1
 if [ "$guard_status" -eq 0 ]; then
     ok "guard accepts strategy on watcher-image"
 else
-    bad "guard refuses strategy on watcher-image: $(printf '%s\n' "$guard_out" | grep '^not ok' | head -1)"
+    bad "guard refuses strategy on watcher-image: $(printf '%s\n' "$guard_out" | grep '^not ok' | sed -n '1p')"
 fi
 rm -rf "$dir"
 
@@ -245,7 +245,7 @@ printf '%s\n' "$guard_out" | tail -n 1
 if [ "$guard_status" -eq 0 ]; then
     ok "unedited scratch copy passes the guard"
 else
-    bad "unedited scratch copy fails: $(printf '%s\n' "$guard_out" | grep '^not ok' | head -1)"
+    bad "unedited scratch copy fails: $(printf '%s\n' "$guard_out" | grep '^not ok' | sed -n '1p')"
 fi
 rm -rf "$dir"
 
@@ -307,7 +307,7 @@ YAML
     if [ "$guard_status" -eq 0 ]; then
         ok "guard stays green with $mode"
     else
-        bad "guard went red with $mode: $(printf '%s\n' "$guard_out" | grep '^not ok' | head -1)"
+        bad "guard went red with $mode: $(printf '%s\n' "$guard_out" | grep '^not ok' | sed -n '1p')"
     fi
     rm -rf "$dir"
 
@@ -395,7 +395,7 @@ DOCKER
     fi
     run_assert demo "$npm_log" "$demo_floors"
     printf 'job: %s\n' "$assert_out"
-    if [ "$assert_status" -ne 0 ] && printf '%s\n' "$assert_out" | grep -q '0 tests is below the floor'; then
+    if [ "$assert_status" -ne 0 ] && printf '%s\n' "$assert_out" | grep '0 tests is below the floor' >/dev/null; then
         ok "$mode: the count proof fails"
     else
         bad "$mode: the count proof did not fail: $assert_out"

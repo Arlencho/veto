@@ -532,6 +532,22 @@ describe('backglass components', { concurrency: 1 }, () => {
     assert.ok((background + 0.05) / (foreground + 0.05) >= 4.5);
   });
 
+  test('a label ending in a full stop does not double the stop in the accessibility label', async () => {
+    const { HoldToApprove } = await import('./HoldToApprove');
+    motion.reduced = true;
+    const root = await mount(
+      createElement(HoldToApprove, {
+        label: 'Press and hold to sign. This will be held.',
+        hint: 'You sign on this phone. Veto never sees your key.',
+        onConfirm: () => undefined,
+      }),
+    );
+    assert.equal(
+      hostOf(root.root, 'Pressable').props.accessibilityLabel,
+      'Press and hold to sign. This will be held. You sign on this phone. Veto never sees your key.',
+    );
+  });
+
   test('the press target pulses once and stays still after rerender and reset', async () => {
     const { HoldToApprove } = await import('./HoldToApprove');
     motion.reduced = false;

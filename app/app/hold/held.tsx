@@ -10,6 +10,7 @@ import {
   daysFromDelay,
   formatChainInstant,
   formatHoldAmount,
+  heldGoneCopy,
   heldReasonChips,
   isDefaultKey,
   routeParam,
@@ -50,7 +51,7 @@ export default function HoldHeld() {
     outlook && outlook.outcome === 'held'
       ? heldReasonChips({
           reasons: outlook.reasons,
-          amountLabel,
+          amountLabel: `${amountLabel} ${loaded.tokenName}`,
           dailyLabel,
           shareLabel: vaultShareText(row?.amount ?? 0n, bundle?.balance ?? 0n),
         })
@@ -59,7 +60,7 @@ export default function HoldHeld() {
     bundle && row ? holdCreatedAt(bundle.account, row, bundle.ledger.entries) : null;
   const hasGuardian = bundle ? !isDefaultKey(bundle.account.guardian.toBase58()) : false;
   const toldLine = `${created ? `Held at ${formatChainInstant(created)}. ` : ''}This phone checks for held withdrawals and schedules the remaining reminders: at 1 hour, at 12 hours, every 12 hours, then 6 hours and 1 hour before it goes. Notifications need to be allowed.`;
-  const empty = bundle && !row ? 'This withdrawal is no longer waiting. Nothing moves unless another request is held.' : undefined;
+  const empty = bundle && !row ? heldGoneCopy(bundle.ledger.entries, idText) : undefined;
   const status = loaded.status === 'ready' && !row ? 'empty' : loaded.status;
 
   async function withAuthority(run: (authority: PublicKey, owner: PublicKey, vaultId: bigint, id: bigint) => Promise<void>) {

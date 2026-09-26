@@ -70,8 +70,9 @@ If the fake wallet account changes, reconnect Veto and fund the new account.
 Execute these separately, in order, from the repository root. Do not pass the
 whole directory to Maestro: 01 resets Veto, 02 continues its pending wallet
 request, and 07 needs laptop-generated chain history. None of 02 through 07
-restarts the fake wallet, and only 04 relaunches Veto to leave the unsigned
-first-run review, so screen and session prerequisites matter.
+restarts the fake wallet, and only 04 relaunches Veto, at its end, to leave
+the first-run live screen for the main tabs, so screen and session
+prerequisites matter.
 
 ```bash
 maestro --device emulator-5554 test e2e/maestro/01-onboarding.yaml
@@ -89,8 +90,8 @@ maestro --device emulator-5554 test e2e/maestro/07-decisions.yaml
 | --- | --- | --- |
 | 01 | Installed Veto, fake wallet available | Four introduction cards, then pending AUTHORIZE |
 | 02 | Pending authorization from 01 | Connected, Add your agent opens paste choice |
-| 03 | Agent choices from 02 | Address and local name entered, rule review shown unsigned |
-| 04 | Relaunched Veto on the main tabs | Rules > Write a rule, typed 0.1 per payment and 1 total, active chain rule |
+| 03 | Agent choices from 02 | Address and local name entered, review sentence shown unsigned |
+| 04 | First-run review from 03 | Agent entered, payee pasted on the scan fallback, 0.1 per payment and 1 total typed, rule live |
 | 05 | Rules tab | Trade rule, supplied agent, unchanged Trading bot defaults, chain detail |
 | 06 | Rules tab | Hold, amount 1, wait 1 day, second Seeker and reviewed safe address, live vault |
 | 07 | Main tab, selected rule with a recorded refusal | Pull refresh, refused row, detail says No money moved. |
@@ -111,10 +112,13 @@ Chain confirmation is asserted back in Veto, not inferred from the wallet tap.
 Hold also handles the authorization request made when its guardian screen reads
 the wallet account list, before showing the guardian fields.
 
-03 tests paste/name/review without signing its first-run proposal, leaving the
-app on a review screen with no Rules tab. 04 relaunches Veto, opens Rules from
-the main tabs and explicitly enters the same agent in a new payment rule. This
-keeps the requested Rules entry covered. Trade defaults are 0.01 SOL per trade,
+03 tests paste/name/review without signing its first-run proposal. It ends on
+the review sentence, because the approve button only renders once a payee is
+set. 04 stays on that first-run review, explicitly enters the same agent,
+pastes the payee through the payee scan's paste field, types 0.1 per payment
+and 1 total, and approves with the long press. The first-run live screen
+confirms the rule, then 04 relaunches Veto so 05 starts on the main tabs. The
+new rule is listed under Rules like any other. Trade defaults are 0.01 SOL per trade,
 0.05 SOL per day, 0.20 SOL total, 90 percent floor and 7 days. The listed pool
 comes from `app/lib/pools.ts` and must exist on the configured devnet deployment.
 

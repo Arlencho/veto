@@ -20,9 +20,14 @@ appId: com.veto.app
     element: "Review the rule"
     direction: DOWN
 - tapOn: "Review the rule"
+# No payee is set on the first-run review yet, so the approve button does not
+# render. Assert the review sentence instead; it names the placeholder payee.
+- extendedWaitUntil:
+    visible: "may pay the payee up to .* per payment and .* in total, until .*"
+    timeout: 60000
+- assertVisible: "may pay the payee up to .* per payment and .* in total, until .*"
 - scrollUntilVisible:
     element: "Most per payment"
     direction: DOWN
     timeout: 60000
-- assertVisible: "Press and hold to approve rule.*"
-# Leave this unsigned. Flow 04 exercises the Rules > Write a rule entry.
+# Leave this unsigned. Flow 04 enters the agent and payee, then approves here.

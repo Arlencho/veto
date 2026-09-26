@@ -1,50 +1,55 @@
 appId: com.veto.app
 ---
-# Flow 03 ends on its unsigned first-run review, which has no Rules tab.
-# Relaunch Veto to reach the main tabs, then open Rules from there.
-- launchApp
-- tapOn: "Rules"
+# Flow 03 ends on the unsigned first-run review. Stay there: this flow enters
+# the agent, sets the payee through the payee scan's paste field, types the
+# limits, and approves. The approve button only renders once a payee is set.
 - scrollUntilVisible:
     element:
-      text: "Write a rule"
+      text: "(?-i)^Agent$"
     direction: DOWN
     timeout: 20000
-- tapOn: "Write a rule"
+- tapOn: "(?-i)^Agent$"
+- eraseText
+- inputText: "${AGENT}"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "May only pay"
+    direction: UP
+    timeout: 20000
+- tapOn: "(?-i)^Edit who your agent may pay.*"
+# The payee scan keeps a paste field below its camera states (added in #351).
+- assertVisible: "(?-i)^Use payee address$"
+- tapOn: "(?-i)^Payee address$"
+- inputText: "${PAYEE}"
+- hideKeyboard
+- tapOn: "(?-i)^Use payee address$"
+# Back on the review screen with the payee staged from the scan handoff.
+- extendedWaitUntil:
+    visible: "Set your agent's limits"
+    timeout: 20000
 - scrollUntilVisible:
     element: "Most per payment"
     direction: DOWN
-    timeout: 60000
+    timeout: 20000
 - tapOn: "Most per payment"
 - eraseText
 - inputText: "0.1"
 - hideKeyboard
 - scrollUntilVisible:
-    element:
-      text: "Most in total, ever"
+    element: "Most in total, ever"
     direction: DOWN
     timeout: 20000
 - tapOn: "Most in total, ever"
 - eraseText
 - inputText: "1"
 - hideKeyboard
+# The block summary below the dials proves the typed limits were applied.
 - scrollUntilVisible:
-    element:
-      text: "Agent"
+    element: "The 1 .* total"
     direction: DOWN
     timeout: 20000
-- tapOn: "Agent"
-- eraseText
-- inputText: "${AGENT}"
-- hideKeyboard
-- scrollUntilVisible:
-    element:
-      text: "Payee"
-    direction: DOWN
-    timeout: 20000
-- tapOn: "Payee"
-- eraseText
-- inputText: "${PAYEE}"
-- hideKeyboard
+- assertVisible: "The 1 .* total"
+- assertVisible: "10 payments of 0.1 .* at most"
 # Maestro longPressOn holds for 3 seconds.
 - assertVisible:
     text: "Press and hold to approve rule.*"
@@ -52,13 +57,11 @@ appId: com.veto.app
 - longPressOn: "Press and hold to approve rule.*"
 - runFlow: helpers/fake-wallet-transaction.yaml
 - extendedWaitUntil:
-    visible: "Your rule"
+    visible: "Your rule is live."
     timeout: 90000
 - extendedWaitUntil:
-    visible: "Active"
+    visible: "can now ask to pay .* It can only ask. It cannot take."
     timeout: 60000
-- tapOn: "Rules"
-- scrollUntilVisible:
-    element: "Write a rule"
-    direction: DOWN
-- assertVisible: "Write a rule"
+# Flow 05 starts on the main tabs; relaunch to leave the first-run live screen.
+- launchApp
+- assertVisible: "Rules"

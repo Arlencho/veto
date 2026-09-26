@@ -14,11 +14,11 @@ test('an invalid safe address cannot open a vault', () => {
   assert.throws(() => validateHoldAddresses(owner, guardian, 'invalid'), /valid Solana/);
 });
 test('the guardian cannot receive recovery even with owner confirmation', () => {
-  assert.throws(() => validateHoldAddresses(owner, guardian, guardian, true), /guardian does not control/);
+  assert.throws(() => validateHoldAddresses(owner, guardian, guardian, true), /Your safe address must be a different wallet from the guardian wallet\./);
 });
-test('the owner wallet requires explicit risk confirmation', () => {
-  assert.throws(() => validateHoldAddresses(owner, guardian, owner), /stolen owner key/);
-  assert.equal(validateHoldAddresses(owner, guardian, owner, true).safeAddress.toBase58(), owner);
+test('the owner wallet is refused even with prior risk confirmation', () => {
+  assert.throws(() => validateHoldAddresses(owner, guardian, owner), /Your safe address must be a different wallet from the one you sign with\./);
+  assert.throws(() => validateHoldAddresses(owner, guardian, owner, true), /Your safe address must be a different wallet from the one you sign with\./);
 });
 test('an independently entered safe wallet is preserved', () => {
   assert.equal(validateHoldAddresses(owner, guardian, ` ${safe} `).safeAddress.toBase58(), safe);

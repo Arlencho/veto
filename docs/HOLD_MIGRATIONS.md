@@ -31,3 +31,19 @@ address change early. Existing Recover semantics are unchanged.
 The old devnet demo vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
 requires the upgraded program and its owner's signature. This code change does
 not deploy a program or submit transactions for that vault.
+
+Migration now requires the writable `hold-ledger` PDA in addition to owner,
+vault and system program. Use the synchronized client and IDL. It appends kind
+14 to the surviving ledger and emits `HoldMigrated` with vault, owner, amount
+and destination. The amount is the rent top-up in lamports and destination is
+the vault; no tokens move. Existing ledger rows remain intact.
+
+Close emits `HoldClosed` with vault, owner, amount in token base units and the
+safe token account destination before closing accounts. Its ledger is deleted;
+the transaction event preserves the final sweep in indexed history.
+
+New vaults and proposed rules reject safe addresses equal to either owner or
+guardian. Apply validates the resulting rules too, including old queued proposals.
+An existing vault with safe equal to guardian can propose an independent safe
+address and apply it after the normal delay. The old recovery destination remains
+in effect while that change waits.

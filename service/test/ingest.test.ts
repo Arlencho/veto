@@ -116,3 +116,25 @@ test('instruction and inner instruction indexes distinguish decisions', async ()
   await reverseDecision({ ...row, inner_index: 0 });
   assert.equal((await stats()).paid, '2');
 });
+
+test('Hold history cannot change an existing agent record during ingestion or reversal', async () => {
+  await add(row);
+  const agentStats = async () => (await pool.query('SELECT requests, paid, outside, allowances, declines, first_open_ts, first_ts, last_ts, last_slot FROM agent_stats WHERE agent = $1', [row.agent])).rows[0];
+  const original = await agentStats();
+  const hold: Decision = { ...row, signature: 'hold', rule_kind: 'hold', rule: 'vault', owner: row.agent,
+    kind: 14, slot: '1', block_time: '2026-08-01T00:00:00Z' };
+  await add(hold);
+  assert.deepEqual(await agentStats(), original);
+  await reverseDecision(hold);
+  assert.deepEqual(await agentStats(), original);
+});
+
+test('agent extrema rescans ignore surviving Hold history', async () => {
+  const hold: Decision = { ...row, signature: 'hold', rule_kind: 'hold', rule: 'vault', owner: row.agent,
+    kind: 14, slot: '1', block_time: '2026-08-01T00:00:00Z' };
+  await add(hold);
+  await add(row);
+  await reverseDecision(row);
+  const stats = (await pool.query('SELECT first_ts, last_ts, last_slot, requests FROM agent_stats WHERE agent = $1', [row.agent])).rows[0];
+  assert.deepEqual(stats, { first_ts: null, last_ts: null, last_slot: null, requests: '0' });
+});

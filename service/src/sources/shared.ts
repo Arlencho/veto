@@ -47,14 +47,18 @@ export async function ingestTransaction(raw: RpcTransaction, source: 'webhook' |
       // Do not require account history again for a duplicate, including closed accounts.
       if ((await tx.query('SELECT 1 FROM decision_keys WHERE signature=$1 AND instruction_index=$2 AND inner_index=$3',
         [location.signature, location.instruction_index, location.inner_index])).rowCount) continue;
-      const identity = record.kind === 'open_mandate' ? record : await ruleIdentity(tx, record.mandate, rpc);
+      const hold = record.kind === 'hold_migrated' || record.kind === 'hold_closed';
+      // Hold has no agent. Attribute lifecycle history to its owner without
+      // fetching a vault that may already have been closed.
+      const identity = hold ? { owner: record.owner, agent: record.owner }
+        : record.kind === 'open_mandate' ? record : await ruleIdentity(tx, record.mandate, rpc);
       const charge = record.kind === 'paid' || record.kind === 'refused' || record.kind === 'traded';
       const row: Decision = {
-        ...location, owner: identity.owner, agent: identity.agent, rule: record.mandate, rule_kind: 'mandate', program_version: 1,
-        kind: { open_mandate: 0, paid: 1, refused: 2, grant_override: 3, revoke_mandate: 4, close_mandate: 5, traded: 6 }[record.kind],
+        ...location, owner: identity.owner, agent: identity.agent, rule: record.mandate, rule_kind: hold ? 'hold' : 'mandate', program_version: 1,
+        kind: { open_mandate: 0, paid: 1, refused: 2, grant_override: 3, revoke_mandate: 4, close_mandate: 5, traded: 6, hold_migrated: 14, hold_closed: 15 }[record.kind],
         reason: charge ? record.reason : 0, amount: 'amount' in record ? String(record.amount) : '0',
         nonce: 'nonce' in record ? String(record.nonce) : '0',
-        counterparty: charge ? record.counterparty : record.kind === 'open_mandate' ? record.merchant : identity.owner,
+        counterparty: hold ? record.destination : charge ? record.counterparty : record.kind === 'open_mandate' ? record.merchant : identity.owner,
         suggested_override: charge ? String(record.suggestedOverride) : null, commitment: 'confirmed', source,
       };
       if (await insertDecision(tx, row)) count++;

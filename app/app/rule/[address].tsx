@@ -12,6 +12,7 @@ import { DecisionRow } from '../../components/DecisionRow';
 import { TradeRuleDetail } from '../../components/TradeRuleDetail';
 import { ConnectAgentPanel } from '../../components/ConnectAgentPanel';
 import { ConnectGate } from '../../components/ConnectGate';
+import { BLOCK_COUNT } from '../../components/backglass/BlockBar';
 import { SpendBoard } from '../../components/daily/SpendBoard';
 import { barUnits, openedAtSec, ruleDay } from '../../components/daily/facts';
 import { LivePill } from '../../components/daily/LivePill';
@@ -400,7 +401,7 @@ export default function RuleDetailScreen() {
               remaining={bars.remaining}
               cap={bars.cap}
               accessibilityLabel={`${remainingText} left of ${formatTokenDisplay(mandate.cap, amountDecimals, mandate.mint)}`}
-              leftCaption={`1 block = one payment of ${formatTokenDisplay(mandate.perTxMax, amountDecimals, mandate.mint)}`}
+              leftCaption={`1 block is 1/${BLOCK_COUNT} of your ${formatTokenDisplay(mandate.cap, amountDecimals, mandate.mint)} cap`}
               rightCaption={funds ? 'Kept in its own account' : 'Reading where this rule keeps its budget.'}
               dimmed={!active}
             />

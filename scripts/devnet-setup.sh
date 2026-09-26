@@ -402,7 +402,8 @@ The lead already upgraded the program from main commit
 `e2a66dbd4bc6aa9e7b68011f6c9973650eaef79d` (`e2a66db`), containing
 [PR 342](https://github.com/Arlencho/veto/pull/342) and
 [PR 344](https://github.com/Arlencho/veto/pull/344). The following deployment
-facts were supplied by the lead, not independently reverified in this run:
+facts were initially supplied by the lead. The continuation below
+independently verifies the deployed bytes:
 
 - Build: 631392 bytes; SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`.
 - Program data was extended from 592720 bytes before the upgrade.
@@ -423,30 +424,130 @@ the Veto program. Its HoldVault owner field is the founder device key
 It will be migrated and closed by its owner later, with his Seed Vault
 signature, following [Hold migrations](HOLD_MIGRATIONS.md).
 
-Verification stopped at the first failure: `make e2e-devnet` exited 2 because
-`keys/deployer.json` is absent in this task checkout. Neither `VETO_KEYS_DIR`
-nor `VETO_E2E_FUNDER` was configured. The journey failed its prerequisite
-check before sending transactions. Summary lines:
+#### Verification resumed, 2026-09-26
+
+The continuation sets `VETO_KEYS_DIR` to the maintainer's existing key directory
+and `VETO_E2E_FUNDER` and `VETO_FUNDER_KEYPAIR` to its `deployer.json`.
+The key files are read in place, never copied, printed or changed. A temporary
+gitignored `keys` symlink served the trade target's fixed relative paths
+and was removed after that check.
+Every network command uses `VETO_RPC=https://api.devnet.solana.com`.
+A temporary fetch preload paces public RPC calls by 450 ms and retries HTTP
+429 with 15, 30, 60 and 120 second back-offs. The preload also suppresses the
+payment journey's automatic Markdown reports; stdout supplies the evidence.
+No deployment or device operation was performed, and the legacy vault was
+not accessed during this continuation.
+
+The default `make e2e-devnet` now loads the signer, but its prerequisite
+check fails before transactions because the funder holds only 235810 USDC
+base units and the journey needs 3000000. Summary lines:
 
 ```text
-setup: check journey prerequisites: fail: devnet journey: deployer key not found
+setup: check journey prerequisites: fail: Funder GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1 holds 235810 USDC base units; this journey needs 3000000 USDC base units.
 ℹ tests 1
-ℹ suites 0
 ℹ pass 0
 ℹ fail 1
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
 make: *** [e2e-devnet] Error 1
 ```
 
-The setup line above omits the checkout-specific absolute path; the missing
-file is `keys/deployer.json`. Per the stop-on-first-failure rule,
-`make hold-e2e-devnet`, `make trade-demo-devnet`, and the subsequent comparison
-of IDL copies against the deployed program were not run. Their success is
-not claimed for this upgrade. Resume verification with the maintainer's
-existing backed-up signer available through the supported key configuration;
-do not deploy again or use the founder's device for this run.
+#### Payment journey with VTEST
+
+The supported test-token variant,
+`make e2e-devnet EXPO_PUBLIC_VETO_MINT=2dV6DLAUF63ugfD1sgNF8fUmQKr9pMDzeLxJGSwkMcCU`,
+exited 0. This verifies the upgraded program with VTEST, not USDC. It opened
+rules `BaZE93eqcVHiKPYn7ttaqZZZ2tFzVbdJz5CcKihPtgA6` and
+`4um4KdLcoC8EkizDui4K2u6NqJKN7vwyVeDt7T4V1NMz`, paid, refused, overrode,
+revoked and closed them. All six exports returned `VERDICT: CONFIRMED`;
+the deliberately changed amount returned `VERDICT: REJECTED`.
+Cleanup returned 4250000 VTEST base units plus remaining SOL and token-account
+rent to the deployer, signature
+`4jByQupPPsW2rWL2Tpv5psqC5z8L7HtyU1AbqyWJKTeVJDM9MM8KUrCxXENBHGYy1cRDMp5njoN3SGoEfEQBWPhS`.
+Summary lines:
+
+```text
+✔ devnet journey opens two rules, pays, refuses, overrides, revokes, closes, and verifies every decision (228468.10125ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+An earlier VTEST attempt and Hold attempt collided during concurrent SDK
+`npm ci` installs and failed before their journeys ran. Both targets were
+then rerun sequentially with complete dependency installs.
+
+#### Hold journey
+
+`make hold-e2e-devnet` exited 0 on a fresh vault. Exact summary lines:
+
+```text
+cluster: devnet https://api.devnet.solana.com
+vault: 6s5wzKHau6LgLjFN7H1vZeQcK74JSoTS8DPN3aRE71j7
+mint: 4thsyyjvf4ATccecnK3MXUpGvbGDfGzrdk7HbjmYZvfL
+init: guardian and safe address set
+deposit: 1000000000
+everyday paid at once: 10000000 to BBzfvQwzsbDwZ8oggy6Crgoy1zKRS2u6znoFwBGkwmZi
+big withdrawal held: 300000000, unlock 1790541143
+execute before unlock: refused, balances unchanged
+execute after unlock: not run (devnet does not warp; unlock is one day out)
+guardian stopped held withdrawal 3
+freeze: guardian
+recover while frozen: 989000000 to safe DM7KQ7UFxuweMM2QTVo4cJRMcMMFaTQJhqaPbctr9npj
+unfreeze: owner and guardian
+loosening share to 5000 waits until 1790541167
+tightening daily limit applied at once: 40000000
+✔ a Hold vault pays a known everyday withdrawal at once, holds a big one, and lets the guardian stop, freeze, and recover (60284.534541ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+Payment after the one-day delay and applying the queued loosening after
+its delay were not exercised on devnet. The test did not warp the clock.
+This vault is separate from the legacy vault reserved for its owner's
+migration and closure.
+
+#### Trade demo result
+
+`make trade-demo-devnet TRADE_DEMO_AMOUNT=1000000` exited 2. The existing
+fixture refused the first expected honest trade because the current pool
+quote is below its configured price floor. Exact summary:
+
+```text
+refused amount_in=1000000 amount_out=0 reason=14 quote below floor suggested_override=0 signature=2AHCniirT2viCPUQRSLs9aRoJihbhKCXfFHJ1kKpsjBYJgirsm9feFfGpjkMZjPXeouK9wyuUExMqjk6t3vzDUpE slot=504532748
+expected reason 0, got refused reason 14
+make: *** [trade-demo-devnet] Error 1
+```
+
+The target stopped before the hostile-agent sequence. No successful trade
+or hostile sequence is claimed for this upgrade. Existing key-directory
+fixtures were left unchanged; the rule's price protection was not loosened.
+A complete trade rerun needs a fixture whose floor and remaining daily
+allowance support the current pool, as noted in the previous upgrade record.
+
+#### IDL and deployed program verification
+
+A confirmed read of program data at slot 504531668 independently verified
+upgrade slot 504527739, the 631392-byte program SHA-256
+`58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`,
+and 1024 trailing zero bytes after the binary. This matches the lead's build.
+
+`anchor idl build -p veto -o /tmp/upgrade3-verification/idl.json -- --lib`
+generated 24 instructions, SHA-256
+`c6db6d11b218d68b9179856f97471e6bd19117313529490ca1b11e382b0370f6`.
+All four copies match byte for byte: `sdk/idl/veto.json`,
+`tools/idl/veto.json`, `watcher/idl/veto.json`, and `indexer/idl/veto.json`.
+`git diff e2a66db -- programs sdk/idl tools/idl watcher/idl indexer/idl`
+is empty. The fresh source IDL and independently verified deployed hash tie
+the client copies to the recorded deployment; no on-chain IDL publication
+is claimed.
+
+#### Local validation and review
+
+- `make test-scripts`: exit 0, all 32 script groups completed.
+- `bash -n scripts/devnet-setup.sh`, `shellcheck -S error scripts/devnet-setup.sh`, and `git diff --check`: exit 0.
+- `scripts/docs-phase2-191.critic-r2-pr209.test.sh`: 1 passed, 0 failed; `write_docs` renders this document byte for byte.
+- Independent DevOps Critic review: no findings; the recorded live results match the logs. The primary review service was unavailable, so the charter's fallback reviewer performed the review.
+- Script edits are confined to the `write_docs` template. No container, workflow or deployment behavior changed.
 
 ### Hold upgrade, 2026-09-26
 

@@ -21,7 +21,6 @@ bad() { printf 'not ok - %s\n' "$1"; fail=$((fail + 1)); }
 [[ -f "$SCRIPT" ]] || { echo "missing ${SCRIPT}"; exit 1; }
 [[ -x "$SCRIPT" ]] || { echo "not executable ${SCRIPT}"; exit 1; }
 
-DEVNET_GENESIS="EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 MAINNET_GENESIS="5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 USDC_MINT="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
 # Two fixture keys: public_key_b64 holds base64 of the 32 raw public key

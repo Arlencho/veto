@@ -1,0 +1,6 @@
+appId: com.veto.app
+---
+# Independently runnable: the helper replays 01 from a cleared install to
+# bring the AUTHORIZE sheet back, then approves it and opens the agent paste
+# choice.
+- runFlow: helpers/connect-wallet.yaml

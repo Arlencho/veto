@@ -1,0 +1,6 @@
+appId: com.veto.app
+---
+# Independently runnable: the helper replays 01 through 03 from a cleared
+# install, approves the payment rule on the first-run review, and relaunches
+# Veto onto the main tabs.
+- runFlow: helpers/reach-main-tabs.yaml

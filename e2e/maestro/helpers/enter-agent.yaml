@@ -1,0 +1,37 @@
+appId: com.veto.app
+---
+# Replays the introduction and wallet authorization, then enters the agent
+# address and a local name and stops on the unsigned first-run review.
+- runFlow: connect-wallet.yaml
+- tapOn: "Paste your agent's address"
+- tapOn: "Paste your agent's address"
+- inputText: "${AGENT}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Name your agent"
+      index: 1
+    direction: DOWN
+# The heading is index 0; the editable field with the same label is index 1.
+- tapOn:
+    text: "Name your agent"
+    index: 1
+- eraseText
+- inputText: "Maestro agent"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Review the rule"
+    direction: DOWN
+- tapOn: "Review the rule"
+# No payee is set on the first-run review yet, so the approve button does not
+# render. Assert the review sentence instead; it names the placeholder payee.
+- extendedWaitUntil:
+    visible: ".* may pay the payee up to .* per payment and .* in total, until .*"
+    timeout: 60000
+- assertVisible: ".* may pay the payee up to .* per payment and .* in total, until .*"
+- scrollUntilVisible:
+    element: "Most per payment"
+    direction: DOWN
+    timeout: 60000
+# Leave this unsigned. approve-payment-rule.yaml continues on this review by
+# entering the agent and payee, typing the limits, and approving.

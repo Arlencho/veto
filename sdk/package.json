@@ -14,24 +14,23 @@
   "engines": {
     "node": ">=22"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
     }
   },
   "files": [
     "dist",
-    "idl",
     "README.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc && node -e \"require('node:fs').cpSync('idl', 'dist/idl', { recursive: true })\"",
     "test": "tsx --test src/*.test.ts",
     "typecheck:examples": "tsc --noEmit -p tsconfig.test.json",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
@@ -45,5 +44,12 @@
     "@types/node": "^22.15.3",
     "tsx": "^4.19.4",
     "typescript": "~5.8.3"
-  }
+  },
+  "keywords": [
+    "veto",
+    "solana",
+    "agents",
+    "payments",
+    "sdk"
+  ]
 }

@@ -1,25 +1,8 @@
 #!/usr/bin/env bash
-# Install and verify the Solana and Anchor toolchain for the program CI job.
-#
-# The job used to run each installer exactly once, so one transient download
-# error failed the whole run and blocked unrelated pull requests. Two such
-# failures landed on the same day: a 500 from the release download, and a
-# build provenance check that rejected a partially downloaded Anchor binary.
-#
-# Every install here is bounded: 3 attempts with a linear back-off, and the
-# installer's own verification runs inside the attempt, so a partial download
-# is never carried into the next attempt and verification is never skipped to
-# get a green run. `avm install` verifies the build provenance attestation of
-# the downloaded binary by default; the dangerous --skip-attestation flag is
-# never passed. On top of the installer's checks, each attempt ends by running
-# the installed binary and matching its reported version, and the workflow
-# reruns the Anchor install and attestation check even after a cache restore.
-#
-# Subcommands:
-#   install-anchor   retry loop: cargo install avm, avm install, avm use, verify
-#   verify-anchor    exit 0 only if anchor on PATH reports the pinned version
-#   install-solana   retry loop: anza installer, verify
-#   verify-solana    exit 0 only if the installed solana binary runs
+# Install the CI toolchain with bounded retries. Anchor is verified against
+# a repository-pinned SHA-256 before execution, on both cache hits and misses.
+# Updating Anchor requires reviewing the release provenance and updating the
+# version, asset and checksum together. No runtime network attestation needed.
 set -euo pipefail
 
 ATTEMPTS=3
@@ -29,6 +12,13 @@ BACKOFF_BASE_S=10
 # the workflow cache key rotates weekly to track it.
 ANCHOR_VERSION="1.2.0"
 ANCHOR_VERSION_OUTPUT="anchor-cli ${ANCHOR_VERSION}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ANCHOR_BIN="${HOME}/.avm/bin/anchor-${ANCHOR_VERSION}"
+ANCHOR_ASSET="anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+ANCHOR_URL="https://github.com/otter-sec/anchor/releases/download/v${ANCHOR_VERSION}/${ANCHOR_ASSET}"
+# Digest from the immutable v1.2.0 release, also verified against its signed
+# provenance when pinned: https://github.com/otter-sec/anchor/releases/tag/v1.2.0
+ANCHOR_CHECKSUM_FILE="${SCRIPT_DIR}/anchor-${ANCHOR_VERSION}-linux-x64.sha256"
 
 SOLANA_INSTALL_URL="https://release.anza.xyz/stable/install"
 SOLANA_INSTALL_DIR="${HOME}/.local/share/solana/install"
@@ -44,43 +34,78 @@ backoff() {
   sleep "$wait_s"
 }
 
-verify_anchor() {
-  command -v avm >/dev/null 2>&1 || return 1
-  command -v anchor >/dev/null 2>&1 || return 1
-  local version
-  version=$(anchor --version 2>/dev/null) || return 1
+load_anchor_checksum() {
+  [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ] || {
+    log "Anchor CI checksum supports Linux x86_64 only" >&2
+    return 1
+  }
+  local checksum
+  checksum=$(cat "$ANCHOR_CHECKSUM_FILE") || return 1
+  [[ "$checksum" =~ ^[0-9a-f]{64}$ ]] || return 1
+  ANCHOR_SHA256="$checksum"
+}
+
+anchor_checksum_matches() {
+  local binary="$1" actual
+  [ -f "$binary" ] || return 1
+  actual=$(sha256sum "$binary") || return 1
+  [ "${actual%% *}" = "$ANCHOR_SHA256" ]
+}
+
+verify_anchor_binary() {
+  local binary="$1" version
+  # Never execute a cache entry or download before verifying its bytes.
+  anchor_checksum_matches "$binary" || return 1
+  [ -x "$binary" ] || return 1
+  version=$("$binary" --version 2>/dev/null) || return 1
   [ "$version" = "$ANCHOR_VERSION_OUTPUT" ]
 }
 
+verify_anchor() {
+  load_anchor_checksum || return 1
+  verify_anchor_binary "$ANCHOR_BIN"
+}
+
+activate_anchor() {
+  # Replace the old avm shim without executing any cached installer or shim.
+  mkdir -p "${HOME}/.cargo/bin" || return 1
+  ln -sf "$ANCHOR_BIN" "${HOME}/.cargo/bin/anchor"
+}
+
 install_anchor_once() {
-  # The caller uses this function as a condition, so errexit is disabled.
-  # Explicitly propagate each failure before checking the installed version.
-  # avm itself is compiled once per runner; a later attempt reuses it instead
-  # of paying for another cargo build.
-  if ! command -v avm >/dev/null 2>&1; then
-    cargo install --git https://github.com/coral-xyz/anchor avm --force || return 1
+  local download
+  mkdir -p "${HOME}/.avm/tmp" "${HOME}/.avm/bin" || return 1
+  download=$(mktemp "${HOME}/.avm/tmp/anchor.XXXXXX") || return 1
+  if curl -fsSL --connect-timeout 20 --max-time 120 --output "$download" "$ANCHOR_URL" \
+      && anchor_checksum_matches "$download" \
+      && chmod +x "$download" \
+      && verify_anchor_binary "$download" \
+      && mv -f "$download" "$ANCHOR_BIN"; then
+    activate_anchor || return 1
+    return 0
   fi
-  # --force re-downloads even when a previous attempt left a binary behind,
-  # so the provenance attestation check really runs on every attempt.
-  avm install --force "$ANCHOR_VERSION" || return 1
-  avm use "$ANCHOR_VERSION" || return 1
-  verify_anchor || return 1
+  rm -f "$download"
+  return 1
 }
 
 install_anchor() {
+  load_anchor_checksum || die "missing or invalid Anchor checksum, or unsupported platform"
+  if verify_anchor_binary "$ANCHOR_BIN"; then
+    activate_anchor || die "could not activate verified Anchor binary"
+    log "Anchor restored from cache; pinned SHA-256 and version verified locally"
+    return 0
+  fi
   local attempt
   for attempt in $(seq 1 "$ATTEMPTS"); do
     if [ "$attempt" -gt 1 ]; then
-      # Drop anything a partial download left behind before trying again.
-      rm -rf "${HOME}/.avm/tmp" "${HOME}/.avm/bin/anchor-${ANCHOR_VERSION}"
       backoff "$attempt"
     fi
-    log "anchor install attempt ${attempt} of ${ATTEMPTS} (build provenance verification enabled)"
+    log "anchor install attempt ${attempt} of ${ATTEMPTS} (pinned SHA-256 verification required)"
     if install_anchor_once; then
-      log "anchor installed and verified: $(anchor --version)"
+      log "anchor installed and verified: ${ANCHOR_VERSION_OUTPUT}"
       return 0
     fi
-    log "anchor install attempt ${attempt} failed verification"
+    log "anchor install attempt ${attempt} failed download, checksum, version or activation"
   done
   die "anchor install failed ${ATTEMPTS} attempts; the binary never passed verification"
 }

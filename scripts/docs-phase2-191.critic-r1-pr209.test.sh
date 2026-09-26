@@ -46,7 +46,7 @@ fi
 clock=0
 while IFS= read -r hit; do
     line="${hit#*:*:}"
-    if ! printf '%s' "$line" | grep -q -E 'https?://'; then
+    if ! printf '%s' "$line" | grep -E 'https?://' >/dev/null; then
         echo "  # ${hit#"$ROOT"/}"; clock=1
     fi
 done < <(grep -rn -E 'October 8, 2026 at [0-9]{1,2}:[0-9]{2}' "$ROOT/README.md" "$ROOT/docs" --include='*.md')

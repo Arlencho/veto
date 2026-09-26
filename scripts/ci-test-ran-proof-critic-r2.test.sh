@@ -130,9 +130,9 @@ expect_refused() {
     fi
     run_guard "$dir"
     echo "----- $mode -----"
-    printf '%s\n' "$guard_out" | grep '^not ok' | head -3
+    printf '%s\n' "$guard_out" | grep '^not ok' | sed -n '1,3p'
     printf '%s\n' "$guard_out" | tail -n 1
-    if [ "$guard_status" -ne 0 ] && printf '%s\n' "$guard_out" | grep '^not ok' | grep -q "$job"; then
+    if [ "$guard_status" -ne 0 ] && printf '%s\n' "$guard_out" | grep '^not ok' | grep "$job" >/dev/null; then
         ok "guard refuses $mode"
     else
         bad "guard accepts $mode (exit $guard_status): the capture-to-proof slot is open"
@@ -155,7 +155,7 @@ expect_accepted() {
     if [ "$guard_status" -eq 0 ]; then
         ok "guard accepts $mode"
     else
-        bad "guard refuses $mode: $(printf '%s\n' "$guard_out" | grep '^not ok' | head -1)"
+        bad "guard refuses $mode: $(printf '%s\n' "$guard_out" | grep '^not ok' | sed -n '1p')"
     fi
     rm -rf "$dir"
 }

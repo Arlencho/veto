@@ -105,7 +105,7 @@ function fakeClient(accounts: () => { pubkey: PublicKey; data: Buffer }[], over:
   const calls: { offset: number | undefined; bytes: string | undefined; dataSize: number | undefined }[] = [];
   const connection = {
     getProgramAccounts: async (_program: PublicKey, opts: { filters: Filters }) => {
-      const memcmp = opts.filters.find((item) => item.memcmp)?.memcmp;
+      const memcmp = opts.filters.find((item) => item.memcmp && item.memcmp.offset !== 0)?.memcmp;
       calls.push({
         offset: memcmp?.offset,
         bytes: memcmp?.bytes,
@@ -156,7 +156,7 @@ test('a guardian finds the vaults it guards by the guardian field and remembers 
     found.map((vault) => vault.address.toBase58()),
     [guarded.toBase58()],
   );
-  assert.deepEqual(calls[0], { offset: 40, bytes: GUARDIAN.toBase58(), dataSize: HOLD_VAULT_LEN });
+  assert.deepEqual(calls[0], { offset: 40, bytes: GUARDIAN.toBase58(), dataSize: undefined });
 
   const owned = await listHoldVaults(client, GUARDIAN);
   assert.equal(owned.length, 0, 'a guarded vault is not listed as the guardian\'s own vault');
@@ -353,4 +353,14 @@ test('stop, freeze and recover are built with the guardian key as the signer', a
     /not the guardian of this vault/,
   );
   assert.equal(sent.length, 3, 'the wallet is not opened for a key that is not the guardian');
+});
+
+test('the owner can discover a legacy vault that still holds funds', async () => {
+  const { listHoldVaults } = await import('./holdChain');
+  const address = holdVaultPda(PROGRAM, OWNER, 1n);
+  const { client } = fakeClient(() => [{ pubkey: address, data: vaultBytes({ vaultId: 1n }).subarray(0, 1291) }]);
+  const rows = await listHoldVaults(client, OWNER);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.address.toBase58(), address.toBase58());
+  assert.equal(rows[0]?.migrationRequired, true);
 });

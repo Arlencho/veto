@@ -4,6 +4,8 @@ import { colors, fonts, radii, space } from '../theme';
 import { HoldTop, StatusBlock } from './chrome';
 
 export type VaultCard = {
+  migrationRequired?: boolean;
+  vaultId?: bigint;
   address: string;
   amountLabel: string;
   tokenName: string;
@@ -35,6 +37,7 @@ export function VaultHome({
   onOpen,
   onSend,
   onGuard = () => undefined,
+  onMigrate,
 }: {
   network: string;
   status: 'loading' | 'error' | 'empty' | 'ready';
@@ -46,6 +49,7 @@ export function VaultHome({
   onOpen: (address: string, kind: 'held' | 'frozen' | 'vault') => void;
   onSend: (address: string) => void;
   onGuard?: (address: string) => void;
+  onMigrate?: (address: string) => void;
 }) {
   return (
     <View style={styles.wrap}>
@@ -81,7 +85,14 @@ export function VaultHome({
                 <Text style={styles.holdText}>{vault.pendingLabel}</Text>
               </Pressable>
             ) : null}
-            {!vault.frozen ? (
+            {vault.migrationRequired ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Update this vault"
+                onPress={() => onMigrate?.(vault.address)} style={styles.ghost}>
+                <Text style={styles.ghostText}>Update this vault</Text>
+                <Text style={styles.body}>Your funds and rules stay in place. Sign with the owner wallet to continue.</Text>
+              </Pressable>
+            ) : null}
+            {!vault.frozen && !vault.migrationRequired ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Send from this vault"

@@ -17,6 +17,9 @@ pub const HOLD_PENDING_CAPACITY: usize = 8;
 /// Decisions kept on the hold ledger. Older ones fall out of the ring.
 pub const HOLD_LEDGER_CAPACITY: usize = 32;
 
+/// Exact pre-330 Borsh size including the discriminator. Never infer this from a future layout.
+pub const LEGACY_HOLD_VAULT_LEN: usize = 1291;
+
 pub const HOLD_WINDOW_SECS: i64 = 24 * 60 * 60;
 pub const HOLD_DELAY_1_DAY: i64 = HOLD_WINDOW_SECS;
 pub const HOLD_DELAY_2_DAYS: i64 = 2 * HOLD_WINDOW_SECS;

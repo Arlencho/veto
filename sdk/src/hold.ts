@@ -9,6 +9,8 @@ import {
   type AccountMeta,
 } from "@solana/web3.js";
 import {
+  MIGRATE_HOLD_VAULT_DISCRIMINATOR,
+  CLOSE_HOLD_VAULT_DISCRIMINATOR,
   APPLY_CHANGE_DISCRIMINATOR,
   CANCEL_CHANGE_DISCRIMINATOR,
   DEPOSIT_DISCRIMINATOR,
@@ -103,7 +105,7 @@ export type HoldVaultAccount = {
   vaultId: bigint;
   dailyLimit: bigint;
   dailyBuckets: { hour: bigint; amount: bigint }[];
-  /** Fixed window retained only for the big-door share calculation. */
+  /** Legacy window total retained for layout migration. */
   windowSpent: bigint;
   windowStart: bigint;
   delaySecs: bigint;
@@ -238,6 +240,7 @@ function needLen(data: Buffer, length: number, what: string): void {
 
 export function decodeHoldVault(data: Buffer, address: PublicKey): HoldVaultAccount {
   requireDisc(data, HOLD_VAULT_DISCRIMINATOR, "Hold vault");
+  if (data.length === 1291) throw new Error("Legacy Hold vault: owner must call migrateHoldVault for the 1691 byte layout before use");
   needLen(data, VAULT_LEN, "Hold vault");
   const knownLen = Math.min(data.readUInt8(OFF_KNOWN_LEN), HOLD_KNOWN_CAPACITY);
   const known: PublicKey[] = [];
@@ -514,6 +517,32 @@ export class HoldVault {
       meta(SystemProgram.programId, false, false),
     ], data);
     const signature = await sendInstruction(this.connection, args.owner, instruction, [args.owner], label);
+    return { signature, ...where };
+  }
+
+  async migrateHoldVault(args: { owner: Keypair; vaultId: bigint | number }): Promise<SentHoldTx> {
+    const where = derived(this.programId, args.owner.publicKey, asU64(args.vaultId, "vaultId"));
+    const instruction = ix(this.programId, [
+      meta(args.owner.publicKey, true, true), meta(where.vault, false, true),
+      meta(SystemProgram.programId, false, false),
+    ], discData(MIGRATE_HOLD_VAULT_DISCRIMINATOR));
+    const signature = await sendInstruction(this.connection, args.owner, instruction, [args.owner], "HoldVault.migrateHoldVault");
+    return { signature, ...where };
+  }
+
+  async closeHoldVault(args: {
+    owner: Keypair; vaultId: bigint | number; destination: PublicKey | string;
+    mint: PublicKey | string; tokenProgram?: PublicKey | string;
+  }): Promise<SentHoldTx> {
+    const where = derived(this.programId, args.owner.publicKey, asU64(args.vaultId, "vaultId"));
+    const instruction = ix(this.programId, [
+      meta(args.owner.publicKey, true, true), meta(where.vault, false, true),
+      meta(where.ledger, false, true), meta(where.vaultToken, false, true),
+      meta(toPublicKey(args.destination, "destination"), false, true),
+      meta(toPublicKey(args.mint, "mint"), false, false),
+      meta(tokenProgramOf(args.tokenProgram, "tokenProgram"), false, false),
+    ], discData(CLOSE_HOLD_VAULT_DISCRIMINATOR));
+    const signature = await sendInstruction(this.connection, args.owner, instruction, [args.owner], "HoldVault.closeHoldVault");
     return { signature, ...where };
   }
 

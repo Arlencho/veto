@@ -20,6 +20,8 @@ import {
   type HoldOutlook,
 } from './holdRead';
 import {
+  migrateHoldVaultInstruction,
+  closeHoldVaultInstruction,
   depositInstruction,
   freezeInstruction,
   initVaultInstruction,
@@ -567,6 +569,20 @@ const instructionCases: {
       }),
   },
   {
+    name: 'migrating a legacy vault', length: 8,
+    feePayer: (row) => row.owner.publicKey,
+    app: (row) => migrateHoldVaultInstruction({ programId: row.programId, owner: row.owner.publicKey, vaultId: row.vaultId }),
+    sdk: (row, vault) => vault.migrateHoldVault({ owner: row.owner, vaultId: row.vaultId }),
+  },
+  {
+    name: 'closing a vault to its safe address', length: 8,
+    feePayer: (row) => row.owner.publicKey,
+    app: (row) => closeHoldVaultInstruction({ programId: row.programId, owner: row.owner.publicKey,
+      vaultId: row.vaultId, destination: row.destination, mint: row.mint }),
+    sdk: (row, vault) => vault.closeHoldVault({ owner: row.owner, vaultId: row.vaultId,
+      destination: row.destination, mint: row.mint }),
+  },
+  {
     name: 'freezing a vault',
     length: 8,
     feePayer: (row) => row.guardian.publicKey,
@@ -973,4 +989,15 @@ test('the share preview holds a burst across the old window edge', () => {
     { amount: 100n, destination: knownDest, balance: 800n, now: NOW },
     { outcome: 'held', reasons: ['over_share'], unlockAt: intText(NOW + DAY) },
   );
+});
+
+test('legacy display preserves rules and blocks withdrawal previews until migration', () => {
+  const vaultKey = Keypair.generate().publicKey;
+  const legacy = vaultBytes(baseVault({})).subarray(0, 1291);
+  const account = decodeHoldVault(legacy, vaultKey, true);
+  assert.equal(account.migrationRequired, true);
+  assert.equal(account.dailyLimit, legacy.readBigUInt64LE(176));
+  assert.throws(() => holdWithdrawalOutlook(account, {
+    amount: 1n, destination: knownDest, balance: 1000n, now: NOW,
+  }), /Update this vault/);
 });

@@ -309,7 +309,8 @@ async function owned(
 
 function readPending(data: Buffer): HoldPending[] {
   requireDisc(data, VAULT_DISC, "hold vault");
-  if (data.length < VAULT_LEN) throw new Error(`hold vault account is ${data.length} bytes, need ${VAULT_LEN}`);
+  // Pending rows keep their offsets across the owner-signed layout migration.
+  if (data.length !== 1291 && data.length < VAULT_LEN) throw new Error(`hold vault account is ${data.length} bytes, need ${VAULT_LEN}`);
   const pending: HoldPending[] = [];
   for (let i = 0; i < HOLD_PENDING_CAPACITY; i += 1) {
     const off = OFF_PENDING + i * PENDING_SIZE;

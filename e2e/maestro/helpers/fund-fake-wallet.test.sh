@@ -3,8 +3,10 @@
 # spl-token are stubbed on a private PATH; no device, emulator, cluster or
 # real keypair is touched. Proves the helper refuses a missing or non-emulator
 # serial, a non-devnet genesis hash and bad amounts before touching adb, reads
-# only the newest fake wallet public key, funds it with SOL and devnet USDC
-# via --fund-recipient, keeps funding noise off stdout, deletes its database
+# only the newest fake wallet key row, base64-decodes its public_key_b64
+# column (standard or URL-safe, padding optional) into 32 bytes and
+# base58-encodes them, funds that address with SOL and devnet USDC via
+# --fund-recipient, keeps funding noise off stdout, deletes its database
 # copies, and never prints private key material.
 set -uo pipefail
 
@@ -22,8 +24,15 @@ bad() { printf 'not ok - %s\n' "$1"; fail=$((fail + 1)); }
 DEVNET_GENESIS="EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 MAINNET_GENESIS="5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 USDC_MINT="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
-OLD_PUB="9xQe3v7KmNpQrStUvWxYzAbCdEfGhJkMnPqR"
-NEW_PUB="8wPd2u6JmNqRsTuVwXyZaBcDeFgHiJkLnPrS"
+# Two fixture keys: public_key_b64 holds base64 of the 32 raw public key
+# bytes. The old row uses standard base64 with padding; the newest row uses
+# URL-safe base64 without padding, so the happy path proves both alphabets
+# and missing padding decode. NEW_PUB is the base58 address of the 32 bytes
+# the newest row encodes.
+OLD_PUB_B64="+/8+AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxw="
+OLD_PUB="Hxh53DDgM5a7GJjTnRrJ3uaMwgYbxR4UZ3DxpejgY4G3"
+NEW_PUB_B64="-v79AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxw"
+NEW_PUB="HtnSNJvohUmvUjYCk13Fqtn5KDKsrGbBwmCYtNDg6b4o"
 DB_SENTINEL="DbPrivateKeySentinelDoNotPrint9f3c"
 FUNDER_SENTINEL="FunderKeySentinelDoNotPrint7zQ"
 
@@ -38,25 +47,30 @@ export FAKE_WALLET_DB="${DIR}/keys.db"
 FUNDER="${DIR}/funder.json"
 printf '[%s]\n' "$FUNDER_SENTINEL" > "$FUNDER"
 
-# The fake wallet key table holds two rows; the helper must pick the newest.
-python3 - "$FAKE_WALLET_DB" "$OLD_PUB" "$NEW_PUB" "$DB_SENTINEL" <<'PY'
+# The fake wallet key table holds two rows; the helper must pick the newest
+# by id. write_key_table builds a fixture database at the given path with the
+# given base64 public keys and sentinel private key material.
+write_key_table() {
+  python3 - "$1" "$2" "$3" "$DB_SENTINEL" <<'PY'
 import sqlite3
 import sys
-path, old_pub, new_pub, sentinel = sys.argv[1:5]
+path, old_pub_b64, new_pub_b64, sentinel = sys.argv[1:5]
 db = sqlite3.connect(path)
 db.execute(
     "CREATE TABLE keys ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-    "public_key TEXT NOT NULL, "
+    "public_key_b64 TEXT NOT NULL, "
     "private_key BLOB NOT NULL)"
 )
-db.execute("INSERT INTO keys (public_key, private_key) VALUES (?, ?)",
-           (old_pub, sentinel.encode()))
-db.execute("INSERT INTO keys (public_key, private_key) VALUES (?, ?)",
-           (new_pub, sentinel.encode()))
+db.execute("INSERT INTO keys (public_key_b64, private_key) VALUES (?, ?)",
+           (old_pub_b64, sentinel.encode()))
+db.execute("INSERT INTO keys (public_key_b64, private_key) VALUES (?, ?)",
+           (new_pub_b64, sentinel.encode()))
 db.commit()
 db.close()
 PY
+}
+write_key_table "$FAKE_WALLET_DB" "$OLD_PUB_B64" "$NEW_PUB_B64"
 
 # The adb stub accepts only `-s emulator-* exec-out run-as <fakewallet> cat
 # databases/keys*` and serves the fixture database. Anything else exits 1, so
@@ -217,7 +231,8 @@ else
   fi
 fi
 
-# 7. Happy path: newest key only on stdout, funded with SOL and USDC.
+# 7. Happy path: newest row's public_key_b64 decodes (URL-safe, no padding)
+# to the base58 address on stdout, funded with SOL and USDC.
 mkdir -p "${DIR}/tmps"
 reset_logs
 stdout="$(TMPDIR="${DIR}/tmps" PATH="${FAKE_BIN}:$PATH" \
@@ -225,12 +240,14 @@ stdout="$(TMPDIR="${DIR}/tmps" PATH="${FAKE_BIN}:$PATH" \
 rc=$?
 stderr="$(cat "${DIR}/happy.stderr")"
 if [[ $rc -eq 0 && "$stdout" == "$NEW_PUB" ]]; then
-  pass "prints only the newest fake wallet public key on stdout"
+  pass "decodes public_key_b64 and prints only the newest base58 address on stdout"
 else
   bad "happy path rc=${rc} stdout: ${stdout}"
 fi
-if printf '%s' "$stdout$stderr" | grep -q "$OLD_PUB"; then
-  bad "older key row leaked: ${stdout} ${stderr}"
+if printf '%s' "$stdout$stderr" | grep -qF "$OLD_PUB"; then
+  bad "older key address leaked: ${stdout} ${stderr}"
+elif printf '%s' "$stdout$stderr" | grep -qF "$OLD_PUB_B64"; then
+  bad "older key base64 leaked: ${stdout} ${stderr}"
 else
   pass "reads only the newest key table row"
 fi
@@ -268,7 +285,35 @@ else
   bad "database copies left behind: $(ls -A "${DIR}/tmps")"
 fi
 
-# 8. Shellcheck, when available, stays clean on helper and test.
+# 8. public_key_b64 that is not base64: refuse, never fund.
+write_key_table "${DIR}/bad-b64.db" "$OLD_PUB_B64" "!!!not-base64!!!"
+if out="$(FAKE_WALLET_DB="${DIR}/bad-b64.db" run_helper emulator-5554 "$FUNDER" 1 2 2>&1)"; then
+  bad "invalid base64 must refuse"
+else
+  if printf '%s' "$out" | grep -q "public_key_b64" \
+    && ! grep -q "transfer" "$FAKE_SOLANA_LOG" 2>/dev/null \
+    && ! grep -q "transfer" "$FAKE_SPL_LOG" 2>/dev/null; then
+    pass "refuses a public_key_b64 value that is not base64"
+  else
+    bad "invalid base64 handling: ${out}"
+  fi
+fi
+
+# 9. public_key_b64 that decodes to other than 32 bytes: refuse, never fund.
+write_key_table "${DIR}/short.db" "$OLD_PUB_B64" "AAECAwQFBgcICQoLDA0ODw=="
+if out="$(FAKE_WALLET_DB="${DIR}/short.db" run_helper emulator-5554 "$FUNDER" 1 2 2>&1)"; then
+  bad "16-byte key must refuse"
+else
+  if printf '%s' "$out" | grep -q "public_key_b64" \
+    && ! grep -q "transfer" "$FAKE_SOLANA_LOG" 2>/dev/null \
+    && ! grep -q "transfer" "$FAKE_SPL_LOG" 2>/dev/null; then
+    pass "refuses a public_key_b64 value that is not 32 bytes"
+  else
+    bad "short key handling: ${out}"
+  fi
+fi
+
+# 10. Shellcheck, when available, stays clean on helper and test.
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S error "$SCRIPT" "${ROOT}/e2e/maestro/helpers/fund-fake-wallet.test.sh"; then
     pass "shellcheck -S error clean"

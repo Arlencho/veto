@@ -62,9 +62,12 @@ e2e/maestro/helpers/fund-fake-wallet.sh emulator-5554 keys/owner.json 1 2
 
 The helper requires an explicit `emulator-NNNN` serial and refuses any other,
 so it cannot address a physical phone. It refuses unless the configured RPC
-reports the devnet genesis hash. It reads only the public key of the newest
-row in the fake wallet key table through `adb exec-out run-as`, prints that
-key, and funds it from the given funder keypair with 1 SOL and 2 devnet USDC
+reports the devnet genesis hash. It reads only the `public_key_b64` column of
+the newest row in the fake wallet key table through `adb exec-out run-as`,
+base64-decodes the 32 raw public key bytes (standard or URL-safe base64,
+padding optional), base58-encodes them into the account address, prints that
+address, and funds it from the given funder keypair with 1 SOL and 2 devnet
+USDC
 (mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`), passing
 `--fund-recipient` so the token account is created. One SOL covers rent, fees
 and the trade rule's 0.20 SOL cap; flow 04 sets aside 1 token and flow 06

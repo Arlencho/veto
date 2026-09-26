@@ -255,6 +255,7 @@ export function migrateHoldVaultInstruction(args: {
   const where = holdWhere(args.programId, args.owner, args.vaultId);
   return ix(args.programId, [
     meta(args.owner, true, true), meta(where.vault, false, true),
+    meta(where.ledger, false, true),
     meta(SystemProgram.programId, false, false),
   ], Buffer.from(MIGRATE_HOLD_VAULT_DISC));
 }

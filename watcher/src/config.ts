@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseGsUri } from "./journalStore.js";
 import { DEFAULT_KWH_MILLI, DEFAULT_MINT_DECIMALS, type SpotQuoteCurrency } from "./money.js";
+import { loadCalibration, type DemoCalibration } from "./calibration.js";
 import { parseRpcList } from "./rpc.js";
 
 export const WATCHER_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,6 +25,7 @@ const SHORT_TO_VETO: Record<string, string> = {
 };
 
 export type WatcherConfig = {
+  calibration?: DemoCalibration;
   rpc: string;
   rpcs: string[];
   keysDir: string;
@@ -198,6 +200,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts?: LoadConf
     perTxMax,
     purpose: env.VETO_PURPOSE ?? "SE3 home charging",
     holdVaults: parseHoldVaultList(lookupFrom(env, files, "VETO_HOLD_VAULTS")),
+    calibration: loadCalibration(key => lookupFrom(env, files, key)),
     quoteCurrency: parseQuoteCurrency(lookupFrom(env, files, "VETO_QUOTE_CURRENCY")),
   };
 }

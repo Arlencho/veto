@@ -112,3 +112,6 @@ export {
   REASON_ZERO_AMOUNT,
   reasonText,
 } from "./reasons.js";
+
+export { VetoErrorCode, VetoErrorMessage } from "./veto_errors.js";
+export type { VetoErrorName } from "./veto_errors.js";

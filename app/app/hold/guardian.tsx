@@ -51,13 +51,13 @@ export default function HoldGuardian() {
     };
   }, [setPhoneKey, session.owner, session.wallet.ready]);
 
-  async function onSign(ownerSafeConfirmed = false) {
+  async function onSign() {
     if (!session.client || !session.config?.mint || !session.owner) {
       throw new Error(session.chain.configError ?? 'Connect a wallet before signing.');
     }
     const guardianText = draft.mode === 'phone' ? draft.phoneKey ?? '' : draft.guardianText.trim();
     const { guardian, safeAddress } = validateHoldAddresses(
-      session.owner.toBase58(), guardianText, draft.safeText, ownerSafeConfirmed,
+      session.owner.toBase58(), guardianText, draft.safeText,
     );
     const mint = new PublicKey(session.config.mint);
     const tokenProgram = await tokenProgramOfMint(session.client, mint);

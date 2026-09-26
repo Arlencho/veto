@@ -14,6 +14,8 @@ test("IDL copies agree with each other and the generated IDL when present", () =
   for (const path of copies) assert.deepEqual(read(path), expected, path);
   if (existsSync(new URL("target/idl/veto.json", root))) {
     assert.deepEqual(read("target/idl/veto.json"), expected, "generated IDL");
+    assert.equal(readFileSync(new URL("watcher/src/idl.ts", root), "utf8"),
+      readFileSync(new URL("target/types/veto.ts", root), "utf8"), "generated watcher type");
   }
 });
 
@@ -41,4 +43,15 @@ test("the tools IDL decodes all Hold rolling buckets without moving the existing
     assert.equal(vault.daily_buckets[i].amount.toString(), String(9007199254740993n + BigInt(i)));
   }
   assert.throws(() => decodeHoldVault(bytes.subarray(0, 1291)));
+});
+
+test("all client error tables preserve the generated program codes and reasons", async () => {
+  const idl = read(copies[0]);
+  const expectedCodes = Object.fromEntries(idl.errors.map((e: { name: string; code: number }) => [e.name, e.code]));
+  const expectedMessages = Object.fromEntries(idl.errors.map((e: { name: string; msg: string }) => [e.name, e.msg]));
+  for (const path of ["app/lib/veto_errors.ts", "sdk/src/veto_errors.ts", "watcher/src/veto_errors.ts", "tools/veto_errors.ts"]) {
+    const table = await import(new URL(path, root).href);
+    assert.deepEqual(table.VetoErrorCode, expectedCodes, path);
+    assert.deepEqual(table.VetoErrorMessage, expectedMessages, path);
+  }
 });

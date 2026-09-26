@@ -1124,6 +1124,34 @@
           "writable": true
         },
         {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  45,
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -2373,6 +2401,19 @@
       ]
     },
     {
+      "name": "HoldClosed",
+      "discriminator": [
+        111,
+        175,
+        192,
+        227,
+        192,
+        83,
+        108,
+        99
+      ]
+    },
+    {
       "name": "HoldDeposited",
       "discriminator": [
         14,
@@ -2422,6 +2463,19 @@
         57,
         137,
         224
+      ]
+    },
+    {
+      "name": "HoldMigrated",
+      "discriminator": [
+        32,
+        149,
+        140,
+        45,
+        3,
+        28,
+        129,
+        197
       ]
     },
     {
@@ -2911,6 +2965,16 @@
       "code": 6065,
       "name": "HoldWithdrawalPending",
       "msg": "a held withdrawal must be resolved before closing"
+    },
+    {
+      "code": 6066,
+      "name": "SafeAddressIsGuardian",
+      "msg": "safe address must differ from the guardian"
+    },
+    {
+      "code": 6067,
+      "name": "SafeAddressIsOwner",
+      "msg": "safe address must differ from the owner"
     }
   ],
   "types": [
@@ -3050,6 +3114,33 @@
           {
             "name": "fields",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HoldClosed",
+      "docs": [
+        "Full token balance swept to the safe token account before closure."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
           }
         ]
       }
@@ -3229,6 +3320,33 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "HoldMigrated",
+      "docs": [
+        "Rent top-up in lamports. No vault tokens move during layout migration."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
           }
         ]
       }

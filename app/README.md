@@ -287,12 +287,15 @@ list, and the URL schemes, and records the checkout `HEAD` commit at inspection
 time (not proof of the build's source commit). It refuses a package that is
 not `com.veto.app`, a targetSdk below 36, any permission blocked in
 `app.json` (read at inspection time), a missing `veto` scheme or any `exp+`
-scheme, a bundle that names `mainnet-beta` or never names devnet, a failed
-signature, or a missing program id or devnet USDC mint. A failed check is
+scheme, an embedded config with a non-devnet cluster or wrong program id or
+devnet USDC mint, or a failed signature. For older APKs without embedded
+config, it checks those addresses in the bundle and refuses a bundle that
+names `mainnet-beta` or never names devnet. A failed check is
 not a release. Run the printed install command from the APK's directory.
 
-The RPC presence check recognizes common Solana RPC providers. For a custom
-host, supply `EXPO_PUBLIC_VETO_RPC` through the environment for an exact match.
+For older APKs without embedded config, the RPC presence check recognizes
+common Solana RPC providers. For a custom host in those APKs, supply
+`EXPO_PUBLIC_VETO_RPC` through the environment for an exact match.
 It never prints that value. A yes is not a connectivity check. An EAS sensitive
 variable inlined during the build remains extractable from the APK.
 
@@ -300,6 +303,35 @@ Attach the inspected APK and its notes to the GitHub release, then walk the
 [device checklist](../docs/internal/DEVICE_CHECK.md) on a wiped Seeker using
 that release link. Keep the completed checklist as release evidence. A
 production build runs without Metro.
+
+## Public tester APK
+
+The `tester` profile builds the public devnet APK in the EAS `preview`
+environment. The owner sets `VETO_TESTER_RPC` there to a separate, capped
+devnet RPC key. It must not be the production key. EAS builds fail if it is
+missing or blank. Tester config never reads `EXPO_PUBLIC_VETO_RPC`, and the
+app refuses that fallback if its embedded tester RPC is missing.
+
+```bash
+cd app
+npx eas-cli build -p android --profile tester
+```
+
+This standalone APK runs without Metro and uses the production package
+`com.veto.app`, program id, devnet cluster and devnet USDC mint. It replaces
+the production app when signed with the same key. It has the same permission
+policy and dev-client scheme stripping as production.
+
+After downloading, run `./scripts/release-apk.sh /path/to/tester.apk` from
+the repository root. Inspection reads the tester marker and selected RPC
+from the APK's embedded Expo config and prints the profile and RPC host only,
+with the key masked. Production APKs have no profile marker, so their profile
+is reported as inferred from the devnet release identity. Older APKs without
+embedded config use the existing provider or exact-match heuristic.
+
+The capped key remains extractable from a public APK. Keep its quota separate
+from the owner's production usage. Never put it in the repository or release
+notes. Production and mainnet-preview keep their existing RPC sources.
 
 ## Mainnet preview APK
 

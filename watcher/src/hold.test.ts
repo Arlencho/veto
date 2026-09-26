@@ -379,5 +379,8 @@ test("readHoldVault reads the pending withdrawal and the held ledger row", async
   assert.equal(snap.entries[0]?.kind, 3);
   assert.equal(snap.entries[0]?.withdrawalId, 4n);
   accounts.set(vault.toBase58(), { data: vaultData.subarray(0, 1291), owner: programId });
+  assert.deepEqual(await readHoldVault(connection, programId, vault), snap,
+    "legacy holds retain the same alerts while the owner arranges migration");
+  accounts.set(vault.toBase58(), { data: vaultData.subarray(0, 1290), owner: programId });
   await assert.rejects(readHoldVault(connection, programId, vault), /need 1691/);
 });

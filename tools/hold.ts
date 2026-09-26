@@ -8,6 +8,7 @@ const coder = new BorshAccountsCoder(idl);
  * Refuse legacy Hold accounts rather than presenting empty rolling buckets.
  */
 export function decodeHoldVault(data: Buffer) {
+  if (data.length === 1291) throw new Error("Legacy Hold vault: the owner must migrate_hold_vault before use");
   const size = coder.size("HoldVault");
   if (data.length < size) throw new Error(`Hold vault account is ${data.length} bytes, need ${size}`);
   return coder.decode("HoldVault", data);

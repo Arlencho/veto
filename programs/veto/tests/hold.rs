@@ -1532,3 +1532,190 @@ fn share_cap_bounds_every_instant_release_in_randomized_24_hours() {
         assert!(held > 10);
     }
 }
+
+// Wire instructions keep these regression fixtures runnable against the old binary.
+fn recovery_ix(w: &World, signer: Pubkey, close: bool, destination: Pubkey) -> Instruction {
+    use anchor_lang::solana_program::instruction::AccountMeta;
+    let disc = if close {
+        [44, 82, 147, 65, 191, 42, 43, 216]
+    } else {
+        [223, 75, 49, 252, 155, 82, 164, 36]
+    };
+    let mut accounts = vec![
+        AccountMeta::new(signer, true),
+        AccountMeta::new(w.vault, false),
+    ];
+    if close {
+        accounts.extend([
+            AccountMeta::new(w.ledger, false),
+            AccountMeta::new(w.vault_token, false),
+            AccountMeta::new(destination, false),
+            AccountMeta::new_readonly(w.mint, false),
+            AccountMeta::new_readonly(spl_token::ID, false),
+        ]);
+    } else {
+        accounts.push(AccountMeta::new_readonly(system_program::ID, false));
+    }
+    Instruction::new_with_bytes(veto::id(), &disc, accounts)
+}
+
+fn legacy_fixture(w: &mut World, spent: u64) -> Vec<u8> {
+    let mut raw = w.svm.get_account(&w.vault).unwrap();
+    raw.data.truncate(1291);
+    raw.lamports = w.svm.minimum_balance_for_rent_exemption(1291);
+    raw.data[184..192].copy_from_slice(&spent.to_le_bytes());
+    // Preserve a queued loosening change and its two-key policy fields.
+    raw.data[1199] = 1;
+    raw.data[1200] = CHANGE_SAFE;
+    raw.data[1251..1283].copy_from_slice(w.safe.as_ref());
+    raw.data[1283..1291].copy_from_slice(&(now(&w.svm) + HOLD_DELAY_1_DAY).to_le_bytes());
+    // Even an old/expired window must be retained conservatively on migration.
+    raw.data[192..200].copy_from_slice(&1i64.to_le_bytes());
+    raw.data[227] = 1;
+    raw.data[231..263].copy_from_slice(w.safe_token.as_ref());
+    let bytes = raw.data.clone();
+    w.svm.set_account(w.vault, raw).unwrap();
+    bytes
+}
+
+#[test]
+fn migration_preserves_legacy_fields_and_spend_for_the_next_day() {
+    let mut w = open_vault(Rules::default());
+    warp(&mut w.svm, 100 * 86400 + 3599);
+    let before = legacy_fixture(&mut w, 90 * ONE);
+    let lamports_before = w.svm.get_account(&w.vault).unwrap().lamports;
+    let ix = recovery_ix(&w, w.owner.pubkey(), false, w.safe_token);
+    send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).unwrap();
+    assert_eq!(&w.svm.get_account(&w.vault).unwrap().data[..1291], &before);
+    assert!(w.svm.get_account(&w.vault).unwrap().lamports > lamports_before);
+    let dest = w.safe_token;
+    withdraw(&mut w, 10 * ONE, &dest).unwrap();
+    assert_eq!(token_balance(&w.svm, &dest), 10 * ONE);
+    let t = now(&w.svm);
+    warp(&mut w.svm, t + 86400 - 1);
+    withdraw(&mut w, 1, &dest).unwrap();
+    assert_eq!(token_balance(&w.svm, &dest), 10 * ONE);
+    assert_eq!(pending_rows(&read_vault(&w.svm, &w.vault)).len(), 1);
+    let ix = recovery_ix(&w, w.owner.pubkey(), false, dest);
+    assert!(send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).is_err());
+}
+
+#[test]
+fn close_returns_all_tokens_to_safe_and_all_account_rent_to_owner() {
+    let mut w = open_vault(Rules::default());
+    let balance = token_balance(&w.svm, &w.vault_token);
+    let rent: u64 = [w.vault, w.vault_token, w.ledger]
+        .iter()
+        .map(|k| w.svm.get_account(k).unwrap().lamports)
+        .sum();
+    let owner_before = w.svm.get_account(&w.owner.pubkey()).unwrap().lamports;
+    let ix = recovery_ix(&w, w.owner.pubkey(), true, w.safe_token);
+    // Separate fee payer makes the rent destination assertion exact.
+    send(&mut w.svm, &w.guardian, &[&w.guardian, &w.owner], &[ix]).unwrap();
+    assert_eq!(token_balance(&w.svm, &w.safe_token), balance);
+    assert_eq!(
+        w.svm.get_account(&w.owner.pubkey()).unwrap().lamports,
+        owner_before + rent
+    );
+    for key in [w.vault, w.vault_token, w.ledger] {
+        assert!(w.svm.get_account(&key).is_none_or(|a| a.lamports == 0));
+    }
+}
+
+#[test]
+fn close_refuses_held_frozen_wrong_destination_and_non_owner() {
+    let mut w = open_vault(Rules::default());
+    for (signer, dest) in [
+        (w.guardian.pubkey(), w.safe_token),
+        (w.owner.pubkey(), w.source),
+    ] {
+        let ix = recovery_ix(&w, signer, true, dest);
+        let key = if signer == w.owner.pubkey() {
+            &w.owner
+        } else {
+            &w.guardian
+        };
+        assert!(send(&mut w.svm, key, &[key], &[ix]).is_err());
+    }
+    let dest = w.safe_token;
+    withdraw(&mut w, ONE, &dest).unwrap();
+    let ix = recovery_ix(&w, w.owner.pubkey(), true, dest);
+    assert_err(
+        send(&mut w.svm, &w.owner, &[&w.owner], &[ix]),
+        "HoldWithdrawalPending",
+    );
+    let guardian = w.guardian.insecure_clone();
+    stop(&mut w, 1, &guardian).unwrap();
+    freeze(&mut w, &guardian).unwrap();
+    let ix = recovery_ix(&w, w.owner.pubkey(), true, dest);
+    assert_err(
+        send(&mut w.svm, &w.owner, &[&w.owner], &[ix]),
+        "VaultFrozen",
+    );
+}
+
+#[test]
+fn migration_refuses_non_owner_and_preserves_frozen_holds_and_changes() {
+    let mut w = open_vault(Rules::default());
+    let dest = w.safe_token;
+    withdraw(&mut w, ONE, &dest).unwrap();
+    let guardian = w.guardian.insecure_clone();
+    freeze(&mut w, &guardian).unwrap();
+    let before = legacy_fixture(&mut w, ONE);
+    let ix = recovery_ix(&w, w.guardian.pubkey(), false, dest);
+    assert_err(
+        send(&mut w.svm, &w.guardian, &[&w.guardian], &[ix]),
+        "NotTheVaultOwner",
+    );
+    assert_eq!(w.svm.get_account(&w.vault).unwrap().data, before);
+    let ix = recovery_ix(&w, w.owner.pubkey(), false, dest);
+    send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).unwrap();
+    assert_eq!(&w.svm.get_account(&w.vault).unwrap().data[..1291], &before);
+    let owner = w.owner.insecure_clone();
+    assert_err(unfreeze(&mut w, &owner, None), "BothKeysRequired");
+    let ix = recovery_ix(&w, w.owner.pubkey(), true, dest);
+    assert_err(
+        send(&mut w.svm, &w.owner, &[&w.owner], &[ix]),
+        "VaultFrozen",
+    );
+}
+
+#[test]
+fn migration_rejects_unknown_lengths_bad_discriminators_and_forged_pdas() {
+    for variant in 0..5 {
+        let mut w = open_vault(Rules::default());
+        legacy_fixture(&mut w, ONE);
+        let mut raw = w.svm.get_account(&w.vault).unwrap();
+        match variant {
+            0 => raw.data.push(0),
+            1 => {
+                raw.data.pop();
+            }
+            2 => raw.data[0] ^= 1,
+            3 => raw.data[168] ^= 1,
+            _ => raw.owner = system_program::ID,
+        }
+        w.svm.set_account(w.vault, raw.clone()).unwrap();
+        let ix = recovery_ix(&w, w.owner.pubkey(), false, w.safe_token);
+        assert!(send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).is_err());
+        assert_eq!(w.svm.get_account(&w.vault).unwrap().data, raw.data);
+    }
+}
+
+#[test]
+fn migration_does_not_reopen_the_share_limit() {
+    let mut w = open_vault(Rules {
+        daily_limit: 1000 * ONE,
+        ..Rules::default()
+    });
+    warp(&mut w.svm, 100 * 86400 + 3599);
+    legacy_fixture(&mut w, 250 * ONE);
+    let ix = recovery_ix(&w, w.owner.pubkey(), false, w.safe_token);
+    send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).unwrap();
+    let dest = w.safe_token;
+    let t = now(&w.svm);
+    warp(&mut w.svm, t + 86400 - 1);
+    withdraw(&mut w, 1, &dest).unwrap();
+    assert_eq!(token_balance(&w.svm, &dest), 0);
+    assert_eq!(pending_rows(&read_vault(&w.svm, &w.vault)).len(), 1);
+}

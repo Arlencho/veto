@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import { HOLD_VAULT_DISC } from './holdIdl';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
@@ -19,7 +20,6 @@ import {
   decodeHoldVault,
   HOLD_GUARDIAN_OFFSET,
   HOLD_OWNER_OFFSET,
-  HOLD_VAULT_LEN,
   holdLedgerPda,
   readU64,
   type HoldAccount,
@@ -78,7 +78,7 @@ export async function readHoldVaults(client: ChainClient, addresses: readonly Pu
     const address = addresses[index];
     if (!info || !address) return;
     try {
-      found.push(decodeHoldVault(Buffer.from(info.data), address));
+      found.push(decodeHoldVault(Buffer.from(info.data), address, true));
     } catch {
       // Closed or reused account. Leave it out.
     }
@@ -109,10 +109,10 @@ async function accountsFor(client: ChainClient, offset: number, wallet: PublicKe
   const rows = await withRateLimitRetry(() =>
     client.connection.getProgramAccounts(client.programId, {
       commitment: 'confirmed',
-      filters: [{ dataSize: HOLD_VAULT_LEN }, { memcmp: { offset, bytes: wallet.toBase58() } }],
+      filters: [{ memcmp: { offset: 0, bytes: HOLD_VAULT_DISC.toString('base64'), encoding: 'base64' } }, { memcmp: { offset, bytes: wallet.toBase58() } }],
     }),
   );
-  return rows.map((row) => decodeHoldVault(Buffer.from(row.account.data), row.pubkey));
+  return rows.map((row) => decodeHoldVault(Buffer.from(row.account.data), row.pubkey, true));
 }
 
 export async function readHoldVault(client: ChainClient, address: PublicKey): Promise<HoldVaultBundle> {
@@ -120,7 +120,7 @@ export async function readHoldVault(client: ChainClient, address: PublicKey): Pr
   if (!info) {
     throw new Error('That vault is not on the blockchain.');
   }
-  const account = decodeHoldVault(Buffer.from(info.data), address);
+  const account = decodeHoldVault(Buffer.from(info.data), address, true);
   const ledgerAddress = holdLedgerPda(client.programId, account.address);
   const ledgerInfo = await client.connection.getAccountInfo(ledgerAddress, 'confirmed');
   if (!ledgerInfo) {

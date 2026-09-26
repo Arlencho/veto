@@ -249,6 +249,132 @@
       ]
     },
     {
+      "name": "close_hold_vault",
+      "docs": [
+        "Close an idle, unfrozen vault to its stored safe address."
+      ],
+      "discriminator": [
+        44,
+        82,
+        147,
+        65,
+        191,
+        42,
+        43,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.owner",
+                "account": "HoldVault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.vault_id",
+                "account": "HoldVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  45,
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_mandate",
       "docs": [
         "Reclaim rent once a mandate is finished. Only the owner, never while active."
@@ -971,6 +1097,38 @@
           }
         }
       ]
+    },
+    {
+      "name": "migrate_hold_vault",
+      "docs": [
+        "Upgrade the previous Hold layout without relaxing any stored rule."
+      ],
+      "discriminator": [
+        223,
+        75,
+        49,
+        252,
+        155,
+        82,
+        164,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "open_mandate",
@@ -2743,6 +2901,16 @@
       "code": 6063,
       "name": "NotATokenAccount",
       "msg": "account is not an initialized SPL token account"
+    },
+    {
+      "code": 6064,
+      "name": "InvalidLegacyHoldLayout",
+      "msg": "vault is not the supported legacy Hold layout"
+    },
+    {
+      "code": 6065,
+      "name": "HoldWithdrawalPending",
+      "msg": "a held withdrawal must be resolved before closing"
     }
   ],
   "types": [

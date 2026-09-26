@@ -1,3 +1,4 @@
+import { migrateHoldVault } from '../../lib/holdActions';
 import { redactRpc } from '../../lib/rpcPrivacy';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -66,6 +67,8 @@ export default function HoldIndex() {
         const tokenName = tokenSymbol(mintKey);
         cards.push({
           address: row.address.toBase58(),
+          vaultId: row.vaultId,
+          migrationRequired: row.migrationRequired,
           amountLabel: formatHoldAmount(balance, decimals),
           tokenName,
           dailyLabel: `${formatHoldAmount(row.dailyLimit, decimals)} ${tokenName}`,
@@ -141,6 +144,18 @@ export default function HoldIndex() {
             error={error}
             vaults={vaults}
             guarded={guarded}
+            onMigrate={(address) => {
+              const card = vaults.find((row) => row.address === address);
+              if (!session.client || !session.owner || card?.vaultId === undefined) return;
+              setStatus('loading');
+              void migrateHoldVault({ client: session.client, owner: session.owner,
+                vaultId: card.vaultId, signAndSend: session.wallet.signAndSend })
+                .then(() => load())
+                .catch((err: unknown) => {
+                  setError(err instanceof Error ? redactRpc(err.message) : 'The vault could not be updated.');
+                  setStatus('error');
+                });
+            }}
             onGuard={(address) => router.push(`/hold/guard?vault=${address}`)}
             onBack={() => router.back()}
             onSetup={() => router.push('/hold/amount')}

@@ -751,3 +751,23 @@ test("the share preview holds a burst across the old window edge", async () => {
   });
   assert.deepEqual(outlook, { outcome: "held", reasons: ["over_share"], unlockAt: NOW + DAY });
 });
+
+test("migration signs with the owner and funds rent using the IDL account order", async () => {
+  const { fake, hold, owner, vaultId } = rig();
+  await hold.migrateHoldVault({ owner, vaultId });
+  const { ix } = opened(fake);
+  assert.deepEqual(ix.data, disc("migrate_hold_vault"));
+  assertMetas(ix, [[owner.publicKey, true, true],
+    [places(owner.publicKey, vaultId).vault, false, true], [SystemProgram.programId, false, false]]);
+});
+
+test("closure signs with the owner and supplies the safe destination and rent accounts", async () => {
+  const { fake, hold, owner, vaultId, destination, mint } = rig();
+  await hold.closeHoldVault({ owner, vaultId, destination, mint });
+  const { ix } = opened(fake);
+  const where = places(owner.publicKey, vaultId);
+  assert.deepEqual(ix.data, disc("close_hold_vault"));
+  assertMetas(ix, [[owner.publicKey, true, true], [where.vault, false, true],
+    [where.ledger, false, true], [where.vaultToken, false, true], [destination, false, true],
+    [mint, false, false], [TOKEN_PROGRAM_ID, false, false]]);
+});

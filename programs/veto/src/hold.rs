@@ -15,8 +15,8 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface};
 use crate::hold_state::*;
 use crate::VetoError;
 use crate::{
-    ApplyChange, CancelChange, Deposit, Execute, Freeze, InitVault, ProposeChange, Recover, Skip,
-    Stop, Unfreeze, Withdraw,
+    ApplyChange, CancelChange, CloseHoldVault, Deposit, Execute, Freeze, InitVault,
+    MigrateHoldVault, ProposeChange, Recover, Skip, Stop, Unfreeze, Withdraw,
 };
 
 pub fn init_vault(ctx: Context<InitVault>, args: InitVaultArgs) -> Result<()> {
@@ -446,6 +446,85 @@ pub fn skip(ctx: Context<Skip>, id: u64) -> Result<()> {
         destination: row.destination,
     });
     msg!("HOLD SKIPPED id={} amount={}", id, row.amount);
+    Ok(())
+}
+
+/// The previous layout is the current Borsh prefix without rolling buckets.
+/// Never accept arbitrary short accounts or re-migrate a current account.
+pub fn migrate_hold_vault(ctx: Context<MigrateHoldVault>) -> Result<()> {
+    let info = ctx.accounts.vault.to_account_info();
+    let current_len = 8 + HoldVault::INIT_SPACE;
+    require!(
+        info.data_len() == LEGACY_HOLD_VAULT_LEN,
+        VetoError::InvalidLegacyHoldLayout
+    );
+    let mut bytes = info.try_borrow_data()?.to_vec();
+    bytes.resize(current_len, 0);
+    let mut vault = HoldVault::try_deserialize(&mut bytes.as_slice())?;
+    require_keys_eq!(
+        vault.owner,
+        ctx.accounts.owner.key(),
+        VetoError::NotTheVaultOwner
+    );
+    require_vault_signer(info.key(), &vault)?;
+    // Retain the full total even if the old fixed window has expired. The
+    // unknown payment timestamps cannot justify freeing any allowance early.
+    crate::rolling_window::record_release(
+        &mut vault.daily_buckets,
+        vault.window_spent,
+        Clock::get()?.unix_timestamp,
+    );
+    let top_up = Rent::get()?
+        .minimum_balance(current_len)
+        .saturating_sub(info.lamports());
+    if top_up > 0 {
+        anchor_lang::system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.key(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.owner.to_account_info(),
+                    to: info.clone(),
+                },
+            ),
+            top_up,
+        )?;
+    }
+    info.resize(current_len)?;
+    vault.try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
+    Ok(())
+}
+
+pub fn close_hold_vault(ctx: Context<CloseHoldVault>) -> Result<()> {
+    let vault = &ctx.accounts.vault;
+    require!(!vault.frozen, VetoError::VaultFrozen);
+    require!(
+        vault
+            .pending
+            .iter()
+            .all(|row| row.status == WITHDRAWAL_EMPTY),
+        VetoError::HoldWithdrawalPending
+    );
+    transfer_out_parts(
+        vault.to_account_info(),
+        vault,
+        &ctx.accounts.vault_token,
+        &ctx.accounts.destination,
+        &ctx.accounts.mint,
+        &ctx.accounts.token_program,
+        ctx.accounts.vault_token.amount,
+    )?;
+    let id = vault.vault_id.to_le_bytes();
+    let bump = [vault.bump];
+    let seeds: &[&[u8]] = &[b"hold", vault.owner.as_ref(), &id, &bump];
+    token_interface::close_account(CpiContext::new_with_signer(
+        ctx.accounts.token_program.key(),
+        token_interface::CloseAccount {
+            account: ctx.accounts.vault_token.to_account_info(),
+            destination: ctx.accounts.owner.to_account_info(),
+            authority: vault.to_account_info(),
+        },
+        &[seeds],
+    ))?;
     Ok(())
 }
 

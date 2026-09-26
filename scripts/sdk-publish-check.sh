@@ -158,7 +158,7 @@ classify() {
       ;;
   esac
 
-  if printf '%s' "$lower" | grep -Eq 'api[-_]?key'; then
+  if printf '%s' "$lower" | grep -E 'api[-_]?key' >/dev/null; then
     printf 'file names an api key: %s' "$rel"
     return 1
   fi
@@ -200,7 +200,7 @@ classify() {
     return 1
   fi
 
-  if printf '%s' "$lower" | grep -Eq 'fixture'; then
+  if printf '%s' "$lower" | grep -E 'fixture' >/dev/null; then
     if grep -E -i -q 'https?://' "$file"; then
       printf 'fixture with an RPC URL: %s' "$rel"
       return 1
@@ -228,7 +228,7 @@ done <<< "$files"
 
 require_listed() {
   local want="$1"
-  if ! printf '%s\n' "$normalized" | grep -Fxq "$want"; then
+  if ! printf '%s\n' "$normalized" | grep -Fx "$want" >/dev/null; then
     die "refusing: tarball is missing ${want}"
   fi
 }

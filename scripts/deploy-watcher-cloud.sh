@@ -184,7 +184,7 @@ require_local_inputs() {
 require_gcloud() {
   need_cmd gcloud
   local account
-  account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n1 || true)"
+  account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | sed -n '1p' || true)"
   [[ -n "$account" ]] || die "gcloud is not logged in"
 }
 
@@ -200,7 +200,7 @@ require_services() {
     monitoring.googleapis.com \
     logging.googleapis.com
   do
-    if ! gcloud services list --enabled --project="$PROJECT" --filter="config.name:${svc}" --format='value(config.name)' | grep -qx "$svc"; then
+    if ! gcloud services list --enabled --project="$PROJECT" --filter="config.name:${svc}" --format='value(config.name)' | grep -x "$svc" >/dev/null; then
       die "required API ${svc} is not enabled on ${PROJECT}"
     fi
   done
@@ -302,7 +302,7 @@ role_grants_versions_access_via_describe() {
   if [[ $rc -ne 0 ]]; then
     return 2
   fi
-  if printf '%s\n' "$perms" | tr ';,' '\n' | grep -qx 'secretmanager.versions.access'; then
+  if printf '%s\n' "$perms" | tr ';,' '\n' | grep -x 'secretmanager.versions.access' >/dev/null; then
     return 0
   fi
   return 1
@@ -606,7 +606,7 @@ policy_name_by_display() {
   gcloud monitoring policies list \
     --project="$PROJECT" \
     --filter="displayName=\"${1}\"" \
-    --format='value(name)' | head -n1 || true
+    --format='value(name)' | sed -n '1p' || true
 }
 
 # Merge a comma-separated channel list with an optional extra channel.
@@ -672,7 +672,7 @@ ensure_one_alert() {
 ensure_alert() {
   local ch=""
   if [[ -n "${ALERT_EMAIL:-}" ]]; then
-    ch="$(gcloud beta monitoring channels list --project="$PROJECT" --filter="type=\"email\" AND labels.email_address=\"${ALERT_EMAIL}\"" --format='value(name)' | head -n1 || true)"
+    ch="$(gcloud beta monitoring channels list --project="$PROJECT" --filter="type=\"email\" AND labels.email_address=\"${ALERT_EMAIL}\"" --format='value(name)' | sed -n '1p' || true)"
     if [[ -z "$ch" ]]; then
       run gcloud beta monitoring channels create \
         --display-name="Veto watcher owner" \
@@ -680,7 +680,7 @@ ensure_alert() {
         --channel-labels="email_address=${ALERT_EMAIL}" \
         --project="$PROJECT"
       if [[ "$MODE" != "dry-run" ]]; then
-        ch="$(gcloud beta monitoring channels list --project="$PROJECT" --filter="type=\"email\" AND labels.email_address=\"${ALERT_EMAIL}\"" --format='value(name)' | head -n1 || true)"
+        ch="$(gcloud beta monitoring channels list --project="$PROJECT" --filter="type=\"email\" AND labels.email_address=\"${ALERT_EMAIL}\"" --format='value(name)' | sed -n '1p' || true)"
       fi
     fi
   else

@@ -43,7 +43,7 @@ require_rpc() {
 }
 
 is_mainnet_url() {
-  printf '%s' "$1" | grep -Eqi 'mainnet'
+  printf '%s' "$1" | grep -Ei 'mainnet' >/dev/null
 }
 
 # Show a public URL as itself. A query string, userinfo, or a path token is
@@ -76,7 +76,7 @@ assert_devnet() {
   if is_mainnet_url "$url"; then
     die "refusing to run against mainnet (url=${shown})"
   fi
-  printf '%s' "$url" | grep -Eqi 'devnet|127\.0\.0\.1|localhost' \
+  printf '%s' "$url" | grep -Ei 'devnet|127\.0\.0\.1|localhost' >/dev/null \
     || die "refusing to run against a url that is neither devnet nor local: ${shown}"
 }
 

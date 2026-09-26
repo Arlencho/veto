@@ -1084,33 +1084,17 @@ test('safe wallet setup requires entry, refuses the guardian, and reviews the fu
   await act(async () => root.unmount());
 });
 
-test('owner recovery needs explicit confirmation and editing clears consent and review', async () => {
+test('owner recovery is refused without offering a risk override', async () => {
   const { GuardianScreen } = await import('../components/hold/GuardianScreen');
   const owner = Keypair.generate().publicKey.toBase58();
-  const guardian = Keypair.generate().publicKey.toBase58();
-  let accepted: boolean | undefined;
-  function Setup() {
-    const [address, setAddress] = useState(owner);
-    return createElement(GuardianScreen, {
-      network: 'Devnet', status: 'ready', owner, phoneKey: null, days: 2,
-      mode: 'seeker', guardianText: guardian, safeText: address,
-      onMode() {}, onGuardian() {}, onSafe: setAddress, onBack() {},
-      onSign: async (confirmed) => { accepted = confirmed; },
-    });
-  }
-  const root = await mount(createElement(Setup));
-  assert.match(textOf(root), /stolen owner key would also reach the safe address/);
+  const root = await mount(createElement(GuardianScreen, {
+    network: 'Devnet', status: 'ready', owner, phoneKey: null, days: 2,
+    mode: 'seeker', guardianText: Keypair.generate().publicKey.toBase58(), safeText: owner,
+    onMode() {}, onGuardian() {}, onSafe() {}, onBack() {}, onSign: async () => {},
+  }));
+  assert.match(textOf(root), /safe address must differ from the owner/);
   assert.equal(pressable(root, 'Review safe address').props.disabled, true);
-  await act(async () => pressable(root, 'I accept the owner wallet recovery risk').props.onPress());
-  await act(async () => pressable(root, 'Review safe address').props.onPress());
-  assert.ok(textOf(root).includes(owner));
-  await act(async () => pressable(root, 'Press and hold to sign').props.onLongPress());
-  assert.equal(accepted, true);
-  const input = () => root.root.findAll((n) => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Safe address')[0];
-  await act(async () => input().props.onChangeText(''));
-  await act(async () => input().props.onChangeText(owner));
-  assert.equal(pressable(root, 'Review safe address').props.disabled, true);
-  assert.doesNotMatch(textOf(root), /Confirm your safe address/);
+  assert.doesNotMatch(textOf(root), /accept the owner wallet recovery risk|Confirm your safe address/);
   await act(async () => root.unmount());
 });
 

@@ -828,6 +828,10 @@ pub enum VetoError {
     InvalidLegacyHoldLayout,
     #[msg("a held withdrawal must be resolved before closing")]
     HoldWithdrawalPending,
+    #[msg("safe address must differ from the guardian")]
+    SafeAddressIsGuardian,
+    #[msg("safe address must differ from the owner")]
+    SafeAddressIsOwner,
 }
 
 #[derive(Accounts)]
@@ -1101,6 +1105,9 @@ pub struct MigrateHoldVault<'info> {
     /// CHECK: Exact legacy length, discriminator, stored owner and PDA checked in handler.
     #[account(mut, owner = crate::ID)]
     pub vault: UncheckedAccount<'info>,
+    #[account(mut, seeds = [b"hold-ledger", vault.key().as_ref()], bump,
+        constraint = ledger.load()?.vault == vault.key() @ VetoError::InvalidVaultPda)]
+    pub ledger: AccountLoader<'info, HoldLedger>,
     pub system_program: Program<'info, System>,
 }
 

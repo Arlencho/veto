@@ -1554,6 +1554,7 @@ fn recovery_ix(w: &World, signer: Pubkey, close: bool, destination: Pubkey) -> I
             AccountMeta::new_readonly(spl_token::ID, false),
         ]);
     } else {
+        accounts.push(AccountMeta::new(w.ledger, false));
         accounts.push(AccountMeta::new_readonly(system_program::ID, false));
     }
     Instruction::new_with_bytes(veto::id(), &disc, accounts)
@@ -1719,3 +1720,63 @@ fn migration_does_not_reopen_the_share_limit() {
     assert_eq!(token_balance(&w.svm, &dest), 0);
     assert_eq!(pending_rows(&read_vault(&w.svm, &w.vault)).len(), 1);
 }
+
+#[test]
+fn lifecycle_events_keep_history_after_migration_and_close() {
+    let mut w = open_vault(Rules::default());
+    legacy_fixture(&mut w, ONE);
+    let before = w.svm.get_account(&w.vault).unwrap().lamports;
+    let ix = recovery_ix(&w, w.owner.pubkey(), false, w.safe_token);
+    let logs = send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).unwrap();
+    let rent = w.svm.get_account(&w.vault).unwrap().lamports - before;
+    let ledger = read_ledger(&w.svm, &w.ledger);
+    let entry =
+        ledger.entries[(ledger.head as usize + HOLD_LEDGER_CAPACITY - 1) % HOLD_LEDGER_CAPACITY];
+    assert_eq!(entry.kind, HOLD_KIND_MIGRATED);
+    assert_eq!(entry.amount, rent);
+    assert_eq!(entry.destination, w.vault);
+    check_lifecycle_event(
+        &logs,
+        MIGRATED_DISC,
+        w.vault,
+        w.owner.pubkey(),
+        rent,
+        w.vault,
+    );
+    let amount = token_balance(&w.svm, &w.vault_token);
+    let ix = recovery_ix(&w, w.owner.pubkey(), true, w.safe_token);
+    let logs = send(&mut w.svm, &w.owner, &[&w.owner], &[ix]).unwrap();
+    check_lifecycle_event(
+        &logs,
+        CLOSED_DISC,
+        w.vault,
+        w.owner.pubkey(),
+        amount,
+        w.safe_token,
+    );
+    assert!(w.svm.get_account(&w.ledger).is_none_or(|a| a.lamports == 0));
+}
+
+fn check_lifecycle_event(
+    logs: &[String],
+    disc: &[u8],
+    vault: Pubkey,
+    owner: Pubkey,
+    amount: u64,
+    destination: Pubkey,
+) {
+    let raw = logs
+        .iter()
+        .filter_map(|line| line.strip_prefix("Program data: ").and_then(decode_b64))
+        .find(|raw| raw.starts_with(disc))
+        .expect("lifecycle event must survive account closure");
+    assert_eq!(raw.len(), 112);
+    assert_eq!(&raw[8..40], vault.as_ref());
+    assert_eq!(&raw[40..72], owner.as_ref());
+    assert_eq!(&raw[72..80], &amount.to_le_bytes());
+    assert_eq!(&raw[80..112], destination.as_ref());
+}
+
+const MIGRATED_DISC: &[u8] = &[32, 149, 140, 45, 3, 28, 129, 197];
+
+const CLOSED_DISC: &[u8] = &[111, 175, 192, 227, 192, 83, 108, 99];

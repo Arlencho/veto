@@ -491,6 +491,22 @@ pub fn migrate_hold_vault(ctx: Context<MigrateHoldVault>) -> Result<()> {
     }
     info.resize(current_len)?;
     vault.try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
+    // Migration moves only the rent shortfall in lamports, into the vault.
+    write_record(
+        &mut *ctx.accounts.ledger.load_mut()?,
+        Clock::get()?.unix_timestamp,
+        top_up,
+        info.key(),
+        0,
+        HOLD_KIND_MIGRATED,
+        HOLD_REASON_NONE,
+    );
+    emit!(HoldMigrated {
+        vault: info.key(),
+        owner: vault.owner,
+        amount: top_up,
+        destination: info.key()
+    });
     Ok(())
 }
 
@@ -513,6 +529,12 @@ pub fn close_hold_vault(ctx: Context<CloseHoldVault>) -> Result<()> {
         &ctx.accounts.token_program,
         ctx.accounts.vault_token.amount,
     )?;
+    emit!(HoldClosed {
+        vault: vault.key(),
+        owner: vault.owner,
+        amount: ctx.accounts.vault_token.amount,
+        destination: ctx.accounts.destination.key()
+    });
     let id = vault.vault_id.to_le_bytes();
     let bump = [vault.bump];
     let seeds: &[&[u8]] = &[b"hold", vault.owner.as_ref(), &id, &bump];
@@ -631,6 +653,12 @@ pub fn propose_change(ctx: Context<ProposeChange>, values: HoldChange) -> Result
         vault.big_share_bps = values.big_share_bps;
     }
     if tighten & CHANGE_GUARDIAN != 0 {
+        // The safe change waits, but adding a guardian takes effect now.
+        require_keys_neq!(
+            values.guardian,
+            vault.safe_address,
+            VetoError::SafeAddressIsGuardian
+        );
         vault.guardian = values.guardian;
     }
 
@@ -696,38 +724,9 @@ pub fn apply_change(ctx: Context<ApplyChange>) -> Result<()> {
         VetoError::ChangeNotReady
     );
     let pending = ctx.accounts.vault.change;
-    if pending.fields & CHANGE_DELAY != 0 {
-        require!(
-            delay_allowed(pending.delay_secs),
-            VetoError::DelayNotAllowed
-        );
-    }
-    if pending.fields & CHANGE_SHARE != 0 {
-        require!(
-            u64::from(pending.big_share_bps) <= HOLD_BPS_DENOMINATOR,
-            VetoError::ShareOutOfRange
-        );
-    }
-    if pending.fields & CHANGE_GUARDIAN != 0 && pending.guardian != Pubkey::default() {
-        require_keys_neq!(
-            pending.guardian,
-            ctx.accounts.vault.owner,
-            VetoError::GuardianIsOwner
-        );
-    }
-    if pending.fields & CHANGE_SAFE != 0 {
-        require!(
-            pending.safe_address != Pubkey::default(),
-            VetoError::SafeAddressRequired
-        );
-        require_keys_neq!(
-            pending.safe_address,
-            ctx.accounts.vault.key(),
-            VetoError::SafeAddressRequired
-        );
-    }
-
     let vault = &mut ctx.accounts.vault;
+    // Validate the resulting rules, including proposals queued by older binaries.
+    // Transaction rollback preserves the pending proposal if validation fails.
     if pending.fields & CHANGE_DAILY != 0 {
         vault.daily_limit = pending.daily_limit;
     }
@@ -743,6 +742,14 @@ pub fn apply_change(ctx: Context<ApplyChange>) -> Result<()> {
     if pending.fields & CHANGE_SAFE != 0 {
         vault.safe_address = pending.safe_address;
     }
+    require_rules(
+        vault.delay_secs,
+        vault.big_share_bps,
+        vault.safe_address,
+        vault.guardian,
+        vault.owner,
+        vault.key(),
+    )?;
     vault.change = PendingChange::default();
 
     let vault_key = vault.key();
@@ -924,6 +931,8 @@ fn require_rules(
         VetoError::SafeAddressRequired
     );
     require_keys_neq!(safe_address, vault, VetoError::SafeAddressRequired);
+    require_keys_neq!(safe_address, guardian, VetoError::SafeAddressIsGuardian);
+    require_keys_neq!(safe_address, owner, VetoError::SafeAddressIsOwner);
     if guardian != Pubkey::default() {
         require_keys_neq!(guardian, owner, VetoError::GuardianIsOwner);
     }
@@ -1147,4 +1156,22 @@ pub struct HoldChangeApplied {
 #[event]
 pub struct HoldChangeCancelled {
     pub vault: Pubkey,
+}
+
+/// Rent top-up in lamports. No vault tokens move during layout migration.
+#[event]
+pub struct HoldMigrated {
+    pub vault: Pubkey,
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub destination: Pubkey,
+}
+
+/// Full token balance swept to the safe token account before closure.
+#[event]
+pub struct HoldClosed {
+    pub vault: Pubkey,
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub destination: Pubkey,
 }

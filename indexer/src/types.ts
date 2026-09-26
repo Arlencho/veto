@@ -1,8 +1,11 @@
 import type { Connection } from "@solana/web3.js";
 
-export type DecisionKind = "paid" | "refused" | "traded";
+export type DecisionKind = "paid" | "refused" | "traded" | "hold_migrated" | "hold_closed";
 
 export type Decision = {
+  vault?: string;
+  owner?: string;
+  destination?: string;
   rule?: string;
   amountIn?: bigint;
   amountOut?: bigint;

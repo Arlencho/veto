@@ -51,6 +51,8 @@ pub const HOLD_KIND_CHANGE_CANCELLED: u8 = 11;
 pub const HOLD_KIND_REFUSED: u8 = 12;
 /// Armed by `unfreeze` when no guardian is set. The vault stays frozen.
 pub const HOLD_KIND_UNFREEZE_SCHEDULED: u8 = 13;
+/// Rent top-up in lamports, destination is the migrated vault.
+pub const HOLD_KIND_MIGRATED: u8 = 14;
 
 /// `reason` on a `HOLD_KIND_REFUSED` entry.
 pub const HOLD_REASON_NONE: u8 = 0;

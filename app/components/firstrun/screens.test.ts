@@ -273,7 +273,7 @@ test('Hold offers second Seeker, same phone and later without blocking the agent
   assert.match(visibleText(root), /A second key on this phone is weaker: if you lose this phone, or someone gets into it, both keys are at risk\./);
   assert.match(visibleText(root), /Acting alone, it cannot choose another destination\./);
   assert.match(visibleText(root), /guardian does not control/);
-  assert.match(visibleText(root), /stolen owner key/);
+  assert.match(visibleText(root), /safe address must differ from the owner/);
   assert.doesNotMatch(visibleText(root), /only say no|also your safe address/);
   assert.match(visibleText(root), /You can set up Hold later from Overview\./);
   const press = async (label: string) => act(async () => {

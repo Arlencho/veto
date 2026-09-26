@@ -8,8 +8,9 @@ appId: com.veto.app
     visible: "Add your agent"
     timeout: 60000
 # The step strip also renders ADD YOUR AGENT. Maestro text matching is
-# case-insensitive, so the anchored regex matches the strip label too; with
-# no index the tap resolves to the clickable button instead.
+# case-insensitive by default and picks the deepest matching element before
+# filtering for clickability, so the strip's non-clickable Text would match
+# first; the inline (?-i) flag limits the match to the button's exact case.
 - tapOn:
-    text: "^Add your agent$"
+    text: "(?-i)^Add your agent$"
 - assertVisible: "Paste your agent's address"

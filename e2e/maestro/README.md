@@ -95,10 +95,12 @@ maestro --device emulator-5554 test e2e/maestro/07-decisions.yaml
 | 06 | Rules tab | Hold, amount 1, wait 1 day, second Seeker and reviewed safe address, live vault |
 | 07 | Main tab, selected rule with a recorded refusal | Pull refresh, refused row, detail says No money moved. |
 
-The Connect wallet and Add your agent taps use anchored text without an index.
-Maestro text matching is case-insensitive, so the strip labels CONNECT WALLET
-and ADD YOUR AGENT match the same regexes, and an index would select the
-non-clickable strip label first; without one the tap resolves to the button.
+The Connect wallet and Add your agent taps use anchored text with the inline
+`(?-i)` case-sensitive flag. Maestro text matching is case-insensitive by
+default and selects the deepest matching element before filtering for
+clickability, so the strip labels CONNECT WALLET and ADD YOUR AGENT, which are
+plain non-clickable Text, would otherwise match and win over the button; the
+flag limits the match to the button's exact-cased label.
 Amount fields use the current form's
 accessibility labels, including `Most per payment` and `Most in total, ever`.
 Approvals use [Maestro longPressOn](https://docs.maestro.dev/reference/commands-available/longpresson),

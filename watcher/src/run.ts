@@ -1,3 +1,4 @@
+import { calibrateAmount, type DemoCalibration } from "./calibration.js";
 import type { PriceFeed, PriceWindow } from "./feed.js";
 import type { JournalRow, JsonlJournal } from "./journal.js";
 import { logError, logLine } from "./log.js";
@@ -93,6 +94,7 @@ function windowStartsAtSlot(window: PriceWindow, at: Date): boolean {
 }
 
 type ProcessWindowFields = {
+  calibration?: DemoCalibration;
   at: Date;
   feed: PriceFeed;
   journal: JsonlJournal;
@@ -427,7 +429,7 @@ export async function processWindow<T extends ProcessWindowArgs>(
     fxQuote = fxRead.quote;
   }
 
-  const amount = amountBaseUnitsQuoted({
+  const spotAmount = amountBaseUnitsQuoted({
     kwhMilli: args.kwhMilli,
     sekPerKwhScaled: scaled,
     mintDecimals: args.mintDecimals,
@@ -435,6 +437,10 @@ export async function processWindow<T extends ProcessWindowArgs>(
     usdRateScaled: fxQuote?.usdRateScaled,
     sekRateScaled: fxQuote?.sekRateScaled,
   });
+
+  const amount = args.calibration === undefined
+    ? spotAmount
+    : calibrateAmount(spotAmount, args.at, args.calibration);
 
   if (amount === 0n) {
     args.journal.append({
@@ -488,6 +494,10 @@ export async function processWindow<T extends ProcessWindowArgs>(
     signature: journalSignature(receipt.signature),
     suggested_override: receipt.suggestedOverride === null ? null : receipt.suggestedOverride.toString(),
     ...fxFields,
+    ...(args.calibration === undefined ? {} : {
+      calibration: "indexed-demo-v1",
+      spot_amount: spotAmount.toString(),
+    }),
   });
 
   if (receipt.decision === "refused") {

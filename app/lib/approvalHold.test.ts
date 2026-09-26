@@ -1,10 +1,10 @@
 (globalThis as { __DEV__?: boolean }).__DEV__ = false;
 
 import assert from 'node:assert/strict';
-import test, { mock } from 'node:test';
+import test, { afterEach, mock } from 'node:test';
 
 import { Keypair } from '@solana/web3.js';
-import { act, createElement, type ReactElement, type ReactNode } from 'react';
+import { act, createElement, useEffect, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 
 import { GENESIS_BY_CLUSTER } from './presign';
@@ -84,6 +84,7 @@ mock.module('react-native', {
     Platform: { OS: 'ios' },
     Pressable: Host('Pressable'),
     ScrollView: Host('ScrollView'),
+    RefreshControl: Host('RefreshControl'),
     StyleSheet: { create<T>(styles: T): T { return styles; }, hairlineWidth: 1, absoluteFill: {} },
     Linking: {
       openURL: async (url: string) => {
@@ -133,10 +134,23 @@ mock.module('expo-clipboard', {
   },
 });
 
+let focused = true;
+const focusListeners = new Set<() => void>();
+function setFocused(value: boolean) {
+  focused = value;
+  focusListeners.forEach((listener) => listener());
+}
+
 mock.module('expo-router', {
   namedExports: {
     useRouter: () => ({ push() {}, replace() {}, back() {} }),
-    useFocusEffect: () => undefined,
+    useFocusEffect: (callback: () => void | (() => void)) => {
+      const active = useSyncExternalStore((listener) => {
+        focusListeners.add(listener);
+        return () => { focusListeners.delete(listener); };
+      }, () => focused);
+      useEffect(() => active ? callback() : undefined, [active, callback]);
+    },
     usePathname: () => '/first-run/approve',
   },
 });
@@ -220,7 +234,7 @@ mock.module('./useChain', {
 const observation = {
   configuredCluster: 'devnet',
   genesisHash: GENESIS_BY_CLUSTER.devnet,
-  ownerTokenBalance: 100n,
+  ownerTokenBalance: 100n as bigint | null,
   cap: 10n,
   decimals: 0,
   mintReadable: true,
@@ -232,7 +246,7 @@ const observation = {
 
 mock.module('./presignRead', {
   namedExports: {
-    observePresign: async () => observation,
+    observePresign: async () => ({ ...observation }),
   },
 });
 
@@ -243,6 +257,12 @@ function visibleText(root: ReactTestRenderer): string {
     .join('\n');
 }
 
+const mounted: ReactTestRenderer[] = [];
+afterEach(async () => {
+  await act(async () => mounted.splice(0).forEach((root) => root.unmount()));
+  focused = true;
+});
+
 async function mount(node: ReactElement): Promise<ReactTestRenderer> {
   let root: ReactTestRenderer | null = null;
   await act(async () => {
@@ -250,6 +270,7 @@ async function mount(node: ReactElement): Promise<ReactTestRenderer> {
     await new Promise((resolve) => setImmediate(resolve));
   });
   assert.ok(root);
+  mounted.push(root);
   return root;
 }
 
@@ -491,4 +512,92 @@ test('typed limits round to token precision, constrain per payment, and reject i
     assert.equal(amountInput(root, 'Most per payment').props.value, '0.5');
     assert.equal(hold(root).props.disabled, false);
   } finally { await act(async () => root.unmount()); }
+});
+
+for (const trigger of ['pull', 'focus', 'interval'] as const) {
+  test(`${trigger} refresh clears wallet warnings after the token account appears`, async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const saved = { ...observation };
+    observation.ownerTokenBalance = null;
+    observation.solLamports = 0;
+    observation.genesisHash = '';
+    const { ApprovalScreen } = await import('../components/ApprovalScreen');
+    const root = await mount(createElement(ApprovalScreen, {
+      mode: 'request', invalidReason: null,
+      request: {
+        v: 1, agent: agent.toBase58(), payee: payee.toBase58(), mint: mint.toBase58(),
+        cap: 10n, max: 2n, days: 7, purpose: 'Charge the car',
+        agentLabel: null, payeeLabel: null,
+      },
+    }));
+    try {
+      assert.match(visibleText(root), /You do not hold this token yet/);
+      assert.equal(hold(root).props.disabled, true);
+      Object.assign(observation, saved, { ownerTokenBalance: 100n });
+      if (trigger === 'pull') {
+        const scroll = root.root.findByType('ScrollView' as never);
+        assert.ok(scroll.props.refreshControl, 'pull to refresh must be available');
+        await act(async () => scroll.props.refreshControl.props.onRefresh());
+      } else if (trigger === 'focus') {
+        await act(async () => setFocused(false));
+        await act(async () => setFocused(true));
+      } else {
+        await act(async () => t.mock.timers.tick(10_000));
+      }
+      assert.doesNotMatch(visibleText(root), /You do not hold this token yet|Not enough SOL|network could not be read/);
+      assert.equal(hold(root).props.disabled, false);
+      // Once all checks pass, polling must stop.
+      observation.ownerTokenBalance = null;
+      await act(async () => t.mock.timers.tick(10_000));
+      assert.equal(hold(root).props.disabled, false);
+    } finally {
+      Object.assign(observation, saved);
+      await act(async () => root.unmount());
+    }
+  });
+}
+
+test('payee entry has one label with address actions, saved name and full address together', async () => {
+  const { ApprovalScreen } = await import('../components/ApprovalScreen');
+  const root = await mount(createElement(ApprovalScreen, {
+    mode: 'template', request: null, invalidReason: null,
+  }));
+  await act(async () => amountInput(root, 'Payee').props.onChangeText(payee.toBase58()));
+  const labels = root.root.findAll((node) => (node.type as unknown) === 'Text' && node.children.join('') === 'Payee');
+  assert.equal(labels.length, 1);
+  await act(async () => holdButton(root, 'Save a name for the payee').props.onPress());
+  await act(async () => amountInput(root, 'Name on this phone').props.onChangeText('Charging station'));
+  await act(async () => holdButton(root, 'Save this name').props.onPress());
+  const block = root.root.findByProps({ testID: 'payee-block' });
+  const text = block.findAll((node) => (node.type as unknown) === 'Text').map((node) => node.children.join('')).join(' ');
+  assert.match(text, /Charging station/);
+  assert.ok(text.includes(payee.toBase58()));
+  assert.match(text, /Paste/);
+  assert.match(text, /Scan/);
+});
+
+test('unreadable mint checks retry after focus returns and stop while the screen is away', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const saved = { ...observation };
+  observation.mintReadable = false;
+  const { ApprovalScreen } = await import('../components/ApprovalScreen');
+  const root = await mount(createElement(ApprovalScreen, {
+    mode: 'template', request: null, invalidReason: null,
+  }));
+  try {
+    assert.match(visibleText(root), /This mint is not on this network/);
+    await act(async () => setFocused(false));
+    observation.mintReadable = true;
+    await act(async () => t.mock.timers.tick(20_000));
+    assert.match(visibleText(root), /This mint is not on this network/);
+    observation.mintReadable = false;
+    await act(async () => setFocused(true));
+    observation.mintReadable = true;
+    await act(async () => t.mock.timers.tick(10_000));
+    assert.doesNotMatch(visibleText(root), /This mint is not on this network|Reading the mint from the chain/);
+    assert.match(visibleText(root), /Most in total, ever/);
+  } finally {
+    Object.assign(observation, saved);
+    await act(async () => root.unmount());
+  }
 });

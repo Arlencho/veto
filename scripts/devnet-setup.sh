@@ -396,6 +396,58 @@ solana account {program_id} -u {rpc}
 
 ## Upgrades
 
+### Hold migration and safe-address upgrade, 2026-09-26
+
+The lead already upgraded the program from main commit
+`e2a66dbd4bc6aa9e7b68011f6c9973650eaef79d` (`e2a66db`), containing
+[PR 342](https://github.com/Arlencho/veto/pull/342) and
+[PR 344](https://github.com/Arlencho/veto/pull/344). The following deployment
+facts were supplied by the lead, not independently reverified in this run:
+
+- Build: 631392 bytes; SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`.
+- Program data was extended from 592720 bytes before the upgrade.
+- Upgrade signature: `5WjvHviV8z3HrECQ5fmpSQ5UtejYMk319Vse92cujx1MXmgHGj6agU6Hbv7bXAkUksENnqXmyURhhqeXw85gPb1f` ([transaction](https://explorer.solana.com/tx/5WjvHviV8z3HrECQ5fmpSQ5UtejYMk319Vse92cujx1MXmgHGj6agU6Hbv7bXAkUksENnqXmyURhhqeXw85gPb1f?cluster={cluster})).
+- Dumped program was byte-identical over 631392 bytes, with zero padding after.
+
+This verification run used `VETO_RPC=https://api.devnet.solana.com` for every
+command. It did not upload, deploy, create a buffer, or access a phone.
+`make test` ran from the clean source commit above and passed 146 tests,
+0 failed: unit 4, Hold 31, Hold red-team 23, payment red-team 20, refusal
+recording 6, SKR mint 2, token-swap fixture 3, trade 27, trade red-team 30;
+doc-tests 0. This target builds SBPF v0 for LiteSVM, not the deployment binary.
+
+A read-only `getAccountInfo` at confirmed slot 504528805 found legacy vault
+`8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` still 1291 bytes, owned by
+the Veto program. Its HoldVault owner field is the founder device key
+`GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`. The vault was not changed.
+It will be migrated and closed by its owner later, with his Seed Vault
+signature, following [Hold migrations](HOLD_MIGRATIONS.md).
+
+Verification stopped at the first failure: `make e2e-devnet` exited 2 because
+`keys/deployer.json` is absent in this task checkout. Neither `VETO_KEYS_DIR`
+nor `VETO_E2E_FUNDER` was configured. The journey failed its prerequisite
+check before sending transactions. Summary lines:
+
+```text
+setup: check journey prerequisites: fail: devnet journey: deployer key not found
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+make: *** [e2e-devnet] Error 1
+```
+
+The setup line above omits the checkout-specific absolute path; the missing
+file is `keys/deployer.json`. Per the stop-on-first-failure rule,
+`make hold-e2e-devnet`, `make trade-demo-devnet`, and the subsequent comparison
+of IDL copies against the deployed program were not run. Their success is
+not claimed for this upgrade. Resume verification with the maintainer's
+existing backed-up signer available through the supported key configuration;
+do not deploy again or use the founder's device for this run.
+
 ### Hold upgrade, 2026-09-26
 
 The lead completed the upgrade after the initial upload stopped on HTTP 429.

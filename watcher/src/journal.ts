@@ -4,6 +4,9 @@ import { dirname } from "node:path";
 export type Decision = "paid" | "refused" | "gap" | "skipped";
 
 export type JournalRow = {
+  /** Demo request shaping, with the original unshaped spot/FX amount. */
+  calibration?: string;
+  spot_amount?: string;
   ts: string;
   window_start: string;
   window_end: string | null;

@@ -1,5 +1,8 @@
 appId: com.veto.app
 ---
+# Independently runnable: the helper replays 01 through 04 from a cleared
+# install and lands on the main tabs with a live payment rule.
+- runFlow: helpers/reach-main-tabs.yaml
 - tapOn: "Rules"
 - scrollUntilVisible:
     element:

@@ -1,33 +1,6 @@
 appId: com.veto.app
 ---
-- tapOn: "Paste your agent's address"
-- tapOn: "Paste your agent's address"
-- inputText: "${AGENT}"
-- hideKeyboard
-- scrollUntilVisible:
-    element:
-      text: "Name your agent"
-      index: 1
-    direction: DOWN
-# The heading is index 0; the editable field with the same label is index 1.
-- tapOn:
-    text: "Name your agent"
-    index: 1
-- eraseText
-- inputText: "Maestro agent"
-- hideKeyboard
-- scrollUntilVisible:
-    element: "Review the rule"
-    direction: DOWN
-- tapOn: "Review the rule"
-# No payee is set on the first-run review yet, so the approve button does not
-# render. Assert the review sentence instead; it names the placeholder payee.
-- extendedWaitUntil:
-    visible: "may pay the payee up to .* per payment and .* in total, until .*"
-    timeout: 60000
-- assertVisible: "may pay the payee up to .* per payment and .* in total, until .*"
-- scrollUntilVisible:
-    element: "Most per payment"
-    direction: DOWN
-    timeout: 60000
-# Leave this unsigned. Flow 04 enters the agent and payee, then approves here.
+# Independently runnable: the helper replays 01 and 02 from a cleared
+# install, then pastes the agent address, names the agent, and ends on the
+# unsigned first-run review sentence.
+- runFlow: helpers/enter-agent.yaml

@@ -51,7 +51,7 @@ valid guardian address different from the owner and a safe wallet controlled
 independently of the owner. The Hold flow deliberately supplies the safe address
 and reviews it; it does not accept the owner-wallet recovery-risk exception.
 
-Run 01 and 02, then pause before approval flows. Copy the full account address
+Run 02 first (it replays 01), then pause before approval flows. Copy the full account address
 from the fake wallet's authorization/account UI, not Veto's shortened display.
 Fund that account with devnet SOL for rent, fees and the trade rule's 0.20 SOL
 cap. A devnet faucet allocation of 1 SOL leaves room for these operations.
@@ -67,12 +67,34 @@ If the fake wallet account changes, reconnect Veto and fund the new account.
 
 ## Run each flow
 
-Execute these separately, in order, from the repository root. Do not pass the
-whole directory to Maestro: 01 resets Veto, 02 continues its pending wallet
-request, and 07 needs laptop-generated chain history. None of 02 through 07
-restarts the fake wallet, and only 04 relaunches Veto, at its end, to leave
-the first-run live screen for the main tabs, so screen and session
-prerequisites matter.
+Every flow is independently runnable from a cleared app. Each one starts with
+`launchApp` with `clearState: true` and replays the steps it depends on through
+the chained helpers in `e2e/maestro/helpers/`, so no flow relies on screen
+state left by a previous Maestro invocation. The replay chain is:
+
+| Helper | Replays | Ends on |
+| --- | --- | --- |
+| `helpers/reach-authorize.yaml` | nothing (clears Veto, taps the cards, Connect wallet) | Pending AUTHORIZE sheet |
+| `helpers/connect-wallet.yaml` | reach-authorize | Agent paste choice |
+| `helpers/enter-agent.yaml` | connect-wallet | Unsigned first-run review |
+| `helpers/approve-payment-rule.yaml` | enter-agent | First-run live screen |
+| `helpers/reach-main-tabs.yaml` | approve-payment-rule, then relaunches Veto | Main tabs |
+| `helpers/reconnect.yaml` | reach-authorize, AUTHORIZE, then relaunches Veto | Main tabs, no new rule |
+
+The top-level flows are thin wrappers: 01 runs reach-authorize, 02 runs
+connect-wallet, 03 runs enter-agent, 04 runs reach-main-tabs, and 05 and 06
+run reach-main-tabs before their own steps. 07 runs reconnect, never a rule
+approval: Decisions opens the wallet's newest live rule, and a replayed
+approval would become that rule and hide the refusal-bearing one. Because
+each flow replays its prerequisites, environment requirements accumulate: 05
+also needs `PAYEE`, and 06 also needs `AGENT` and `PAYEE` for the replayed
+payment rule.
+
+Execute from the repository root, one flow per invocation, in any order.
+Funding still needs a pause: run 02 first (it replays 01), copy and fund the
+fake wallet account as described above, then run the approval flows. 07
+needs a refusal generated from the laptop against the newest rule of a
+previous invocation, as described below.
 
 ```bash
 maestro --device emulator-5554 test e2e/maestro/01-onboarding.yaml
@@ -80,21 +102,22 @@ maestro --device emulator-5554 test e2e/maestro/02-connect.yaml
 # Pause here to fund the fake wallet account.
 maestro --device emulator-5554 test -e AGENT="$AGENT" e2e/maestro/03-add-agent-paste.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/04-payment-rule.yaml
-maestro --device emulator-5554 test -e AGENT="$AGENT" e2e/maestro/05-trade-rule.yaml
-maestro --device emulator-5554 test -e GUARDIAN="$GUARDIAN" -e SAFE="$SAFE" e2e/maestro/06-hold.yaml
-# Generate a refusal and select its rule as described below before 07.
+maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/05-trade-rule.yaml
+maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" -e GUARDIAN="$GUARDIAN" -e SAFE="$SAFE" e2e/maestro/06-hold.yaml
+# Run 04 or later in its own invocation, then generate a refusal for its
+# newest rule from the laptop as described below, before 07.
 maestro --device emulator-5554 test e2e/maestro/07-decisions.yaml
 ```
 
-| Flow | Starting state | Observable result |
-| --- | --- | --- |
-| 01 | Installed Veto, fake wallet available | Four introduction cards, then pending AUTHORIZE |
-| 02 | Pending authorization from 01 | Connected, Add your agent opens paste choice |
-| 03 | Agent choices from 02 | Address and local name entered, review sentence shown unsigned |
-| 04 | First-run review from 03 | Agent entered, payee pasted on the scan fallback, 0.1 per payment and 1 total typed, rule live |
-| 05 | Rules tab | Trade rule, supplied agent, unchanged Trading bot defaults, chain detail |
-| 06 | Rules tab | Hold, amount 1, wait 1 day, second Seeker and reviewed safe address, live vault |
-| 07 | Main tab, selected rule with a recorded refusal | Pull refresh, refused row, detail says No money moved. |
+| Flow | Replays | Adds | Observable result |
+| --- | --- | --- | --- |
+| 01 | nothing | Introduction and Connect wallet | Four introduction cards, then pending AUTHORIZE |
+| 02 | 01 | AUTHORIZE approval | Connected, Add your agent opens paste choice |
+| 03 | 01, 02 | Agent address and name | Address and local name entered, review sentence shown unsigned |
+| 04 | 01, 02, 03 | Payee, limits, approval | Agent entered, payee pasted on the scan fallback, 0.1 per payment and 1 total typed, rule live, main tabs |
+| 05 | 01 through 04 | Trade rule | Trade rule, supplied agent, unchanged Trading bot defaults, chain detail |
+| 06 | 01 through 04 | Hold vault | Hold, amount 1, wait 1 day, second Seeker and reviewed safe address, live vault |
+| 07 | 01, 02 (reconnect only) | Refusal read | Pull refresh, refused row, detail says No money moved. |
 
 The Connect wallet and Add your agent taps use anchored text with the inline
 `(?-i)` case-sensitive flag. Maestro text matching is case-insensitive by
@@ -114,19 +137,23 @@ the wallet account list, before showing the guardian fields.
 
 03 tests paste/name/review without signing its first-run proposal. It ends on
 the review sentence, because the approve button only renders once a payee is
-set. 04 stays on that first-run review, explicitly enters the same agent,
-pastes the payee through the payee scan's paste field, types 0.1 per payment
-and 1 total, and approves with the long press. The first-run live screen
-confirms the rule, then 04 relaunches Veto so 05 starts on the main tabs. The
+set. 04 replays 01 through 03 back to that first-run review, explicitly enters
+the same agent, pastes the payee through the payee scan's paste field, types
+0.1 per payment and 1 total, and approves with the long press. The first-run
+live screen confirms the rule, then 04 relaunches Veto so it and every later
+flow start their own steps on the main tabs. The
 new rule is listed under Rules like any other. Trade defaults are 0.01 SOL per trade,
 0.05 SOL per day, 0.20 SOL total, 90 percent floor and 7 days. The listed pool
 comes from `app/lib/pools.ts` and must exist on the configured devnet deployment.
 
-Repeated approval flows create additional funded rules or vaults. Clearing
-Veto data does not remove chain accounts. Before a new full run, return unused
-funds through the app's normal close actions or fund a fresh test wallet, then
-start at 01. To retry only a failed flow, restore its starting screen first.
-If a transaction was submitted, inspect its chain result before submitting again.
+Every run of 04, 05 or 06 replays first-run and approves fresh on-chain rules
+or vaults, and clearing Veto data does not remove chain accounts. Rules
+approved by earlier invocations stay listed under Rules after a reconnect.
+Before a new full pass, return unused
+funds through the app's normal close actions or fund a fresh test wallet.
+To retry a failed flow, just run it again; its replay rebuilds everything it
+needs. If a transaction was submitted, inspect its chain result before
+submitting again.
 
 ## Drive requests from the laptop
 
@@ -171,10 +198,14 @@ the daily allowance. Run the honest trade first. Rerunning the hostile script
 against an exhausted rule needs a new rule or a new allowance day. Do not run
 it against any pool other than the designated devnet demo pool.
 
-Before 07, open the payment rule (or the trade rule after a successful hostile
-run) from Rules to select it, then use its Rules back control to return to the
-main tabs. If Hold's Done left you on the vault home, use Close first. 07 reads
-the currently selected rule. Its `Refused, recorded` assertion targets a real
+Before 07, run a rule-creating flow (04 or later) in its own invocation; that
+invocation leaves Veto on the main tabs with its freshly approved rule as the
+wallet's newest live rule. Generate the refusal against that rule from the
+laptop. Do not run any other rule-creating flow between the refusal and 07:
+07 clears Veto, reconnects, and opens the wallet's newest live rule in
+Decisions, so the refusal-bearing rule must still be the newest. 07 replays
+only the introduction and authorization, never an approval, for exactly this
+reason. Its `Refused, recorded` assertion targets a real
 row's accessibility text, not the `Refused` filter, and opens that row to assert
 `No money moved.`. A missing refusal should fail, not be skipped.
 

@@ -1,33 +1,6 @@
 appId: com.veto.app
 ---
-# Only this flow clears Veto data. It never clears the fake wallet.
-- launchApp:
-    clearState: true
-- scrollUntilVisible:
-    element: "Next: you set one rule"
-    direction: DOWN
-    timeout: 60000
-- tapOn: "Next: you set one rule"
-- scrollUntilVisible:
-    element: "Next: a refusal is saved"
-    direction: DOWN
-    timeout: 60000
-- tapOn: "Next: a refusal is saved"
-- scrollUntilVisible:
-    element: "Next: you decide"
-    direction: DOWN
-    timeout: 60000
-- tapOn: "Next: you decide"
-# The step strip also renders CONNECT WALLET. Maestro text matching is
-# case-insensitive by default and picks the deepest matching element before
-# filtering for clickability, so the strip's non-clickable Text would match
-# first; the inline (?-i) flag limits the match to the button's exact case.
-- scrollUntilVisible:
-    element:
-      text: "(?-i)^Connect wallet$"
-    direction: DOWN
-- tapOn:
-    text: "(?-i)^Connect wallet$"
-- extendedWaitUntil:
-    visible: "AUTHORIZE"
-    timeout: 30000
+# Independently runnable: the helper clears Veto state and replays the four
+# introduction cards and the Connect wallet tap, ending on the pending
+# AUTHORIZE sheet.
+- runFlow: helpers/reach-authorize.yaml

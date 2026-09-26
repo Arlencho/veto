@@ -1,0 +1,65 @@
+appId: com.veto.app
+---
+# Replays first-run through the unsigned review, then stays there: enters the
+# agent, sets the payee through the payee scan's paste field, types the
+# limits, and approves. The approve button only renders once a payee is set.
+- runFlow: enter-agent.yaml
+- scrollUntilVisible:
+    element:
+      text: "(?-i)^Agent$"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "(?-i)^Agent$"
+- eraseText
+- inputText: "${AGENT}"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "May only pay"
+    direction: UP
+    timeout: 20000
+- tapOn: "(?-i)^Edit who your agent may pay.*"
+# The payee scan keeps a paste field below its camera states (added in #351).
+- assertVisible: "(?-i)^Use payee address$"
+- tapOn: "(?-i)^Payee address$"
+- inputText: "${PAYEE}"
+- hideKeyboard
+- tapOn: "(?-i)^Use payee address$"
+# Back on the review screen with the payee staged from the scan handoff.
+- extendedWaitUntil:
+    visible: "Set your agent's limits"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Most per payment"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Most per payment"
+- eraseText
+- inputText: "0.1"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Most in total, ever"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Most in total, ever"
+- eraseText
+- inputText: "1"
+- hideKeyboard
+# The block summary below the dials proves the typed limits were applied.
+- scrollUntilVisible:
+    element: "The 1 .* total"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "The 1 .* total"
+- assertVisible: "10 payments of 0.1 .* at most"
+# Maestro longPressOn holds for 3 seconds.
+- assertVisible:
+    text: "Press and hold to approve rule.*"
+    enabled: true
+- longPressOn: "Press and hold to approve rule.*"
+- runFlow: fake-wallet-transaction.yaml
+- extendedWaitUntil:
+    visible: "Your rule is live."
+    timeout: 90000
+- extendedWaitUntil:
+    visible: "can now ask to pay .* It can only ask. It cannot take."
+    timeout: 60000

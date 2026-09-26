@@ -1,7 +1,11 @@
 appId: com.veto.app
 ---
-# Before running, generate a refusal for the selected rule from the laptop.
-# Start on a main tab with that rule selected, as described in README.md.
+# Before running, complete a rule-creating flow (04 or later) in its own
+# invocation and generate a refusal for its newest rule from the laptop, as
+# described in README.md. This flow replays only the introduction and
+# authorization, never a rule approval: Decisions opens the wallet's newest
+# live rule, and that must stay the refusal-bearing one.
+- runFlow: helpers/reconnect.yaml
 - tapOn: "Decisions"
 # Reach the top first, then pull down through the list to trigger refresh.
 - swipe:

@@ -1,16 +1,6 @@
 appId: com.veto.app
 ---
-# Continue the pending MWA request in com.solana.mobilewalletadapter.fakewallet.
-# Do not launch either app here: restarting the wallet changes its test key.
-- assertVisible: "AUTHORIZE"
-- tapOn: "AUTHORIZE"
-- extendedWaitUntil:
-    visible: "Add your agent"
-    timeout: 60000
-# The step strip also renders ADD YOUR AGENT. Maestro text matching is
-# case-insensitive by default and picks the deepest matching element before
-# filtering for clickability, so the strip's non-clickable Text would match
-# first; the inline (?-i) flag limits the match to the button's exact case.
-- tapOn:
-    text: "(?-i)^Add your agent$"
-- assertVisible: "Paste your agent's address"
+# Independently runnable: the helper replays 01 from a cleared install to
+# bring the AUTHORIZE sheet back, then approves it and opens the agent paste
+# choice.
+- runFlow: helpers/connect-wallet.yaml

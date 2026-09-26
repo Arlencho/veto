@@ -1,5 +1,8 @@
 appId: com.veto.app
 ---
+# Flow 03 ends on its unsigned first-run review, which has no Rules tab.
+# Relaunch Veto to reach the main tabs, then open Rules from there.
+- launchApp
 - tapOn: "Rules"
 - scrollUntilVisible:
     element:

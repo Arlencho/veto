@@ -10,7 +10,7 @@ lead. Authoring validation is offline YAML parsing only; no device run is claime
    with the Veto APK. Start it and confirm its serial is `emulator-5554`. Use the
    emulator only, with the owner's phone left alone. Every command below pins the
    emulator explicitly.
-2. Install Maestro following its [installation guide](https://docs.maestro.dev/get-started/installing-maestro).
+2. Install Maestro following its [installation guide](https://docs.maestro.dev/getting-started/installing-maestro).
 3. Obtain the fake wallet from the official
    [Mobile Wallet Adapter releases](https://github.com/solana-mobile/mobile-wallet-adapter/releases),
    or build the `fakewallet` Android module from that repository. Inspect the APK
@@ -70,7 +70,8 @@ If the fake wallet account changes, reconnect Veto and fund the new account.
 Execute these separately, in order, from the repository root. Do not pass the
 whole directory to Maestro: 01 resets Veto, 02 continues its pending wallet
 request, and 07 needs laptop-generated chain history. None of 02 through 07
-restarts either app, so their screen and session prerequisites matter.
+restarts the fake wallet, and only 04 relaunches Veto to leave the unsigned
+first-run review, so screen and session prerequisites matter.
 
 ```bash
 maestro --device emulator-5554 test e2e/maestro/01-onboarding.yaml
@@ -89,13 +90,16 @@ maestro --device emulator-5554 test e2e/maestro/07-decisions.yaml
 | 01 | Installed Veto, fake wallet available | Four introduction cards, then pending AUTHORIZE |
 | 02 | Pending authorization from 01 | Connected, Add your agent opens paste choice |
 | 03 | Agent choices from 02 | Address and local name entered, rule review shown unsigned |
-| 04 | Review from 03 or a main tab | Rules > Write a rule, typed 0.1 per payment and 1 total, active chain rule |
+| 04 | Relaunched Veto on the main tabs | Rules > Write a rule, typed 0.1 per payment and 1 total, active chain rule |
 | 05 | Rules tab | Trade rule, supplied agent, unchanged Trading bot defaults, chain detail |
 | 06 | Rules tab | Hold, amount 1, wait 1 day, second Seeker and reviewed safe address, live vault |
 | 07 | Main tab, selected rule with a recorded refusal | Pull refresh, refused row, detail says No money moved. |
 
-The Connect wallet tap uses an exact, case-sensitive label and index 0 because
-the strip also renders CONNECT WALLET. Amount fields use the current form's
+The Connect wallet and Add your agent taps use anchored text without an index.
+Maestro text matching is case-insensitive, so the strip labels CONNECT WALLET
+and ADD YOUR AGENT match the same regexes, and an index would select the
+non-clickable strip label first; without one the tap resolves to the button.
+Amount fields use the current form's
 accessibility labels, including `Most per payment` and `Most in total, ever`.
 Approvals use [Maestro longPressOn](https://docs.maestro.dev/reference/commands-available/longpresson),
 which holds for 3 seconds. The full button label includes its hint, so its
@@ -105,9 +109,10 @@ Chain confirmation is asserted back in Veto, not inferred from the wallet tap.
 Hold also handles the authorization request made when its guardian screen reads
 the wallet account list, before showing the guardian fields.
 
-03 tests paste/name/review without signing its first-run proposal. 04 switches
-to Rules and explicitly enters the same agent in a new payment rule. This keeps
-the requested Rules entry covered. Trade defaults are 0.01 SOL per trade,
+03 tests paste/name/review without signing its first-run proposal, leaving the
+app on a review screen with no Rules tab. 04 relaunches Veto, opens Rules from
+the main tabs and explicitly enters the same agent in a new payment rule. This
+keeps the requested Rules entry covered. Trade defaults are 0.01 SOL per trade,
 0.05 SOL per day, 0.20 SOL total, 90 percent floor and 7 days. The listed pool
 comes from `app/lib/pools.ts` and must exist on the configured devnet deployment.
 

@@ -18,16 +18,15 @@ appId: com.veto.app
     direction: DOWN
     timeout: 60000
 - tapOn: "Next: you decide"
-# Case-sensitive exact label plus index targets the button, not CONNECT WALLET
-# in the step strip or its "Connect wallet, not yet" accessibility label.
+# The step strip also renders CONNECT WALLET. Maestro text matching is
+# case-insensitive, so the anchored regex matches the strip label too; with
+# no index the tap resolves to the clickable button instead.
 - scrollUntilVisible:
     element:
       text: "^Connect wallet$"
-      index: 0
     direction: DOWN
 - tapOn:
     text: "^Connect wallet$"
-    index: 0
 - extendedWaitUntil:
     visible: "AUTHORIZE"
     timeout: 30000

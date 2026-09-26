@@ -7,7 +7,9 @@ appId: com.veto.app
 - extendedWaitUntil:
     visible: "Add your agent"
     timeout: 60000
+# The step strip also renders ADD YOUR AGENT. Maestro text matching is
+# case-insensitive, so the anchored regex matches the strip label too; with
+# no index the tap resolves to the clickable button instead.
 - tapOn:
     text: "^Add your agent$"
-    index: 0
 - assertVisible: "Paste your agent's address"

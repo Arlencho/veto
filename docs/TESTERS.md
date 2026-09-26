@@ -1,22 +1,28 @@
-# Try Veto on your Seeker
+# Try Veto on your Seeker or Android phone
 
-For Seeker owners testing before October 8, 2026.
+For Seeker owners and other Android testers trying the first public devnet APK.
 
-Veto lets you set spending rules for an agent and see which payments were paid or refused.
+Veto lets you set payment and trade rules for an agent and see which requests were paid or refused.
 Its Hold vault makes withdrawals to new addresses wait so you can stop them.
 
 **Everything here is devnet test money with no value.**
 
-## 5-minute setup
+See the [release notes](RELEASE_NOTES.md) for features and known limits.
+The planned Try page is <https://veto-hq.github.io>, currently a placeholder.
 
-1. Download and install the APK from the [latest release](https://github.com/Arlencho/veto/releases/latest).
-2. Set your Seed Vault wallet to devnet and copy your own wallet address.
-3. Get devnet SOL at [Solana Faucet](https://faucet.solana.com) and devnet USDC at
+## Setup
+
+1. Download and install the APK from the [latest release](https://github.com/Arlencho/veto/releases/latest)
+   when published. If no APK is attached, report setup as blocked.
+2. Use Seed Vault on Seeker, or a Solana wallet supporting Mobile Wallet Adapter
+   on another Android phone. Set the wallet to devnet and copy your own wallet address.
+3. Get free devnet SOL at [Solana Faucet](https://faucet.solana.com) and free devnet USDC at
    [Circle Faucet](https://faucet.circle.com). Choose Solana devnet for USDC.
    Use your own wallet address at both faucets.
 4. Open Veto and follow the first-run steps. Use the test-agent choice below when asked to add an agent.
 
-Faucets and confirmations can take longer than five minutes.
+Faucets and confirmations can take time. In the steps below, approve in your
+connected wallet; Seed Vault is the Seeker example.
 
 ## Three things to try
 
@@ -41,8 +47,13 @@ such as 1 devnet USDC. Choose **Next: set the rules**, set a daily limit and wai
 then **Next: choose a guardian key**.
 
 Choose **A second key in Seed Vault on this phone** if available, or **Your second Seeker**
-and enter its address. Check **Safe address**. If your wallet exposes only one account
-and you have no second Seeker, report this task as blocked.
+and enter its address. The guardian must be a different key from the owner.
+Enter **Safe address** explicitly: a wallet you own that the guardian does not
+control. It cannot be the guardian address. Choosing the owner wallet requires
+confirming the risk that a stolen owner key could spend recovered money.
+If you cannot access a separate guardian key and a suitable safe wallet, report
+this task as blocked. A second key on the same phone is useful for testing,
+but does not provide the separation of a guardian on another device.
 Use **Press and hold to sign with your key on this phone**, approve in Seed Vault,
 then **Done**.
 
@@ -57,6 +68,17 @@ sign. Check that the withdrawal is no longer waiting and the money remains in th
 Open **Agents** and find your agent. A new agent shows **Too new to grade** until it
 has at least 10 requests and three days of history. Open **See how grades work**.
 Does the explanation make sense? A grade describes behaviour, not safety.
+
+## More to explore
+
+- **Owner-direct connect:** paste or scan an existing agent public address, then
+  review and approve its rule. The agent must run separately to submit requests.
+- **Trade rule:** choose a listed pool, limits and price floor. The hacked-agent
+  demo described in the [release notes](RELEASE_NOTES.md) uses a separate script;
+  there is no in-app button to run it.
+- **Export:** when you have a paid or refused payment decision, open it and use
+  **Share** to reach **Export**. Choose JSON or CSV. Records cannot show requests
+  an agent never submitted.
 
 ## Tell us
 

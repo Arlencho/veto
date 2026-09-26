@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import bs58 from 'bs58';
+import idl from '../../indexer/idl/veto.json' with { type: 'json' };
 import { after, before, beforeEach, test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { useOwnDatabase } from './db.js';
@@ -7,9 +10,10 @@ const { pool, transaction } = await import('../src/db/transaction.js');
 const { migrate } = await import('../src/db/migrate.js');
 const { createWebhookServer } = await import('../src/sources/webhook.js');
 const { backfill, finalize } = await import('../src/sources/backfill.js');
-const { createRpc } = await import('../src/sources/shared.js');
+const { createRpc, ingestTransaction } = await import('../src/sources/shared.js');
 const { decodeTransaction } = await import('../src/decode/index.js');
-const { insertDecision } = await import('../src/ingest.js');
+const { createApiServer } = await import('../src/api/index.js');
+const { insertDecision, reverseDecision } = await import('../src/ingest.js');
 const { ingestLocation } = await import('../src/boundary.js');
 import type { RpcTransaction } from '../src/decode/index.js';
 const read = (name: string) => JSON.parse(readFileSync(new URL(`../fixtures/devnet/${name}.json`, import.meta.url), 'utf8'));
@@ -160,3 +164,52 @@ test('webhook requires configuration and rejects malformed or oversized bodies',
     assert.equal((await fetch(endpoint, { method: 'POST', headers: { authorization: 'secret' }, body: ' '.repeat(8 * 1024 * 1024 + 1) })).status, 413);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
+
+for (const [instruction, event, kind] of [
+  ['migrate_hold_vault', 'HoldMigrated', 14],
+  ['close_hold_vault', 'HoldClosed', 15],
+] as const) {
+  test(`${event} persists exact history without live accounts and deduplicates both sources`, async () => {
+    const program = '3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV';
+    const owner = bs58.encode(Buffer.alloc(32, 21));
+    const vault = bs58.encode(Buffer.alloc(32, 22));
+    const destination = instruction === 'migrate_hold_vault' ? vault : bs58.encode(Buffer.alloc(32, 23));
+    const layout = idl.instructions.find(ix => ix.name === instruction)!;
+    const accountKeys = [program, ...layout.accounts.map(a => a.name === 'owner' ? owner : a.name === 'vault' ? vault : destination)];
+    const raw = Buffer.alloc(112);
+    createHash('sha256').update(`event:${event}`).digest().copy(raw, 0, 0, 8);
+    Buffer.from(bs58.decode(vault)).copy(raw, 8);
+    Buffer.from(bs58.decode(owner)).copy(raw, 40);
+    raw.writeBigUInt64LE(9007199254740993n, 72);
+    Buffer.from(bs58.decode(destination)).copy(raw, 80);
+    const tx: RpcTransaction = {
+      slot: 123, blockTime: 1780000000,
+      transaction: { signatures: [event], message: { accountKeys, instructions: [{
+        programIdIndex: 0, accounts: layout.accounts.map((_, i) => i + 1), data: bs58.encode(Buffer.from(layout.discriminator)),
+      }] } },
+      meta: { err: null, logMessages: [`Program ${program} invoke [1]`, `Program data: ${raw.toString('base64')}`, `Program ${program} success`] },
+    };
+    const noRpc = async <T>(): Promise<T> => { throw new Error('History must not require live accounts'); };
+    assert.equal(await ingestTransaction(tx, 'webhook', noRpc), 1);
+    assert.deepEqual((await pool.query('SELECT rule_kind, rule, owner, agent, kind, amount, counterparty, instruction_index, inner_index FROM decisions')).rows, [{
+      rule_kind: 'hold', rule: vault, owner, agent: owner, kind, amount: '9007199254740993', counterparty: destination, instruction_index: 0, inner_index: -1,
+    }]);
+    assert.equal(await ingestTransaction(tx, 'backfill', noRpc), 0);
+    assert.deepEqual((await pool.query('SELECT requests, paid, outside FROM rule_stats')).rows, [{ requests: '0', paid: '0', outside: '0' }]);
+    const api = createApiServer();
+    await new Promise<void>(resolve => api.listen(0, '127.0.0.1', resolve));
+    try {
+      const url = `http://127.0.0.1:${(api.address() as { port: number }).port}`;
+      for (const endpoint of ['record', 'rules']) {
+        assert.equal((await fetch(`${url}/v1/agents/${owner}/${endpoint}`)).status, 404);
+      }
+    } finally { await new Promise<void>(resolve => api.close(() => resolve())); }
+    assert.equal((await pool.query('SELECT * FROM agent_stats WHERE agent = $1', [owner])).rowCount, 0);
+    assert.equal(await reverseDecision({ signature: event, instruction_index: 0, inner_index: -1 }), true);
+    assert.equal((await pool.query('SELECT * FROM agent_stats WHERE agent = $1', [owner])).rowCount, 0);
+    const missing = structuredClone(tx); missing.meta!.logMessages = [];
+    assert.throws(() => decodeTransaction(missing), /Malformed or incomplete/);
+    const failed = structuredClone(tx); failed.meta!.err = 'failed';
+    assert.equal(await ingestTransaction(failed, 'webhook', noRpc), 0);
+  });
+}

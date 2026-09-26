@@ -524,6 +524,7 @@ export class HoldVault {
     const where = derived(this.programId, args.owner.publicKey, asU64(args.vaultId, "vaultId"));
     const instruction = ix(this.programId, [
       meta(args.owner.publicKey, true, true), meta(where.vault, false, true),
+      meta(where.ledger, false, true),
       meta(SystemProgram.programId, false, false),
     ], discData(MIGRATE_HOLD_VAULT_DISCRIMINATOR));
     const signature = await sendInstruction(this.connection, args.owner, instruction, [args.owner], "HoldVault.migrateHoldVault");

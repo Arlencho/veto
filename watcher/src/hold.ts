@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -443,4 +444,36 @@ export async function scanHoldVaults(args: {
     }
   }
   return raised;
+}
+
+export type HoldLifecycleEvent = {
+  kind: "migrated" | "closed";
+  vault: string;
+  owner: string;
+  amount: bigint;
+  destination: string;
+};
+
+/** Decode authenticated event logs even when Close has removed the ledger. */
+export function decodeHoldLifecycleEvents(logs: readonly string[], programId: string, failed = false): HoldLifecycleEvent[] {
+  if (failed) return [];
+  const stack: string[] = [];
+  const events: HoldLifecycleEvent[] = [];
+  for (const line of logs) {
+    const invoke = /^Program (\w+) invoke \[\d+\]$/.exec(line);
+    if (invoke) { stack.push(invoke[1]!); continue; }
+    const end = /^Program (\w+) (?:success|failed.*)$/.exec(line);
+    if (end) { if (stack.at(-1) === end[1]) stack.pop(); continue; }
+    if (stack.at(-1) !== programId || !line.startsWith("Program data: ")) continue;
+    const raw = Buffer.from(line.slice(14), "base64");
+    if (raw.length !== 112) continue;
+    for (const [name, kind] of [["HoldMigrated", "migrated"], ["HoldClosed", "closed"]] as const) {
+      const disc = createHash("sha256").update(`event:${name}`).digest().subarray(0, 8);
+      if (!raw.subarray(0, 8).equals(disc)) continue;
+      events.push({ kind, vault: new PublicKey(raw.subarray(8, 40)).toBase58(),
+        owner: new PublicKey(raw.subarray(40, 72)).toBase58(), amount: raw.readBigUInt64LE(72),
+        destination: new PublicKey(raw.subarray(80, 112)).toBase58() });
+    }
+  }
+  return events;
 }

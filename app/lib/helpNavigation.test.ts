@@ -435,6 +435,6 @@ test('Help explains the guardian recovery destination and safe wallet ownership 
   assert.match(text, /immediately recover the entire balance to the configured safe address/);
   assert.match(text, /Acting alone, it cannot choose another destination/);
   assert.match(text, /guardian does not control/);
-  assert.match(text, /stolen owner key would also reach the safe address/);
+  assert.match(text, /Your safe address must be a different wallet from the one you sign with\./);
   await act(async () => root.unmount());
 });

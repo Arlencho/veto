@@ -208,6 +208,9 @@ setup: check journey prerequisites: fail: Funder GYus8c91vyc7XDrgqfDaYcmVTERb4hQ
 make: *** [e2e-devnet] Error 1
 ```
 
+The funding blocker above was resolved by the completed USDC rerun recorded
+below under Final USDC and trade verification.
+
 #### Payment journey with VTEST
 
 The supported test-token variant,
@@ -277,10 +280,96 @@ make: *** [trade-demo-devnet] Error 1
 ```
 
 The target stopped before the hostile-agent sequence. No successful trade
-or hostile sequence is claimed for this upgrade. Existing key-directory
+or hostile sequence was established by that attempt. Existing key-directory
 fixtures were left unchanged; the rule's price protection was not loosened.
 A complete trade rerun needs a fixture whose floor and remaining daily
-allowance support the current pool, as noted in the previous upgrade record.
+allowance support the current pool, as noted in the previous upgrade record. The fresh-rule rerun below resolves this.
+
+#### Final USDC and trade verification, 2026-09-26
+
+After the deployer was funded, `make e2e-devnet` with the default Circle devnet
+USDC mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` exited 0.
+Rule A `BSK4K9uSpATApYfF5RWspWem89RX41UuhHV6zhEY7tQw` and rule B
+`CAHm3TDUKzyCCAqzh8TXvGfHAip6DPAEWWgfqGW2S1yX` opened, paid, refused,
+overrode, revoked and closed as expected. All six decision exports were
+`VERDICT: CONFIRMED`; the tampered amount was `VERDICT: REJECTED`.
+Cleanup returned 2250000 USDC base units and remaining SOL to the deployer,
+signature `p7veBbVbCrVJJLnZnykJh1p9Ko22Ri2toQWmKhgwFGmVVqvjf41CJBF4EZ7ASeo7yKd9kVBG3GXgTBqfLaNLNsX`.
+Exact summary:
+
+```text
+✔ devnet journey opens two rules, pays, refuses, overrides, revokes, closes, and verifies every decision (239911.482875ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+The fresh trade rule was opened with `keys/owner.json`, owner
+`EGQdANFMq6xVjKcSrij4gWiH91q8TvhdY5e87KjjF2yc`, on pool
+`DTFPL7GmcFN9yc6Yv2FZrq158gRhM8JG1v6svgcNNjxL`.
+At 2026-09-26T20:44:41.550Z, the pool held 188044036 wSOL base units and
+17767984 USDC base units. The floor is exactly 90 percent of that spot
+ratio: `159911856/1880440360` in output/input base units.
+The limits remain per trade 0.002 SOL, per day 0.01 SOL, cap 0.05 SOL,
+and 30 days (`expires_at=1793047481`).
+
+| Fresh fixture | Public address |
+|---|---|
+| Rule | `5Tjmm2QueaRAnxDKbF39NxCwEsixRSZTZDrYFHv2Nd4n` |
+| Ledger | `BhL3TaWeN2d838zZzbJw28yfPrrx2YCHNqNHTvgQ6419` |
+| Source | `FoCU6rSJ9ZqY493UjeUovNyCzoW4m4yN5o273ij8haG2` |
+| Destination | `HcyMqQuodBgL9RzMMbEwAM6zYZhoFrSnoPuVbqVh6wgg` |
+| Agent | `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` |
+
+Open signature: `5U3mkG6JP5cdJFADDP9WLQ6AFp6uAPNjxqXBy7fMv37SXpSoKWXsnswJ6g9HuwLpzftoTiiY68CLJe3Gj9hFtvMw`. This is an open instruction,
+so it has no recorded trade reason. The second trader received 10030498
+lamports to restore its fee and swap budget to 0.3 SOL, signature
+`34E44NcdWn6MszmkfRj9RoUiKECRPsnwUU4S8eByZS2bjhzLKdKMBjXnLqTSa9DCesiLmcEEZ88D3MMPbKw2vbjg`; this funding transfer has no trade reason.
+
+`VETO_KEYS_DIR` points to the supplied directory, read-only. Existing signer
+files are read through symlinks, never copied, printed or changed. The new
+public fixture is written to this worktree's gitignored `keys/trade-config.json`;
+the source directory's config remains unchanged. Every live command uses
+`VETO_RPC=https://api.devnet.solana.com`, paced requests, and HTTP 429
+back-off of 15, 30, 60 and 120 seconds. No deployment, device operation,
+or access to the old Hold vault occurred in this final verification.
+
+`make trade-demo-devnet TRADE_DEMO_AMOUNT=1000000` exited 0 on the fresh
+rule. Every trade decision below includes the reason decoded from its
+confirmed transaction. The first line is `trade-once`; subsequent lines
+are the hostile-agent sequence. Exact output:
+
+```text
+traded amount_in=999999 amount_out=93708 reason=0 ok suggested_override=0 signature=5JAXFBaG1vm5nPk7xki7qjRT4UqT55wm5K95Y2hZ5ywLxFgKg1oeWvjQs4XqoLKnC9RCPpP8r1uw4JET6QgY58XP slot=504536589
+a.destination refused amount_in=1000000 amount_out=0 reason=11 output account not allowed suggested_override=0 signature=4bCeLFR8eDNTMHGkfYYkB7ee4AxBpaJM81ZZBQdXbj9UNcto4hroozWFuCoM1QZHu5EvUNEMHw52FPfPpq6Xfdea slot=504536628
+b.pool refused amount_in=1000000 amount_out=0 reason=12 pool account not allowed suggested_override=0 signature=S1soTkQDrBivSzetPwf4R31GNtJYhbCGZxnCGdhKew5q6BUTV5p5GuUYvhGkfcyyoAN4nMAnFbCzpA1PmHaHsQu slot=504536704
+c.per_trade refused amount_in=2000001 amount_out=0 reason=5 over per-payment maximum suggested_override=2000001 signature=3xQQKBhPSgdJUZvMBNimqWiso1Hv43cQ8r6UGZTSyLseJ9x34pF4VLkMLwEAFTnHjscEwqWYqZJ1VJ74K5evjBey slot=504536715
+d.floor refused amount_in=1000000 amount_out=0 reason=14 quote below floor suggested_override=0 signature=2WPoHBRJrLde5QjdP2qvBv5xPqZuDhBCuLcg85duqRunxLtCB9cNpFt8BcgUmFuFMHoi22kcX1HCPX8Gsh2s5QQt slot=504536756
+e.honest traded amount_in=999999 amount_out=92447 reason=0 ok suggested_override=0 signature=5EHddFNd47rvvmCzWMLmBMmzkmWAKvcM9vbs5BpJHDLd7nvatiMxXgobiyQFv2Xdo2bjx5t9yHdho1HWS8qwYyMf slot=504536786
+f.fill traded amount_in=1999999 amount_out=182020 reason=0 ok suggested_override=0 signature=4vrBwW9kmVbcNNWGqzq3puSCHMVUfkDzDydcmCJSwuSeLFCcKPFq5W6kD79ivSJhULgURiybQEkCTaUZMd61jXYQ slot=504536798
+f.fill traded amount_in=1999996 amount_out=178284 reason=0 ok suggested_override=0 signature=3RMZ5EUaWh9ZAi4y5wK8qLqJbBFjoVaqZceTLpyJ5sAUfQzRbhBrT1DBfDw5cQVjYnVAuCkk7AgCsbpn5ZZ12qrA slot=504536811
+f.fill traded amount_in=1999993 amount_out=174662 reason=0 ok suggested_override=0 signature=5oaNQ7EM1DN7oaMpgLr2i7N5uoYUxi1aPTBDj1455Ha13StF8omrUGkPfTa9E3WNMr5FZBzo936ZD4Ny2KoSPoyV slot=504536824
+f.fill traded amount_in=1000014 amount_out=86008 reason=0 ok suggested_override=0 signature=4AnkKFVXNuANtNrsLzJ8sriDJ4m9B4FCLn4PE2WHgsnixDqfc3FgwWmWQ2V9b1d11mCBg9HNoh8yzLkUawYXyXyX slot=504536837
+f.daily refused amount_in=2000000 amount_out=0 reason=13 over daily limit suggested_override=0 signature=musrxe3ReagFwvZ7faHGsm2iGwdVcEdCp91tZYmp5itpaz8SKdpVt5L9Zj9eFGCyva4TKMawxbu9CfQxyDrnPDX slot=504536850
+```
+
+Every auxiliary signature emitted by the demo is also recorded below.
+These token-account, decoy-pool and direct pool-swap transactions have no
+Veto trade decision and therefore no recorded trade reason. `setup=lower`
+funds the second trader's wrapped SOL account; the two `third_party_swap`
+rows move and restore the pool price.
+
+```text
+setup=bad_pool signature=2moDVTkmRjDgThxgZgi7bSDPkyfUYMgt9eQA8vhBRSjzrnfGMVGd3ShYpfyLBqnxFWyvkRH9sBN2hB43Ru9NrNa
+setup=bad_pool signature=5vJxvTyekGw58yWLZY3xpdJGb9GYqNGkAGvwe2ebiGJ6rV6WDm73X25SZxrRxiEN8e3qbpGLHyAeAdgw8VFyRDNK
+setup=bad_pool signature=2j9AgzhURPYYg9ys2xZQLCf3yjMHtuKSt6c7uwXEreXEyTF9YabPh5A2F9GrUt5PuQ2Y7pPwbN8f6ThyCB5heth8
+setup=bad_pool signature=3D9Q5ePsMc4qsDYpZ5P4gEJbjWk7ioRq2HUUfHLMUPzTaUPjsnVogd6GnMNAmFseAxYBQavfkaqfN2eacveTojsV
+setup=bad_pool signature=2iJHyU3hfYkZmeVnUeBPDsxaa8zwxzSwB8WRFsEqoRy1MKSVB9XCpLSE79GktsxfgA7AY1D8ceryefnFVw1gz6Br
+setup=bad_pool signature=2WNe1WDBsR5CvKA5XoN4W3gT7PvLH7Y8AtGRrdBMNZ43cXMzsqeaXHVsbRuNDgAtyyPVREVvjY79W2J5YuGUba39
+setup=lower signature=FBMjtmhxR84gUPTeJbLcZTSTCTpp3D9rcfq8i8rsYAPeQCWrg1DDsKz1xyUhVPDQK1mPfedv9vc2q8pWiMc6LKK
+third_party_swap direction=lower signature=2vv63An2M2VUhPHYxq1qwHSAoPdYNxtPwPxpjQZks1TJaCLU7Mcjw6G3usPMNVMN9fRaMjLLZSiN9FtmstGELXNX
+third_party_swap direction=restore signature=XeYCUEsdq5GGDTRv2HN9hoh5g6oyweqoFJsPeSKYNSGUpFSknNeQr5KXEsmhneBWF798Pbu2VFTWeo1Hg6cBC95
+```
 
 #### IDL and deployed program verification
 

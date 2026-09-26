@@ -348,7 +348,7 @@ test('a held withdrawal shows the chain countdown and Stop as the main action', 
       waitLabel: '2 days',
       countdown,
       untilLabel: 'Sun 27 Sep, 14:12, unless stopped. Blockchain clock.',
-      reasons: ['1,000 is over your 50 a day', 'New address', '100% of your vault'],
+      reasons: ['1,000 test tokens is over your 50 test tokens a day', 'New address', '100% of your vault'],
       toldLine: 'Both phones were told at 14:12. Reminders follow at 1 hour, at 12 hours, every 12 hours, then 6 hours and 1 hour before it goes.',
       dailyLabel: '50',
       onClose() {},
@@ -363,7 +363,7 @@ test('a held withdrawal shows the chain countdown and Stop as the main action', 
   assert.match(text, /1,000 test tokens/);
   assert.match(text, /8xQf\.\.\.Tz9A/);
   assert.match(text, /Blockchain clock/);
-  assert.match(text, /1,000 is over your 50 a day/);
+  assert.match(text, /1,000 test tokens is over your 50 test tokens a day/);
   assert.match(text, /New address/);
   assert.match(text, /100% of your vault/);
   assert.ok(

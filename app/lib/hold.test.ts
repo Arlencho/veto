@@ -17,11 +17,14 @@ import {
   delaySecsForDays,
   formatChainInstant,
   formatHoldAmount,
+  heldGoneCopy,
   heldReasonChips,
   holdNetworkPill,
   holdRecordLines,
   holdTokenName,
   HOLD_KIND_FROZEN,
+  HOLD_KIND_PAID,
+  HOLD_KIND_STOPPED,
   HOLD_SHARE_BPS,
   HOLD_SUGGESTED_DAILY,
   HOLD_SUGGESTED_DAYS,
@@ -153,11 +156,33 @@ test('held reasons name the amount, the daily limit, and the share of this vault
   assert.deepEqual(
     heldReasonChips({
       reasons: ['over_daily_limit', 'new_address', 'over_share'],
-      amountLabel: '1,000',
-      dailyLabel: '50',
+      amountLabel: '1,000 USDC',
+      dailyLabel: '50 USDC',
       shareLabel: vaultShareText(1_000n, 1_000n),
     }),
-    ['1,000 is over your 50 a day', 'New address', '100% of your vault'],
+    ['1,000 USDC is over your 50 USDC a day', 'New address', '100% of your vault'],
+  );
+});
+
+test('the held screen empty state says a stop plainly and stays neutral about the key', () => {
+  const stopped = { withdrawalId: 7n, kind: HOLD_KIND_STOPPED };
+  const paid = { withdrawalId: 8n, kind: HOLD_KIND_PAID };
+  assert.equal(heldGoneCopy([stopped], '7'), 'Stopped. Nothing left the vault.');
+  assert.equal(
+    heldGoneCopy([paid], '8'),
+    'This withdrawal is no longer waiting. Nothing moves unless another request is held.',
+  );
+  assert.equal(
+    heldGoneCopy([stopped], '9'),
+    'This withdrawal is no longer waiting. Nothing moves unless another request is held.',
+  );
+  assert.equal(
+    heldGoneCopy([stopped], ''),
+    'This withdrawal is no longer waiting. Nothing moves unless another request is held.',
+  );
+  assert.equal(
+    heldGoneCopy([stopped], 'not-a-number'),
+    'This withdrawal is no longer waiting. Nothing moves unless another request is held.',
   );
 });
 

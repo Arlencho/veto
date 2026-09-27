@@ -143,7 +143,11 @@ export function createRefreshGate() {
           queued = null;
         }
         // A follow-up for an owner the wallet has since left must not overwrite the new owner.
-        return latestOwner === owner ? start(owner, read) : undefined;
+        if (latestOwner !== owner) {
+          return undefined;
+        }
+        // A read that started after this request already satisfies it.
+        return running && running.owner === owner ? running.done : start(owner, read);
       });
     queued = slot;
     return slot.done;

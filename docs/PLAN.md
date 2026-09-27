@@ -10,7 +10,7 @@ already exist.
 ## The claim
 
 Limits on chain already exist. An overspend that is simply impossible protects the money and
-leaves nothing to read: no artifact, no reason, no trail. Veto makes the refusal legible. A
+leaves only a failed transaction's logs, nothing in program state. Veto makes the refusal legible. A
 recorded no, a one-line why, and the override that would have cleared it. On a phone, with the
 key in Seed Vault.
 
@@ -25,7 +25,7 @@ Capped agent spending is not new. The table names the limits that already exist.
 
 | Who | What they do | Relation to this entry |
 |---|---|---|
-| Squads v4 spending limits | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec, Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops, and the stop leaves no record |
+| Squads v4 spending limits | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec, Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
 | SPL `approve` / delegate | Caps what a delegate can pull | Cap only. No purpose, no expiry, no reason, no record |
 | LazorKit | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
 | SolAgent Pay | An overspend "is not a policy violation logged after the fact, it is an impossible transaction". Funds are escrowed into a vault | Veto records the decline and leaves the funds in an account the owner controls |
@@ -65,7 +65,7 @@ The program enforces the limits on chain and records the refusal. New policy fie
 scope.
 
 `charge` returns `Ok` when it declines. An error would roll back every account write, so the
-refusal would leave no trace. Declining transfers nothing, writes a ledger entry with a reason
+refusal would leave nothing in program state. Declining transfers nothing, writes a ledger entry with a reason
 code, logs a readable line, and succeeds. The refusal reason codes are listed in the
 [README](../README.md).
 

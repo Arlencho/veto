@@ -2,15 +2,15 @@
 
 Seeker owner? [Try Veto on devnet before October 8](docs/TESTERS.md).
 
-**Everyone stops the overspend. Only this one can prove it stopped.**
+**Everyone stops the overspend. Veto also records why it stopped.**
 
 Veto enforces a spending rule on chain: when a charge breaks it, the transfer is never executed
 and no tokens move. That much is table stakes, and every serious design does it.
 
-What nothing else does is leave anything behind. Elsewhere a blocked overspend is a failed
-transaction: no artifact, no reason, no trail, nothing to audit. Here the decline is a first-class
-on-chain record, with a one-line why and the override that would have cleared it. On a phone, with
-the key in Seed Vault.
+The difference is what the stop leaves behind. Elsewhere a blocked overspend is usually a failed
+transaction: Solana keeps its logs and error code, but no program state changes. Here a refusal is a
+successful transaction that moves no payment tokens and writes a structured reason to program
+state, with the override that would have cleared it. On a phone, with the key in Seed Vault.
 
 AP2 standardised the record of a yes. This is the missing half.
 
@@ -26,7 +26,7 @@ Capped agent spending on Solana is not new, and this project does not claim it.
 
 | Prior art | What it does | What Veto adds |
 |---|---|---|
-| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops, and the stop leaves no record |
+| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
 | SPL `approve` / delegate | Caps what a delegate may pull | Cap only. No purpose, no expiry, no reason, no record |
 | [LazorKit](https://github.com/lazor-kit/lazor-kit) | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
 | [SolAgent Pay](https://github.com/altaranexus-ship-it/solagent-pay) | Session PDA with lifetime and per-request ceilings, merchant allowlist, TTL, revoke and sweep | An overspend "is not a policy violation logged after the fact, it is an impossible transaction". Funds are escrowed into a vault. Veto records the decline and leaves the funds in the owner's wallet |
@@ -42,7 +42,7 @@ When a rule fails, the token transfer instruction is never executed, so zero tok
 delegation on the source token account is a second ceiling the program itself cannot exceed.
 
 When `charge` declines it does not return an error. An error would roll back every account write,
-and the refusal would leave no trace. The instruction transfers nothing, writes a refusal to an
+and the refusal would leave nothing in program state, only the failed transaction's logs. The instruction transfers nothing, writes a refusal to an
 on-chain ledger with a reason code and the override that would have cleared it, logs a readable
 line, and returns `Ok`.
 

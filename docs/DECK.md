@@ -66,7 +66,8 @@ These are the limits that already exist.
 ## 5. What every one of them has in common
 
 > The difference is what is left behind. Elsewhere a blocked overspend is a failed
-> transaction: no artifact, no reason, no trail. Here the decline is recorded.
+> transaction: logs and an error code, but nothing in program state. Here the decline is a
+> successful transaction that records a structured reason and moves no payment tokens.
 
 Quote SolAgent Pay's own README on screen, verbatim, in their words: an overspend "is not a policy
 violation logged after the fact, it is an impossible transaction."

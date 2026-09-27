@@ -6,7 +6,7 @@ The claim is the recorded refusal. When a rule fails, the transfer is never exec
 
 > The agent tries to pay. The amount is over the ceiling you set. It does not pay. The chain records why, in one line, with the override that would clear it.
 >
-> The decline is a record. A blocked overspend elsewhere is a failed transaction: no artifact, no reason, no trail.
+> The decline is a record. A blocked overspend elsewhere is a failed transaction: logs and an error code, but nothing in program state. Here the refusal is a successful transaction that records a structured reason and moves no payment tokens.
 >
 > A rule opened in the app keeps its budget in its own token account, derived from the owner. The mandate is the delegate on that account. The key never leaves Seed Vault. One human, several agents, one rule each. A ruleset is written once and reused on the next agent. This one is on a phone.
 >

@@ -75,9 +75,11 @@ mock.module('react-native-svg', {
   },
 });
 
+let walletOwner: string | null = 'owner';
+
 mock.module('../lib/useWallet', {
   namedExports: {
-    useWallet: () => ({ ready: true, ownerPublicKey: 'owner', cluster: 'devnet', busy: false, error: null }),
+    useWallet: () => ({ ready: true, ownerPublicKey: walletOwner, cluster: 'devnet', busy: false, error: null, solanaMobileInstalled: false, connect: async () => undefined }),
   },
 });
 
@@ -160,4 +162,18 @@ test('on a tab route the gate adds no safe area of its own inside the Screen', a
   const areas = root.root.findAll((node) => isHost(node, 'SafeAreaView'));
   assert.equal(areas.length, 1);
   assert.deepEqual(areas[0]?.props.edges, ['top']);
+});
+
+test('before the wallet connects, a stack route still keeps the Connect screen below the status bar', async () => {
+  walletOwner = null;
+  try {
+    const root = await mount('stack');
+    const areas = root.root.findAll(insetsTop);
+    assert.equal(areas.length, 1, 'exactly one top inset');
+    const texts = root.root.findAll((node) => isHost(node, 'Text'));
+    assert.ok(texts.length > 0);
+    assert.ok(texts.every((node) => insideTopInset(node)), 'every text of the Connect screen is inside the inset');
+  } finally {
+    walletOwner = 'owner';
+  }
 });

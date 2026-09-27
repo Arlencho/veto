@@ -2,6 +2,8 @@ import { createContext, useContext, type ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
+// Scoped to the tree: content rendered in a Modal or portal inside a padded screen draws from
+// y=0 again, so wrap it in ResetTopInset before placing a Screen inside it.
 const TopInset = createContext(false);
 
 // True when an ancestor already keeps its content below the status bar.
@@ -29,4 +31,9 @@ export function SafeTop({
       </SafeAreaView>
     </TopInset.Provider>
   );
+}
+
+// Starts a fresh inset scope, for Modal or portal content that draws from the top of the window.
+export function ResetTopInset({ children }: { children: ReactNode }) {
+  return <TopInset.Provider value={false}>{children}</TopInset.Provider>;
 }

@@ -75,12 +75,17 @@ export function ConnectGate({
     setFreshRun(true);
   }
 
+  // Tab screens wrap the gate in their own safe area. Stack routes such as /week/<agent> put the
+  // gate outside the screen shell, so every branch the gate renders insets itself once, and the
+  // shell inside drops its top edge.
+  const pad = (node: ReactNode) => (insetAbove ? node : <SafeTop style={styles.safe}>{node}</SafeTop>);
+
   if (!wallet.ready || !onboarding.ready) {
-    return <ActivityIndicator color={colors.text} accessibilityLabel="Loading" />;
+    return pad(<ActivityIndicator color={colors.text} accessibilityLabel="Loading" />);
   }
 
   if (intro) {
-    return (
+    return pad(
       <IntroCards
         showConnect
         connectBusy={wallet.busy}
@@ -107,11 +112,11 @@ export function ConnectGate({
   }
 
   if (freshRun && connected && wallet.ownerPublicKey && !guideDone) {
-    return <Guide onFinish={() => setGuideDone(true)} />;
+    return pad(<Guide onFinish={() => setGuideDone(true)} />);
   }
 
   if (!connected || !wallet.ownerPublicKey) {
-    return (
+    return pad(
       <ConnectWalletScreen
         cluster={wallet.cluster}
         busy={wallet.busy}
@@ -133,12 +138,7 @@ export function ConnectGate({
       {children}
     </View>
   );
-  // Tab screens wrap the gate in their own safe area. Stack routes such as /week/<agent> put the
-  // gate outside the screen shell, so the gate insets itself and the shell inside drops its top edge.
-  if (insetAbove) {
-    return body;
-  }
-  return <SafeTop style={styles.safe}>{body}</SafeTop>;
+  return pad(body);
 }
 
 const styles = StyleSheet.create({

@@ -121,6 +121,18 @@ export type DecodedTxDecision = {
 // this is a different charge still sitting in the signature window.
 const SIGNATURE_SKEW_SEC = 120;
 
+/**
+ * The oldest block time a transaction can have and still attach to one of these entries. A
+ * timed transaction older than this is never matched, so its body need not be read.
+ */
+export function oldestMatchableBlockTime(entries: readonly RingEntry[]): number {
+  let oldest = Number.POSITIVE_INFINITY;
+  for (const entry of entries) {
+    oldest = Math.min(oldest, Number(entry.ts));
+  }
+  return oldest - SIGNATURE_SKEW_SEC;
+}
+
 function decisionKeyMatches(tx: DecodedTxDecision, entry: RingEntry): boolean {
   if (tx.kind !== entry.kind) {
     return false;

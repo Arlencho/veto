@@ -17,6 +17,13 @@ mock.module('expo-router', { namedExports: {
 mock.module('./useWallet', { namedExports: {
   useWallet: () => ({ cluster: 'devnet', agentPublicKey: existingAgent }),
 } });
+const savedBooks: Record<string, string>[] = [];
+mock.module('./mwa', { namedExports: { secureStore: {} } });
+mock.module('./addressBook', { namedExports: {
+  loadAddressBook: async () => ({}),
+  saveAddressBook: async (_store: unknown, book: Record<string, string>) => { savedBooks.push(book); },
+  withSavedName: (book: Record<string, string>, address: string, name: string) => ({ ...book, [address]: name.trim() }),
+} });
 mock.module('../components/Screen', { namedExports: { Screen: 'Screen' } });
 mock.module('react-native', { namedExports: {
   ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', Text: 'Text',
@@ -25,6 +32,7 @@ mock.module('react-native', { namedExports: {
 
 async function mount() {
   destinations.length = 0;
+  savedBooks.length = 0;
   const { default: NameRoute } = await import('../app/first-run/name');
   let root!: ReactTestRenderer;
   await act(async () => { root = create(createElement(NameRoute)); });
@@ -42,7 +50,7 @@ async function paste(root: ReactTestRenderer, text: string) {
 }
 
 for (const [label, input, destination] of [
-  ['agent address', ` ${agent} `, FIRST_RUN_ROUTES.approve],
+  ['agent address', ` ${agent} `, `${FIRST_RUN_ROUTES.approve}?agent=${agent}`],
   ['rule request', request, `${FIRST_RUN_ROUTES.approve}?url=${encodeURIComponent(request)}`],
 ] as const) {
   test(`pasting a valid ${label} enables review and opens the approve step without an existing agent`, async () => {
@@ -83,7 +91,41 @@ test('an existing test agent can still be reviewed with an empty paste field', a
   try {
     assert.equal(review(root).props.disabled, false);
     await act(async () => { review(root).props.onPress(); });
-    assert.deepEqual(destinations, [FIRST_RUN_ROUTES.approve]);
+    assert.deepEqual(destinations, [`${FIRST_RUN_ROUTES.approve}?agent=${agent}`]);
+  } finally {
+    existingAgent = null;
+    await act(async () => root.unmount());
+  }
+});
+
+test('the phone test agent and its name reach the approve step, so opening does not create another key (#362)', async () => {
+  existingAgent = agent;
+  const root = await mount();
+  try {
+    await act(async () => {
+      root.root.findByProps({ accessibilityLabel: 'Name your agent' }).props.onChangeText(' Phone test ');
+    });
+    await act(async () => { await review(root).props.onPress(); });
+    assert.deepEqual(savedBooks, [{ [agent]: 'Phone test' }]);
+    assert.deepEqual(destinations, [`${FIRST_RUN_ROUTES.approve}?agent=${agent}`]);
+  } finally {
+    existingAgent = null;
+    await act(async () => root.unmount());
+  }
+});
+
+test('a second tap while the name is saving does not open the approve step twice', async () => {
+  existingAgent = agent;
+  const root = await mount();
+  try {
+    await act(async () => {
+      root.root.findByProps({ accessibilityLabel: 'Name your agent' }).props.onChangeText('Phone test');
+    });
+    await act(async () => {
+      const press = review(root).props.onPress;
+      await Promise.all([press(), press()]);
+    });
+    assert.deepEqual(destinations, [`${FIRST_RUN_ROUTES.approve}?agent=${agent}`]);
   } finally {
     existingAgent = null;
     await act(async () => root.unmount());

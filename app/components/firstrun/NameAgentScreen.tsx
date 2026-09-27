@@ -39,6 +39,7 @@ export function NameAgentScreen({
   facts,
   factsPending = false,
   error = null,
+  busy = false,
   onReview,
   onReject,
   onBack,
@@ -54,6 +55,7 @@ export function NameAgentScreen({
   facts: AgentRequestFacts | null;
   factsPending?: boolean;
   error?: string | null;
+  busy?: boolean;
   onReview: () => void;
   onReject: () => void;
   onBack?: () => void;
@@ -80,7 +82,7 @@ export function NameAgentScreen({
       empty="No agent yet. Scan a code, paste an address, or create a test agent."
       footer={
         <>
-          <BrassButton label="Review the rule" onPress={onReview} disabled={!address && !validPaste} />
+          <BrassButton label="Review the rule" onPress={onReview} busy={busy} disabled={!address && !validPaste} />
           <QuietButton label="Not my agent" onPress={onReject} />
         </>
       }

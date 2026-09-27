@@ -1,6 +1,6 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Keypair, Transaction } from '@solana/web3.js';
+import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
 
 import { onWalletActionSuccess } from './walletActionStatus';
 import { isSolanaMobileWalletInstalled, SOLANA_MOBILE_WALLET_BASE_URI } from './installedPackage';
@@ -11,7 +11,8 @@ import {
   createAgentKeypair,
   disconnect,
   explainWalletFailure,
-  loadAgentKeypair,
+  agentPublicKey as readAgentPublicKey,
+  signWithAgent as signAgentTransaction,
   restore,
   signAndSendTransactions,
 } from './wallet';
@@ -27,7 +28,8 @@ export type WalletState = {
   connect: (choice?: { chooser?: boolean }) => Promise<void>;
   disconnect: () => Promise<void>;
   signAndSend: (transactions: Transaction[]) => Promise<string[]>;
-  getAgentKeypair: () => Promise<Keypair | null>;
+  getAgentPublicKey: () => Promise<PublicKey | null>;
+  signWithAgent: (transaction: Transaction) => Promise<Transaction>;
   createAgentKeypair: () => Promise<Keypair>;
 };
 
@@ -130,7 +132,8 @@ function useWalletState(): WalletState {
     }
   }, []);
 
-  const getAgentKeypair = useCallback(() => loadAgentKeypair(secureStore), []);
+  const getAgentPublicKey = useCallback(() => readAgentPublicKey(secureStore), []);
+  const signWithAgent = useCallback((transaction: Transaction) => signAgentTransaction(secureStore, transaction), []);
 
   const onCreateAgent = useCallback(async () => {
     const created = await createAgentKeypair(secureStore);
@@ -150,7 +153,8 @@ function useWalletState(): WalletState {
       connect: onConnect,
       disconnect: onDisconnect,
       signAndSend,
-      getAgentKeypair,
+      getAgentPublicKey,
+      signWithAgent,
       createAgentKeypair: onCreateAgent,
     }),
     [
@@ -164,7 +168,8 @@ function useWalletState(): WalletState {
       onConnect,
       onDisconnect,
       signAndSend,
-      getAgentKeypair,
+      getAgentPublicKey,
+      signWithAgent,
       onCreateAgent,
     ],
   );

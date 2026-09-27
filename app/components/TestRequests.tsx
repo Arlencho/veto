@@ -32,7 +32,7 @@ export function TestRequests({ mandate }: { mandate: MandateAccount | null }) {
       connection: new Connection(chain.config.rpcUrl, 'confirmed'),
       programId: new PublicKey(chain.config.programId), cluster: chain.config.explorerCluster,
       address: mandate.address, owner: wallet.ownerPublicKey,
-      getAgentKeypair: wallet.getAgentKeypair, signAndSend: wallet.signAndSend, report,
+      getAgentPublicKey: wallet.getAgentPublicKey, signWithAgent: wallet.signWithAgent, signAndSend: wallet.signAndSend, report,
     };
     try {
       const plan = await prepareTestRequests(options);

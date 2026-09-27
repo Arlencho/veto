@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { payeeLookup, readPayeeTokenAccount } from './agentConnect';
 import { CHARGE_IX_DISC, KIND_PAID, KIND_REFUSED, STATUS_EXHAUSTED, writeU64Le, reasonText } from './constants';
 import { decodeEventsFromLogs } from './events';
@@ -55,7 +55,8 @@ export type TestRequestUpdate = { text: string; signature?: string };
 export type TestRequestPlan = { rule: MandateAccount; paid: bigint | null; refused: bigint };
 export type TestRequestOptions = {
   connection: Connection; programId: PublicKey; cluster: string; address: string; owner: string;
-  getAgentKeypair: () => Promise<Keypair | null>;
+  getAgentPublicKey: () => Promise<PublicKey | null>;
+  signWithAgent: (transaction: Transaction) => Promise<Transaction>;
   signAndSend: (transactions: Transaction[]) => Promise<string[]>;
   report: (update: TestRequestUpdate) => void;
 };
@@ -67,8 +68,8 @@ async function liveRule(options: TestRequestOptions, allowExhausted = false): Pr
   const info = await options.connection.getAccountInfo(new PublicKey(options.address), 'confirmed');
   if (!info || !info.owner.equals(options.programId)) throw new Error('The rule is closed or unavailable. Refresh your rules.');
   const rule = decodeMandateAccount(options.address, info.data);
-  const agent = await options.getAgentKeypair();
-  if (!testRequestsVisible(allowExhausted && rule.status === STATUS_EXHAUSTED ? { ...rule, status: 0 } : rule, agent?.publicKey.toBase58() ?? null, options.cluster, BigInt(Math.floor(Date.now() / 1000))) || rule.owner !== options.owner) {
+  const agent = await options.getAgentPublicKey();
+  if (!testRequestsVisible(allowExhausted && rule.status === STATUS_EXHAUSTED ? { ...rule, status: 0 } : rule, agent?.toBase58() ?? null, options.cluster, BigInt(Math.floor(Date.now() / 1000))) || rule.owner !== options.owner) {
     throw new Error('This rule is no longer active for the owner and test agent on this phone.');
   }
   return rule;
@@ -100,13 +101,13 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
   try {
     const current = await prepareTestRequests(options);
     if (current.paid !== plan.paid || current.refused !== plan.refused || current.rule.merchant !== plan.rule.merchant || current.rule.mint !== plan.rule.mint || current.rule.agent !== plan.rule.agent) throw new Error('The rule changed.');
-    const agent = await options.getAgentKeypair();
-    if (!agent || agent.publicKey.toBase58() !== current.rule.agent) throw new Error('Agent no longer available.');
-    if (needsTestFeeTopUp(await connection.getBalance(agent.publicKey, 'confirmed'))) {
+    const agent = await options.getAgentPublicKey();
+    if (!agent || agent.toBase58() !== current.rule.agent) throw new Error('Agent no longer available.');
+    if (needsTestFeeTopUp(await connection.getBalance(agent, 'confirmed'))) {
       report({ text: 'Waiting for the wallet to send 0.01 devnet SOL to the test agent for fees.' });
       const owner = new PublicKey(options.owner);
       const block = await connection.getLatestBlockhash('confirmed');
-      const transaction = new Transaction({ ...block, feePayer: owner }).add(SystemProgram.transfer({ fromPubkey: owner, toPubkey: agent.publicKey, lamports: 10_000_000 }));
+      const transaction = new Transaction({ ...block, feePayer: owner }).add(SystemProgram.transfer({ fromPubkey: owner, toPubkey: agent, lamports: 10_000_000 }));
       const fee = await connection.getFeeForMessage(transaction.compileMessage(), 'confirmed');
       if (fee.value === null) throw new Error('RPC fee unavailable');
       if (await connection.getBalance(owner, 'confirmed') < 10_000_000 + fee.value) throw new Error('Insufficient owner SOL');
@@ -126,15 +127,15 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
     for (const amount of [plan.paid, plan.refused]) {
       if (amount === null) continue;
       const rule = await liveRule(options, amount === plan.refused);
-      if (rule.agent !== agent.publicKey.toBase58()) throw new Error('Agent no longer available.');
+      if (rule.agent !== agent.toBase58()) throw new Error('Agent no longer available.');
       // Re-read after each confirmed request; also remain above our previous nonce.
       const nonce = nextTestNonce(rule.lastNonce > previous ? rule.lastNonce : previous, rule.overrideNonce);
       const instruction = await testChargeInstruction(connection, options.programId, rule, amount, nonce);
       const block = await connection.getLatestBlockhash('confirmed');
-      const transaction = new Transaction({ ...block, feePayer: agent.publicKey }).add(instruction);
-      transaction.sign(agent);
+      const transaction = new Transaction({ ...block, feePayer: agent }).add(instruction);
+      const signed = await options.signWithAgent(transaction);
       report({ text: `Sending request for ${amount} base units.` });
-      const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false, preflightCommitment: 'confirmed' });
+      const signature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, preflightCommitment: 'confirmed' });
       report({ text: `Request for ${amount} base units submitted; waiting for confirmation.`, signature });
       const confirmation = await connection.confirmTransaction({ ...block, signature }, 'confirmed');
       if (confirmation.value.err) throw new Error('Transaction failed');

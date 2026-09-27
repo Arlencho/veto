@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Buffer } from 'buffer';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 
 import {
   AGENT_SECRET_STORE_KEY,
@@ -333,4 +333,20 @@ test('an unreadable agents map is reported and is not overwritten', async () => 
   assert.equal(store.data[AGENTS_STORE_KEY], garbage);
   const loaded = await loadAgentKeypair(store);
   assert.equal(loaded?.publicKey.toBase58(), existing.publicKey.toBase58());
+});
+
+
+test('agent signing returns a verifiable transaction without exposing the stored signing material', async () => {
+  const wallet = await import('./wallet');
+  const store = memoryStore();
+  const address = await loadOrCreateAgentPublicKey(store);
+  assert.equal((await wallet.agentPublicKey(store))?.toBase58(), address);
+  const payer = new PublicKey(address);
+  const transaction = new Transaction({ feePayer: payer, recentBlockhash: PublicKey.default.toBase58() })
+    .add(SystemProgram.transfer({ fromPubkey: payer, toPubkey: Keypair.generate().publicKey, lamports: 1 }));
+  const signed = await wallet.signWithAgent(store, transaction);
+  assert.equal(signed, transaction);
+  assert.equal(signed.verifySignatures(), true);
+  assert.equal(await wallet.agentPublicKey(memoryStore()), null);
+  await assert.rejects(wallet.signWithAgent(memoryStore(), transaction), /Agent no longer available/);
 });

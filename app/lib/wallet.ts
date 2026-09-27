@@ -258,6 +258,17 @@ export async function loadAgentKeypair(store: WalletStore): Promise<Keypair | nu
   return parseAgentSecret(raw);
 }
 
+export async function agentPublicKey(store: WalletStore): Promise<PublicKey | null> {
+  return (await loadAgentKeypair(store))?.publicKey ?? null;
+}
+
+export async function signWithAgent(store: WalletStore, transaction: Transaction): Promise<Transaction> {
+  const agent = await loadAgentKeypair(store);
+  if (!agent) throw new Error('Agent no longer available.');
+  transaction.partialSign(agent);
+  return transaction;
+}
+
 async function rememberAgent(store: WalletStore, keypair: Keypair): Promise<void> {
   const raw = await store.getItem(AGENTS_STORE_KEY);
   const map = raw ? parseAgentsMap(raw) : {};

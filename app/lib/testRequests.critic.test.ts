@@ -21,7 +21,8 @@ function harness(patch = {}) {
   w.connection.getTransaction = (async () => decisionFor()) as typeof w.connection.getTransaction;
   const options = {
     connection: w.connection, programId: PROGRAM_ID, cluster: 'devnet', address: w.mandate.toBase58(), owner: w.owner.publicKey.toBase58(),
-    getAgentKeypair: async () => w.agent,
+    getAgentPublicKey: async () => w.agent.publicKey,
+    signWithAgent: async (transaction: Transaction) => { transaction.sign(w.agent); return transaction; },
     signAndSend: async (transactions: Transaction[]) => { walletTransactions.push(...transactions); return ['top-up-signature']; },
     report: (update: TestRequestUpdate) => updates.push(update),
   };

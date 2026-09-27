@@ -20,7 +20,7 @@ mock.module('react-native', { namedExports: {
   Linking: { openURL: async () => {} },
   Alert: { alert: (_title: string, text: string, buttons: typeof actions) => { confirmation = text; actions = buttons; } },
 } });
-mock.module('../lib/useWallet', { namedExports: { useWallet: () => ({ agentPublicKey: key, ownerPublicKey: key, cluster, getAgentKeypair: async () => null, signAndSend: async () => [] }) } });
+mock.module('../lib/useWallet', { namedExports: { useWallet: () => ({ agentPublicKey: key, ownerPublicKey: key, cluster, getAgentPublicKey: async () => null, signWithAgent: async () => null, signAndSend: async () => [] }) } });
 mock.module('../lib/useChain', { namedExports: { useChain: () => ({ config: { rpcUrl: 'https://api.devnet.solana.com', programId: key, explorerCluster: cluster }, tradeRules: [], refresh: async () => { refreshes++; } }) } });
 mock.module('../lib/testRequests', { namedExports: {
   testRequestsVisible,

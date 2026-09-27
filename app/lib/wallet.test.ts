@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import { Buffer } from 'buffer';
-import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+
+import { CHARGE_IX_DISC } from './constants';
+
+mock.module('expo-constants', { defaultExport: { expoConfig: { extra: {
+  vetoRpc: 'https://api.devnet.solana.com', vetoProgramId: PublicKey.default.toBase58(),
+} } } });
 
 import {
   AGENT_SECRET_STORE_KEY,
@@ -343,7 +349,8 @@ test('agent signing returns a verifiable transaction without exposing the stored
   assert.equal((await wallet.agentPublicKey(store))?.toBase58(), address);
   const payer = new PublicKey(address);
   const transaction = new Transaction({ feePayer: payer, recentBlockhash: PublicKey.default.toBase58() })
-    .add(SystemProgram.transfer({ fromPubkey: payer, toPubkey: Keypair.generate().publicKey, lamports: 1 }));
+    .add(new TransactionInstruction({ programId: PublicKey.default, data: Buffer.from(CHARGE_IX_DISC),
+      keys: [{ pubkey: payer, isSigner: true, isWritable: false }] }));
   const signed = await wallet.signWithAgent(store, transaction);
   assert.equal(signed, transaction);
   assert.equal(signed.verifySignatures(), true);

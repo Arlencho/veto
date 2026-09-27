@@ -121,6 +121,9 @@ case "${1:-}" in
   genesis-hash)
     printf '%s\n' "${FAKE_GENESIS:-EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG}"
     ;;
+  balance)
+    printf '%s lamports\n' "${FAKE_LAMPORTS:-0}"
+    ;;
   transfer)
     printf 'Signature: stubSolanaNoiseOnStdout111\n'
     ;;
@@ -314,7 +317,21 @@ else
   fi
 fi
 
-# 10. Shellcheck, when available, stays clean on helper and test.
+# 10. An account that already holds SOL is skipped, so the helper can loop.
+reset_logs
+if out="$(FAKE_LAMPORTS=5000 run_helper emulator-5554 "$FUNDER" 1 2 2>/dev/null)"; then
+  if [[ "$out" == "$NEW_PUB" ]] \
+    && ! grep -q "transfer" "$FAKE_SOLANA_LOG" 2>/dev/null \
+    && ! grep -q "transfer" "$FAKE_SPL_LOG" 2>/dev/null; then
+    pass "skips an account that already holds SOL"
+  else
+    bad "funded account handling: ${out}"
+  fi
+else
+  bad "already funded account must exit 0"
+fi
+
+# 11. Shellcheck, when available, stays clean on helper and test.
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S error "$SCRIPT" "${ROOT}/e2e/maestro/helpers/fund-fake-wallet.test.sh"; then
     pass "shellcheck -S error clean"

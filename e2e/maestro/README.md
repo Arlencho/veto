@@ -51,14 +51,22 @@ valid guardian address different from the owner and a safe wallet controlled
 independently of the owner. The Hold flow deliberately supplies the safe address
 and reviews it; it does not accept the owner-wallet recovery-risk exception.
 
-Run 02 first (it replays 01), then pause before approval flows. The fake
-wallet creates a new key each time it authorizes, so the flows that sign need
-that newest key funded. From the repository root, with the emulator running
-and `solana` on PATH configured for the devnet RPC, fund it with:
+The fake wallet creates a new account every time it authorizes, and every
+flow authorizes again when it replays its prerequisites. The account a flow
+signs with therefore exists only once that flow is running, so fund it while
+the flow runs. From the repository root, with the emulator running and
+`solana` on PATH configured for the devnet RPC, keep this loop running in a
+second terminal during the flows, with a funded devnet keypair as the funder:
 
 ```bash
-e2e/maestro/helpers/fund-fake-wallet.sh emulator-5554 keys/owner.json 1 2
+while sleep 6; do
+  e2e/maestro/helpers/fund-fake-wallet.sh emulator-5554 keys/deployer.json 1 2
+done
 ```
+
+Each call funds the newest account once and skips it on later calls, because
+an account that already holds SOL is left alone. Before approving, the payment
+flow waits up to 90 seconds for the app's wallet checks to see the funds.
 
 The helper requires an explicit `emulator-NNNN` serial and refuses any other,
 so it cannot address a physical phone. It refuses unless the configured RPC
@@ -80,15 +88,16 @@ Veto's shortened display, transfer that exact mint from the existing funded
 devnet setup, and add SOL from the Solana devnet faucet or an already funded
 devnet wallet on the laptop.
 The `OWNER` in the env file is not necessarily the fake wallet account.
-If the fake wallet account changes, reconnect Veto and fund the new account.
+Every authorization creates a new fake wallet account; the funding loop above
+covers each one.
 
 ## Run each flow
 
 Flows 01 to 06 are independently runnable from a cleared app. Each one starts with
 `launchApp` with `clearState: true` and replays the steps it depends on through
 the chained helpers in `e2e/maestro/helpers/`, so no flow relies on screen
-state left by a previous Maestro invocation. 07 is the exception and runs
-right after one of them. The replay chain is:
+state left by a previous Maestro invocation. 07 is the exception: it runs right
+after a rule-creating flow (04 to 06) and a refusal sent from the laptop. The replay chain is:
 
 | Helper | Replays | Ends on |
 | --- | --- | --- |
@@ -107,18 +116,14 @@ each flow replays its prerequisites, environment requirements accumulate: 05
 also needs `PAYEE`, and 06 also needs `AGENT` and `PAYEE` for the replayed
 payment rule.
 
-Execute from the repository root, one flow per invocation, in any order.
-Funding still needs a pause: run 02 first (it replays 01), fund the fake
-wallet account with `helpers/fund-fake-wallet.sh` as described above, then
-run the approval flows. 07
-needs a refusal generated from the laptop against the newest rule of a
-previous invocation, as described below.
+Execute from the repository root, one flow per invocation, with the funding
+loop running. Run 01 to 06 in any order; run 07 last, right after a
+rule-creating flow and a refusal generated from the laptop against its rule,
+as described below.
 
 ```bash
 maestro --device emulator-5554 test e2e/maestro/01-onboarding.yaml
 maestro --device emulator-5554 test e2e/maestro/02-connect.yaml
-# Pause here and fund the fake wallet account:
-e2e/maestro/helpers/fund-fake-wallet.sh emulator-5554 keys/owner.json 1 2
 maestro --device emulator-5554 test -e AGENT="$AGENT" e2e/maestro/03-add-agent-paste.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/04-payment-rule.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/05-trade-rule.yaml
@@ -166,8 +171,9 @@ new rule is listed under Rules like any other. Trade defaults are 0.01 SOL per t
 comes from `app/lib/pools.ts` and must exist on the configured devnet deployment.
 
 Every run of 04, 05 or 06 replays first-run and approves fresh on-chain rules
-or vaults, and clearing Veto data does not remove chain accounts. Rules
-approved by earlier invocations stay listed under Rules after a reconnect.
+or vaults, and clearing Veto data does not remove chain accounts. Each
+invocation signs with a new fake wallet account, so its Rules list shows only
+what that invocation approved.
 Before a new full pass, return unused
 funds through the app's normal close actions or fund a fresh test wallet.
 To retry a failed flow, just run it again; its replay rebuilds everything it

@@ -146,6 +146,14 @@ PUBKEY="$(b64_to_base58 "$PUBKEY_B64")" \
   || refuse "decoded fake wallet address is not valid base58: ${PUBKEY}"
 
 echo "fake wallet account: ${PUBKEY}" >&2
+# An account that already holds SOL was funded by an earlier call. Skipping it
+# makes the helper safe to run in a loop while flows create new accounts.
+LAMPORTS="$(solana balance --lamports "$PUBKEY" 2>/dev/null | awk '{print $1}')"
+if [[ "$LAMPORTS" =~ ^[0-9]+$ ]] && (( LAMPORTS > 0 )); then
+  echo "already funded, skipping" >&2
+  printf '%s\n' "$PUBKEY"
+  exit 0
+fi
 echo "funding ${SOL_AMOUNT} SOL and ${USDC_AMOUNT} devnet USDC from ${FUNDER}" >&2
 solana transfer --keypair "$FUNDER" --allow-unfunded-recipient "$PUBKEY" "$SOL_AMOUNT" >&2
 spl-token transfer --owner "$FUNDER" --fee-payer "$FUNDER" --fund-recipient --allow-unfunded-recipient \

@@ -20,7 +20,7 @@ function stripDevClientSchemes(manifest) {
 }
 
 function stripsDevClientScheme(profile) {
-  return profile === 'production' || profile === 'mainnet-preview';
+  return profile === 'production' || profile === 'mainnet-preview' || profile === 'tester';
 }
 
 function withProductionDevClientScheme(config) {

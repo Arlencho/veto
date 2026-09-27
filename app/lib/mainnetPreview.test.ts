@@ -32,7 +32,7 @@ test('mainnet preview uses only its dedicated EAS RPC secret and refuses a missi
 });
 
 test('existing build identities and RPC sources are unchanged', () => {
-  const others = Object.keys(build).filter((profile) => profile !== 'mainnet-preview');
+  const others = Object.keys(build).filter((profile) => profile !== 'mainnet-preview' && profile !== 'tester');
   assert.deepEqual(others.sort(), ['development', 'production']);
   for (const profile of others) {
     const config = shapeConfig(expo, {

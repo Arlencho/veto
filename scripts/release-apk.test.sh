@@ -76,7 +76,7 @@ echo 'ok - allows VIBRATE for haptics'
 run
 [[ "$rc" == 0 ]] || fail 'valid APK inspection succeeds'
 NOTES="$CASE/output/release-notes.md"
-for fact in 'Metadata tool: aapt2' 'Package: com.veto.app' 'versionCode: 7' 'versionName: 1.2.3' 'targetSdk: 36' 'Permission: android.permission.CAMERA' 'Permission: android.permission.INTERNET' 'Scheme: veto' 'Bundle names devnet: yes' 'Signature verifies: yes' 'RPC present: yes' 'adb install release.apk' 'Solana devnet. Devnet USDC is a test token with no value.'; do
+for fact in 'Metadata tool: aapt2' 'Package: com.veto.app' 'versionCode: 7' 'versionName: 1.2.3' 'targetSdk: 36' 'Permission: android.permission.CAMERA' 'Permission: android.permission.INTERNET' 'Scheme: veto' 'Devnet confirmed: yes' 'Signature verifies: yes' 'RPC present: yes' 'adb install release.apk' 'Solana devnet. Devnet USDC is a test token with no value.'; do
   grep -Fxq "$fact" "$NOTES" || fail 'release notes contain the required facts'
 done
 grep -Fxq "Checkout commit: $(git -C "$ROOT" rev-parse HEAD)" "$NOTES" || fail 'notes record checkout commit'
@@ -110,7 +110,7 @@ if ! { [[ "$rc" -ne 0 ]] && grep -q 'bundle names mainnet-beta' "$CASE/stderr"; 
 echo 'ok - rejects a bundle that names mainnet-beta'
 bundle "$PROGRAM" "$MINT" "$EXPO_PUBLIC_VETO_RPC" 'no-cluster-marker'
 run
-if ! { [[ "$rc" -ne 0 ]] && grep -Fxq 'Bundle names devnet: no' "$NOTES"; }; then fail 'rejects a bundle that does not name devnet'; fi
+if ! { [[ "$rc" -ne 0 ]] && grep -Fxq 'Devnet confirmed: no' "$NOTES"; }; then fail 'rejects a bundle that does not name devnet'; fi
 echo 'ok - rejects a bundle that does not name devnet'
 bundle "$PROGRAM" "$MINT" "$EXPO_PUBLIC_VETO_RPC"
 for missing in program mint; do
@@ -151,3 +151,54 @@ bundle "$PROGRAM" "$MINT" 'https://veto-hq.github.io'
 run
 grep -Fxq 'RPC present: no' "$NOTES" || fail 'does not mistake wallet identity for RPC'
 echo 'ok - provider heuristic recognizes RPC and excludes wallet identity'
+
+# The endpoint is carried in Expo config, not necessarily in Hermes strings.
+bundle 'supported clusters: mainnet-beta devnet' '' 'https://api.devnet.solana.com'
+cat >"$CASE/assets/app.config" <<CONFIG
+{"extra":{"vetoBuildProfile":"tester","vetoRpc":"https://user:private-test-key@tester.example.test/private-test-key?api-key=private-test-key","vetoProgramId":"$PROGRAM","vetoMint":"$MINT","vetoExplorerCluster":"devnet"}}
+CONFIG
+(cd "$CASE" && "$ZIP" -q output/release.apk assets/app.config)
+EXPO_PUBLIC_VETO_RPC=https://wrong.example.test/private-test-key run
+[[ "$rc" == 0 ]] || fail 'accepts tester APK with an embedded capped RPC'
+grep -Fxq 'Build profile: tester' "$NOTES" || fail 'reports tester profile from APK'
+grep -Fxq 'RPC host: tester.example.test (key masked)' "$NOTES" || fail 'reports only selected tester RPC host'
+grep -Fxq 'RPC present: yes' "$NOTES" || fail 'finds tester RPC in embedded config'
+echo 'ok - tester APK reports its profile and selected RPC host without credentials'
+cat >"$CASE/assets/app.config" <<'CONFIG'
+{"extra":{"vetoBuildProfile":"tester","vetoRpc":""}}
+CONFIG
+(cd "$CASE" && "$ZIP" -q output/release.apk assets/app.config)
+run
+[[ "$rc" -ne 0 ]] || fail 'rejects tester config without its RPC'
+echo 'ok - tester APK cannot fall back to a bundle RPC'
+
+for invalid in missing-rpc invalid-rpc mainnet wrong-program wrong-mint malformed; do
+  node - "$CASE/assets/app.config" "$invalid" "$PROGRAM" "$MINT" <<'CONFIG'
+const fs = require('node:fs');
+const [path, invalid, program, mint] = process.argv.slice(2);
+const extra = {
+  vetoBuildProfile: 'tester', vetoRpc: 'https://tester.example.test/private-test-key',
+  vetoProgramId: program, vetoMint: mint, vetoExplorerCluster: 'devnet',
+};
+if (invalid === 'missing-rpc') extra.vetoRpc = '';
+if (invalid === 'invalid-rpc') extra.vetoRpc = 'file:///private-test-key';
+if (invalid === 'mainnet') extra.vetoExplorerCluster = 'mainnet-beta';
+if (invalid === 'wrong-program') extra.vetoProgramId = 'wrong';
+if (invalid === 'wrong-mint') extra.vetoMint = 'wrong';
+fs.writeFileSync(path, invalid === 'malformed' ? 'https://private-test-key' : JSON.stringify({ extra }));
+CONFIG
+  (cd "$CASE" && "$ZIP" -q output/release.apk assets/app.config)
+  run
+  [[ "$rc" -ne 0 ]] || fail "rejects invalid embedded tester config: $invalid"
+done
+echo 'ok - tester config rejects missing or invalid RPC, mainnet, wrong addresses and malformed JSON'
+
+cat >"$CASE/assets/app.config" <<CONFIG
+{"extra":{"vetoRpc":"https://production.example.test/private-test-key","vetoProgramId":"$PROGRAM","vetoMint":"$MINT","vetoExplorerCluster":"devnet"}}
+CONFIG
+(cd "$CASE" && "$ZIP" -q output/release.apk assets/app.config)
+run
+[[ "$rc" == 0 ]] || fail 'accepts production embedded config'
+grep -Fxq 'Build profile: production (inferred from devnet release identity)' "$NOTES" || fail 'labels production inference'
+grep -Fxq 'RPC host: production.example.test (key masked)' "$NOTES" || fail 'reports production RPC host'
+echo 'ok - production embedded config reports its RPC host and inferred profile'

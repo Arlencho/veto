@@ -36,6 +36,20 @@
         "EXPO_PUBLIC_VETO_MINT_DECIMALS": "6",
         "EXPO_PUBLIC_VETO_EXPLORER_CLUSTER": "mainnet-beta"
       }
+    },
+    "tester": {
+      "autoIncrement": true,
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_VETO_PROGRAM_ID": "3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV",
+        "EXPO_PUBLIC_VETO_MINT": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "EXPO_PUBLIC_VETO_MINT_DECIMALS": "6",
+        "EXPO_PUBLIC_VETO_EXPLORER_CLUSTER": "devnet"
+      }
     }
   }
 }

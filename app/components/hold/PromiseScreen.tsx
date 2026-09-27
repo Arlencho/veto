@@ -21,7 +21,7 @@ export function PromiseScreen({
         If someone gets your key, a big withdrawal or one to a new address has to wait, and you or your
         guardian can stop it before it goes through. The wait is 1, 2 or 3 days on the blockchain
         clock. In that time either of you can also freeze the vault or move everything to a safe
-        address you chose while calm. If nobody stops it, it goes through when the wait ends.
+        address you chose while calm. If nobody stops it or freezes the vault, anyone can send it through once the wait ends.
       </Text>
       <View style={styles.doors}>
         <View style={styles.fast}>
@@ -39,7 +39,7 @@ export function PromiseScreen({
       </Text>
       <Text style={styles.fact}>
         {GUARDIAN_RECOVERY_COPY} {SAFE_WALLET_GUIDANCE} {OWNER_SAFE_REASON} Without a wait, a stolen owner
-        key can move at most the everyday amount, and only to addresses this vault has paid before. Only money inside the vault is protected. Lose both
+        key can move at most the everyday amount, and only to addresses this vault has paid before, or the whole balance to the safe address you chose. Only money inside the vault is protected. Lose both
         keys and nobody, Veto included, can reach the money.
       </Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Set up a vault" onPress={onStart} style={styles.cta}>

@@ -161,7 +161,7 @@ test('the promise screen states the Hold promise', async () => {
   );
   assert.match(text, /If someone gets your key, a big withdrawal or one to a new address has to wait, and you or your guardian can stop it before it goes through/);
   assert.doesNotMatch(text, /cannot finish/);
-  assert.match(text, /If nobody stops it, it goes through when the wait ends/);
+  assert.match(text, /If nobody stops it or freezes the vault, anyone can send it through once the wait ends/);
   assert.match(text, /1, 2 or 3 days on the blockchain clock/);
   assert.match(text, /Everyday door/);
   assert.match(text, /Big door/);

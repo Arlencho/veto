@@ -182,7 +182,7 @@ Three outcomes would show the claim does not hold.
 
 The phone is the Backglass app. A fresh install walks five stages: Learn, Connect wallet, Add your agent, Approve the rule, and Live. The four tabs are Overview, Rules, Agents, and Decisions. Overview is the home screen. Agents grades each agent with the rules in `app/lib/grade.ts`. Plaques, a seven-day week in review, a track record card, renewal in the last seven days, and a quiet note that is off until turned on are in the app. Two Android widgets show what an agent can still spend. `authorize` identifies the app as `https://veto-hq.github.io`.
 
-The agent package is `@veto-hq/agent-sdk`. Install it with `npm install @veto-hq/agent-sdk`. Published to npm on <date>. The package is published from this checkout by the maintainer.
+The agent package is `@veto-hq/agent-sdk`. Install it with `npm install @veto-hq/agent-sdk`. Published to npm at 0.1.0 on 2026-09-27. The package is published from this checkout by the maintainer.
 
 Hold is a vault in the same program (`programs/veto/src/hold.rs`). It does not replace the spending rule. A rule is still a delegate, not an escrow. The SDK exports `HoldVault`. The watcher alerts on `VETO_HOLD_VAULTS`. The app has the Hold screens. Hold is merged and tested, and live on devnet as of the 2026-09-25 upgrade recorded in [DEVNET.md](../DEVNET.md). A device check with a real vault follows.
 

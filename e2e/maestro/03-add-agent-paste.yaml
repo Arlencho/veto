@@ -1,0 +1,6 @@
+appId: com.veto.app
+---
+# Independently runnable: the helper replays 01 and 02 from a cleared
+# install, then pastes the agent address, names the agent, and ends on the
+# unsigned first-run review sentence.
+- runFlow: helpers/enter-agent.yaml

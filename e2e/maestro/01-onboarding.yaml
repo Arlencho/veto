@@ -1,0 +1,6 @@
+appId: com.veto.app
+---
+# Independently runnable: the helper clears Veto state and replays the four
+# introduction cards and the Connect wallet tap, ending on the pending
+# AUTHORIZE sheet.
+- runFlow: helpers/reach-authorize.yaml

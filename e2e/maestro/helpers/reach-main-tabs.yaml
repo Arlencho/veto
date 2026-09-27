@@ -1,0 +1,9 @@
+appId: com.veto.app
+---
+# Replays first-run and approves the payment rule, then relaunches Veto to
+# leave the first-run live screen and land on the main tabs. Chain accounts
+# survive the local clear, so the Rules tab also lists rules approved by
+# earlier invocations.
+- runFlow: approve-payment-rule.yaml
+- launchApp
+- assertVisible: "Rules"

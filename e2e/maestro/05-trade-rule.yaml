@@ -1,0 +1,37 @@
+appId: com.veto.app
+---
+# Independently runnable: the helper replays 01 through 04 from a cleared
+# install and lands on the main tabs with a live payment rule.
+- runFlow: helpers/reach-main-tabs.yaml
+- tapOn: "Rules"
+- scrollUntilVisible:
+    element:
+      text: "Write a rule"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Write a rule"
+- tapOn:
+    text: "^Trade rule$"
+    index: 0
+- assertVisible: "Trading bot"
+- scrollUntilVisible:
+    element:
+      text: "Agent"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Agent"
+- eraseText
+- inputText: "${AGENT}"
+- hideKeyboard
+# Keep all Trading bot template defaults, including the listed devnet pool.
+- assertVisible:
+    text: "Press and hold to approve rule.*"
+    enabled: true
+# Maestro longPressOn holds for 3 seconds.
+- longPressOn: "Press and hold to approve rule.*"
+- runFlow: helpers/fake-wallet-transaction.yaml
+- extendedWaitUntil:
+    visible: "(?i)Input sent today"
+    timeout: 90000
+- assertVisible: "(?i)Input sent in total"
+- tapOn: "Rules"

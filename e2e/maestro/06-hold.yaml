@@ -1,0 +1,109 @@
+appId: com.veto.app
+---
+# Independently runnable: the helper replays 01 through 04 from a cleared
+# install and lands on the main tabs with a live payment rule. The trade rule
+# from 05 is not a prerequisite of this flow.
+- runFlow: helpers/reach-main-tabs.yaml
+- tapOn: "Rules"
+- scrollUntilVisible:
+    element:
+      text: "Open Hold.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Open Hold.*"
+- scrollUntilVisible:
+    element:
+      text: "Set up a vault"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Set up a vault"
+- extendedWaitUntil:
+    visible: "Amount of .*"
+    timeout: 60000
+- scrollUntilVisible:
+    element:
+      text: "Amount of .*"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Amount of .*"
+- eraseText
+- inputText: "1"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Next: set the rules"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Next: set the rules"
+- scrollUntilVisible:
+    element:
+      text: "1 day"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "1 day"
+- scrollUntilVisible:
+    element:
+      text: "Next: choose a guardian key"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Next: choose a guardian key"
+# Entering this screen queries wallet accounts before the form is ready.
+- extendedWaitUntil:
+    visible: "AUTHORIZE|Your second Seeker"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "AUTHORIZE"
+    commands:
+      - tapOn: "AUTHORIZE"
+- scrollUntilVisible:
+    element:
+      text: "Your second Seeker"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Your second Seeker"
+- scrollUntilVisible:
+    element:
+      text: "Second Seeker address"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Second Seeker address"
+- eraseText
+- inputText: "${GUARDIAN}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Safe address"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Safe address"
+- eraseText
+- inputText: "${SAFE}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Review safe address"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Review safe address"
+- scrollUntilVisible:
+    element:
+      text: "Confirm your safe address"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "${SAFE}"
+- scrollUntilVisible:
+    element:
+      text: "Press and hold to sign with your key on this phone.*"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    text: "Press and hold to sign with your key on this phone.*"
+    enabled: true
+# Maestro longPressOn holds for 3 seconds.
+- longPressOn: "Press and hold to sign with your key on this phone.*"
+- runFlow: helpers/fake-wallet-transaction.yaml
+- extendedWaitUntil:
+    visible: "Your vault is live."
+    timeout: 90000
+- tapOn: "Done"

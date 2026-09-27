@@ -1,0 +1,19 @@
+appId: com.veto.app
+---
+# Replays the introduction from a cleared install, then continues the pending
+# MWA request in com.solana.mobilewalletadapter.fakewallet. The wallet sheet
+# does not survive between Maestro invocations, so the replay is what brings
+# AUTHORIZE back. Do not launch the wallet app itself: restarting it changes
+# its test key.
+- runFlow: reach-authorize.yaml
+- tapOn: "AUTHORIZE"
+- extendedWaitUntil:
+    visible: "Add your agent"
+    timeout: 60000
+# The step strip also renders ADD YOUR AGENT. Maestro text matching is
+# case-insensitive by default and picks the deepest matching element before
+# filtering for clickability, so the strip's non-clickable Text would match
+# first; the inline (?-i) flag limits the match to the button's exact case.
+- tapOn:
+    text: "(?-i)^Add your agent$"
+- assertVisible: "Paste your agent's address"

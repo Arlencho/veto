@@ -5,6 +5,8 @@ import { CHARGE_IX_DISC, KIND_PAID, KIND_REFUSED, STATUS_EXHAUSTED, writeU64Le, 
 import { decodeEventsFromLogs } from './events';
 import { decodeMandateAccount, isActive, type MandateAccount } from './mandate';
 import { ledgerPda } from './ring';
+import { readMintDecimals } from './ruleAccount';
+import { formatTokenAmount } from './tokens';
 
 const PENDING_APPROVAL_MESSAGE = 'This rule has a waiting one-time approval. The test would cancel it.';
 const U64_MAX = 0xffffffffffffffffn;
@@ -53,7 +55,7 @@ export async function testChargeInstruction(connection: Connection, programId: P
 }
 
 export type TestRequestUpdate = { text: string; signature?: string };
-export type TestRequestPlan = { rule: MandateAccount; paid: bigint | null; refused: bigint };
+export type TestRequestPlan = { rule: MandateAccount; paid: bigint | null; refused: bigint; decimals: number };
 export type TestRequestOptions = {
   connection: Connection; programId: PublicKey; cluster: string; address: string; owner: string;
   getAgentPublicKey: () => Promise<PublicKey | null>;
@@ -80,7 +82,10 @@ async function liveRule(options: TestRequestOptions, allowExhausted = false): Pr
 export async function prepareTestRequests(options: TestRequestOptions): Promise<TestRequestPlan> {
   const rule = await liveRule(options);
   testRequestNonces(rule.lastNonce, rule.overrideNonce);
-  return { rule, ...testRequestAmounts(rule) };
+  const amounts = testRequestAmounts(rule);
+  const mint = await options.connection.getAccountInfo(new PublicKey(rule.mint), 'confirmed');
+  if (!mint) throw new Error('The token mint of this rule is unavailable.');
+  return { rule, ...amounts, decimals: readMintDecimals(mint.data) };
 }
 
 /** Errors crossing the device/UI boundary use fixed text, never RPC or key-store payloads. */
@@ -121,7 +126,7 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
   const { connection, report } = options;
   try {
     const current = await prepareTestRequests(options);
-    if (current.paid !== plan.paid || current.refused !== plan.refused || current.rule.merchant !== plan.rule.merchant || current.rule.mint !== plan.rule.mint || current.rule.agent !== plan.rule.agent) throw new Error('The rule changed.');
+    if (current.paid !== plan.paid || current.refused !== plan.refused || current.rule.merchant !== plan.rule.merchant || current.rule.mint !== plan.rule.mint || current.decimals !== plan.decimals || current.rule.agent !== plan.rule.agent) throw new Error('The rule changed.');
     const agent = await options.getAgentPublicKey();
     if (!agent || agent.toBase58() !== current.rule.agent) throw new Error('Agent no longer available.');
     if (needsTestFeeTopUp(await connection.getBalance(agent, 'confirmed'))) {
@@ -155,9 +160,10 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
       const block = await connection.getLatestBlockhash('confirmed');
       const transaction = new Transaction({ ...block, feePayer: agent }).add(instruction);
       const signed = await options.signWithAgent(transaction);
-      report({ text: `Sending request for ${amount} base units.` });
+      const shown = formatTokenAmount(amount, plan.decimals, plan.rule.mint);
+      report({ text: `Sending a request for ${shown}.` });
       const signature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, preflightCommitment: 'confirmed' });
-      report({ text: `Request for ${amount} base units submitted; waiting for confirmation.`, signature });
+      report({ text: `Request for ${shown} submitted; waiting for confirmation.`, signature });
       const confirmation = await connection.confirmTransaction({ ...block, signature }, 'confirmed');
       if (confirmation.value.err) throw new Error('Transaction failed');
       const tx = await readConfirmedTransaction(connection, signature);
@@ -172,7 +178,7 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
         return;
       }
       const decision = decisions[0];
-      report({ text: decision.kind === KIND_PAID ? `Paid ${amount} base units to the payee.` : `Refused ${amount} base units: ${reasonText(decision.reason)}.`, signature });
+      report({ text: decision.kind === KIND_PAID ? `Paid ${shown} to the payee.` : `Refused ${shown}: ${reasonText(decision.reason)}.`, signature });
       previous = nonce;
     }
   } catch (error) {

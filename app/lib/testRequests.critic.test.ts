@@ -63,6 +63,6 @@ test('critic r1: one null decision read after a confirmed charge does not abando
   h.w.connection.getTransaction = (async () => (reads++ === 0 ? null : h.decisionFor())) as typeof h.w.connection.getTransaction;
   await runTestRequests(h.options, await prepareTestRequests(h.options));
   assert.deepEqual(sentNonces(h), [1n, 2n], 'the run stopped after the paid charge');
-  assert.ok(h.updates.some(row => row.text.startsWith('Paid 5000000 base units')));
-  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10000001 base units')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Paid 5 ')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10.000001 ')));
 });

@@ -122,6 +122,7 @@ case "${1:-}" in
     printf '%s\n' "${FAKE_GENESIS:-EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG}"
     ;;
   balance)
+    [[ "${FAKE_BALANCE_FAIL:-0}" == 1 ]] && { echo "stub: rpc error" >&2; exit 1; }
     printf '%s lamports\n' "${FAKE_LAMPORTS:-0}"
     ;;
   transfer)
@@ -139,6 +140,10 @@ cat > "${FAKE_BIN}/spl-token" <<'EOF'
 set -u
 printf 'spl-token %s\n' "$*" >> "$FAKE_SPL_LOG"
 case "${1:-}" in
+  balance)
+    [[ "${FAKE_USDC_FAIL:-0}" == 1 ]] && { echo "stub: rpc error" >&2; exit 1; }
+    printf '%s\n' "${FAKE_USDC:-0}"
+    ;;
   transfer)
     # The real spl-token rejects --keypair; the funder is --owner and --fee-payer.
     case " $* " in *" --keypair "*) echo "spl-token stub: --keypair is not a transfer flag" >&2; exit 2 ;; esac
@@ -317,13 +322,13 @@ else
   fi
 fi
 
-# 10. An account that already holds SOL is skipped, so the helper can loop.
-reset_logs
-if out="$(FAKE_LAMPORTS=5000 run_helper emulator-5554 "$FUNDER" 1 2 2>/dev/null)"; then
+# 10. An account that already holds SOL and USDC is skipped, so the helper
+# can loop.
+if out="$(FAKE_LAMPORTS=5000 FAKE_USDC=2 run_helper emulator-5554 "$FUNDER" 1 2 2>/dev/null)"; then
   if [[ "$out" == "$NEW_PUB" ]] \
     && ! grep -q "transfer" "$FAKE_SOLANA_LOG" 2>/dev/null \
     && ! grep -q "transfer" "$FAKE_SPL_LOG" 2>/dev/null; then
-    pass "skips an account that already holds SOL"
+    pass "skips an account that already holds SOL and USDC"
   else
     bad "funded account handling: ${out}"
   fi
@@ -331,7 +336,33 @@ else
   bad "already funded account must exit 0"
 fi
 
-# 11. Shellcheck, when available, stays clean on helper and test.
+# 11. SOL but no USDC (an earlier USDC transfer failed): send only USDC.
+if out="$(FAKE_LAMPORTS=5000 FAKE_USDC=0 run_helper emulator-5554 "$FUNDER" 1 2 2>/dev/null)"; then
+  if [[ "$out" == "$NEW_PUB" ]] \
+    && ! grep -q "transfer" "$FAKE_SOLANA_LOG" 2>/dev/null \
+    && grep -q "transfer" "$FAKE_SPL_LOG" 2>/dev/null; then
+    pass "sends USDC to an account that holds SOL but no USDC"
+  else
+    bad "SOL without USDC handling: ${out}"
+  fi
+else
+  bad "SOL without USDC must exit 0"
+fi
+
+# 12. Balance lookups that fail count as empty: fund both, never exit early.
+if out="$(FAKE_BALANCE_FAIL=1 FAKE_USDC_FAIL=1 run_helper emulator-5554 "$FUNDER" 1 2 2>/dev/null)"; then
+  if [[ "$out" == "$NEW_PUB" ]] \
+    && grep -q "transfer" "$FAKE_SOLANA_LOG" 2>/dev/null \
+    && grep -q "transfer" "$FAKE_SPL_LOG" 2>/dev/null; then
+    pass "funds both when balance lookups fail"
+  else
+    bad "failed balance lookup handling: ${out}"
+  fi
+else
+  bad "failed balance lookups must still fund and exit 0"
+fi
+
+# 13. Shellcheck, when available, stays clean on helper and test.
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S error "$SCRIPT" "${ROOT}/e2e/maestro/helpers/fund-fake-wallet.test.sh"; then
     pass "shellcheck -S error clean"

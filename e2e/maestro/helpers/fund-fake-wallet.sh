@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Fund the Solana Mobile fake wallet's current devnet account from a local
-# funder keypair. The operator runs this on the laptop between Maestro flows
-# 02 and 04: the fake wallet creates a new key each time it authorizes, so
-# the flows that sign need that newest key funded.
+# funder keypair. The operator runs this in a loop on the laptop while the
+# Maestro flows run: the fake wallet creates a new key each time it
+# authorizes, so the flows that sign need that newest key funded.
 #
 # Usage: fund-fake-wallet.sh <emulator-serial> <funder-keypair.json> <sol-amount> <usdc-amount>
 #
@@ -146,17 +146,33 @@ PUBKEY="$(b64_to_base58 "$PUBKEY_B64")" \
   || refuse "decoded fake wallet address is not valid base58: ${PUBKEY}"
 
 echo "fake wallet account: ${PUBKEY}" >&2
-# An account that already holds SOL was funded by an earlier call. Skipping it
-# makes the helper safe to run in a loop while flows create new accounts.
-LAMPORTS="$(solana balance --lamports "$PUBKEY" 2>/dev/null | awk '{print $1}')"
-if [[ "$LAMPORTS" =~ ^[0-9]+$ ]] && (( LAMPORTS > 0 )); then
+# Each asset is sent only when the account does not already hold it, so the
+# helper is safe to run in a loop while flows create new accounts, and an
+# account left with SOL but no USDC still gets its USDC. A balance that cannot
+# be read counts as empty, so a failed lookup funds rather than skips.
+LAMPORTS="$(solana balance --lamports "$PUBKEY" 2>/dev/null | awk '{print $1}' || true)"
+USDC_HELD="$(spl-token balance --owner "$PUBKEY" "$DEVNET_USDC_MINT" 2>/dev/null || true)"
+has_sol=0
+has_usdc=0
+[[ "$LAMPORTS" =~ ^[0-9]+$ ]] && (( LAMPORTS > 0 )) && has_sol=1
+[[ "$USDC_HELD" =~ ^[0-9]*\.?[0-9]+$ ]] && [[ "$USDC_HELD" =~ [1-9] ]] && has_usdc=1
+
+if (( has_sol && has_usdc )); then
   echo "already funded, skipping" >&2
-  printf '%s\n' "$PUBKEY"
-  exit 0
+else
+  if (( has_sol )); then
+    echo "already holds SOL" >&2
+  else
+    echo "funding ${SOL_AMOUNT} SOL from ${FUNDER}" >&2
+    solana transfer --keypair "$FUNDER" --allow-unfunded-recipient "$PUBKEY" "$SOL_AMOUNT" >&2
+  fi
+  if (( has_usdc )); then
+    echo "already holds devnet USDC" >&2
+  else
+    echo "funding ${USDC_AMOUNT} devnet USDC from ${FUNDER}" >&2
+    spl-token transfer --owner "$FUNDER" --fee-payer "$FUNDER" --fund-recipient --allow-unfunded-recipient \
+      "$DEVNET_USDC_MINT" "$USDC_AMOUNT" "$PUBKEY" >&2
+  fi
 fi
-echo "funding ${SOL_AMOUNT} SOL and ${USDC_AMOUNT} devnet USDC from ${FUNDER}" >&2
-solana transfer --keypair "$FUNDER" --allow-unfunded-recipient "$PUBKEY" "$SOL_AMOUNT" >&2
-spl-token transfer --owner "$FUNDER" --fee-payer "$FUNDER" --fund-recipient --allow-unfunded-recipient \
-  "$DEVNET_USDC_MINT" "$USDC_AMOUNT" "$PUBKEY" >&2
 
 printf '%s\n' "$PUBKEY"

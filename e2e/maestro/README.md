@@ -2,7 +2,8 @@
 
 These flows target `com.veto.app` on devnet using the Solana Mobile fake wallet,
 `com.solana.mobilewalletadapter.fakewallet`. Device execution is reserved for the
-lead. Authoring validation is offline YAML parsing only; no device run is claimed.
+lead. All seven flows have passed on an Android emulator with the fake wallet
+against the devnet deployment; the offline checks below parse the YAML only.
 
 ## Prepare the emulator later
 
@@ -25,9 +26,10 @@ lead. Authoring validation is offline YAML parsing only; no device run is claime
    client and connect it to Metro before starting flow 01. Expo Go cannot load
    the wallet native modules. See [app setup](../../app/README.md).
 5. Keep Android display/font scaling at its default and dismiss development
-   menus or onboarding overlays. Do not force-stop the fake wallet between flows.
-   Its test account can change when its process exits, as described in
-   [Solana Mobile's development wallet setup](https://docs.solanamobile.com/get-started/development-setup).
+   menus or onboarding overlays. The fake wallet creates a new test account on
+   every authorization (see
+   [Solana Mobile's development wallet setup](https://docs.solanamobile.com/get-started/development-setup));
+   the funding loop below covers each one.
 
 ## Addresses and funds
 
@@ -223,13 +225,12 @@ the daily allowance. Run the honest trade first. Rerunning the hostile script
 against an exhausted rule needs a new rule or a new allowance day. Do not run
 it against any pool other than the designated devnet demo pool.
 
-Before 07, run a rule-creating flow (04 or later) in its own invocation; that
-invocation leaves Veto on the main tabs with its freshly approved rule as the
-wallet's newest live rule. Generate the refusal against that rule from the
-laptop. Do not run any other rule-creating flow between the refusal and 07:
-07 relaunches Veto without clearing it and opens the connected account's
-newest live rule in Decisions, so the refusal-bearing rule must still be the
-newest. It never reconnects, because the fake wallet would create a new
+Before 07, run a rule-creating flow (04 or later) in its own invocation. Each
+of them approves a payment rule, and Decisions shows that payment rule, also
+after 05 or 06 add a trade rule or a vault. Generate the refusal against that
+payment rule from the laptop with `pay-once`, not against a trade rule. Do not
+run another flow between the refusal and 07: 07 relaunches Veto without
+clearing it and reads Decisions for the connected account. It never reconnects, because the fake wallet would create a new
 account with no rules. Its `Refused, recorded` assertion targets a real
 row's accessibility text, not the `Refused` filter, and opens that row to assert
 `No money moved.`. A missing refusal should fail, not be skipped.
@@ -253,5 +254,5 @@ shellcheck -S error e2e/maestro/helpers/fund-fake-wallet.sh e2e/maestro/helpers/
 ```
 
 This checks YAML syntax and document shape only. It does not verify Android
-layout, MWA interoperability, devnet availability or transaction success. Those
-remain the lead's emulator checks. No production code is changed by this suite.
+layout, MWA interoperability, devnet availability or transaction success; the
+emulator runs above do. No production code is changed by this suite.

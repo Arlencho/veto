@@ -1,4 +1,4 @@
-import { formatBaseUnits, formatDisplayAmount } from './format';
+import { formatBaseUnits, formatDisplayAmount, type DisplayRounding } from './format';
 
 function shortenMint(mint: string): string {
   if (mint.length <= 8) {
@@ -90,7 +90,7 @@ export function formatTokenDisplay(
   amount: bigint,
   decimals: number,
   mint: string | null | undefined,
-  rounding: 'nearest' | 'floor' = 'nearest',
+  rounding: DisplayRounding = 'nearest',
 ): string {
   return withToken(formatDisplayAmount(amount, decimals, mint?.trim() === WSOL_MINT ? 4 : 2, rounding), mint);
 }

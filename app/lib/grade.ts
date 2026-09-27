@@ -504,7 +504,7 @@ export function snapshotRule(rule: RuleFacts, nowSec: bigint): RuleSnapshot {
     shortAddress: truncateAddress(rule.address),
     remainingLabel,
     capLabel,
-    spentLabel: formatTokenDisplay(rule.spent, rule.decimals, mint),
+    spentLabel: formatTokenDisplay(rule.spent, rule.decimals, mint, 'ceil'),
     perTxMaxLabel: formatTokenDisplay(rule.perTxMax, rule.decimals, mint),
     remainingRatio: ratio(remaining, rule.cap),
     day,

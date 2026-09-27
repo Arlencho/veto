@@ -62,7 +62,7 @@ export default function OverviewScreen() {
   const mint = mandate?.mint;
   const remainingText = formatTokenDisplay(remaining, chain.decimals, mint, 'floor');
   const capText = formatTokenDisplay(mandate?.cap ?? 0n, chain.decimals, mint);
-  const spentText = formatTokenDisplay(mandate?.spent ?? 0n, chain.decimals, mint);
+  const spentText = formatTokenDisplay(mandate?.spent ?? 0n, chain.decimals, mint, 'ceil');
   const perText = formatTokenDisplay(mandate?.perTxMax ?? 0n, chain.decimals, mint);
   const tokenNote = mainnetPreviewNote(mint, chain.config?.explorerCluster ?? null) ?? devnetTestTokenNote(mint, chain.config?.explorerCluster ?? null);
   const offerFaucet =

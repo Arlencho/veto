@@ -15,15 +15,17 @@ time to stop them.
   one request just above it, which the program refuses. Both are devnet
   transactions with explorer links, and amounts are shown in the token (for
   example 0.05 USDC). See Known limits for when it appears.
-- **Fixed: the test agent kept after approval.** Approving a rule for a test
-  agent created on the phone no longer creates a second key; the rule names the
-  agent the app showed and the name you gave it.
-- **Faster, lighter start.** A cold start sends far fewer network requests: the
-  home screen widget reads only when a widget is placed, the start-up read runs
-  once, and only transactions the screen can show are fetched. On a Seeker with
-  three rules, rate-limit retries on a cold start went from 40 to 60 to none.
+- **Fixed: the test agent is kept after approval.** Approving a rule for a test
+  agent created on the phone no longer creates a second key: the rule is opened
+  for the agent the app showed, and the name you typed is saved with that
+  agent's address.
+- **Lighter start.** A cold start sends far fewer network requests: the home
+  screen widget reads only when a widget is placed, the start-up read runs once,
+  and only the ledger transactions the Decisions list can show are fetched. On a
+  Seeker with three payment rules and a Hold vault, three cold starts logged 40,
+  60 and 42 rate-limit retries before this change and none after.
 
-## Added
+## What the app does
 
 - **Payment rule.** Choose an agent, payee, purpose, maximum per payment,
   total budget and expiry. Review the terms before signing. Requests that

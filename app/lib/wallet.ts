@@ -5,6 +5,7 @@ import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { walletActionSucceeded } from './walletActionStatus';
 
 import { walletChainForCluster } from './appConfig';
+import { CHARGE_IX_DISC } from './constants';
 
 export const APP_IDENTITY = {
   name: 'Veto',
@@ -256,6 +257,35 @@ export async function loadAgentKeypair(store: WalletStore): Promise<Keypair | nu
     return null;
   }
   return parseAgentSecret(raw);
+}
+
+export async function agentPublicKey(store: WalletStore): Promise<PublicKey | null> {
+  return (await loadAgentKeypair(store))?.publicKey ?? null;
+}
+
+export async function signWithAgent(store: WalletStore, transaction: Transaction): Promise<Transaction> {
+  const agent = await loadAgentKeypair(store);
+  if (!agent) throw new Error('Agent no longer available.');
+  const refused = 'Agent signing is restricted to a single Veto charge.';
+  let programId: PublicKey;
+  try {
+    const { loadConfig } = await import('./config');
+    programId = new PublicKey(loadConfig().programId);
+  } catch {
+    throw new Error(refused);
+  }
+  const instruction = transaction.instructions[0];
+  if (
+    !transaction.feePayer?.equals(agent.publicKey) ||
+    transaction.instructions.length !== 1 ||
+    !instruction.programId.equals(programId) ||
+    !CHARGE_IX_DISC.equals(Buffer.from(instruction.data.subarray(0, CHARGE_IX_DISC.length))) ||
+    !instruction.keys.some(account => account.isSigner && account.pubkey.equals(agent.publicKey))
+  ) {
+    throw new Error(refused);
+  }
+  transaction.partialSign(agent);
+  return transaction;
 }
 
 async function rememberAgent(store: WalletStore, keypair: Keypair): Promise<void> {

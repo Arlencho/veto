@@ -14,6 +14,7 @@ let actions: { text: string; onPress: () => void }[] = [];
 let refreshes = 0;
 let sends = 0;
 let prepared = 0;
+let prepareError: Error | null = null;
 let cluster = 'devnet';
 mock.module('react-native', { namedExports: {
   View: 'View', Text: 'Text', Pressable: 'Pressable', StyleSheet: { create: (styles: unknown) => styles },
@@ -24,8 +25,8 @@ mock.module('../lib/useWallet', { namedExports: { useWallet: () => ({ agentPubli
 mock.module('../lib/useChain', { namedExports: { useChain: () => ({ config: { rpcUrl: 'https://api.devnet.solana.com', programId: key, explorerCluster: cluster }, tradeRules: [], refresh: async () => { refreshes++; } }) } });
 mock.module('../lib/testRequests', { namedExports: {
   testRequestsVisible,
-  testRequestFailure: () => 'Could not finish',
-  prepareTestRequests: async () => { prepared++; return { rule: mandate, paid: 10n, refused: 21n }; },
+  testRequestFailure: (error: Error) => error.message,
+  prepareTestRequests: async () => { prepared++; if (prepareError) throw prepareError; return { rule: mandate, paid: 10n, refused: 21n }; },
   runTestRequests: async (options: { report: (row: { text: string; signature?: string }) => void }) => {
     sends++;
     options.report({ text: 'Paid 10 base units to the payee.', signature: 'payment' });
@@ -60,4 +61,21 @@ test('the component hides on a non-devnet build', async () => {
   await act(async () => { root = create(createElement(TestRequests, { mandate })); });
   assert.equal(root.toJSON(), null);
   await act(async () => root.unmount());
+});
+
+
+test('a waiting approval is explained inline without opening confirmation', async () => {
+  cluster = 'devnet';
+  confirmation = '';
+  const beforeSends = sends;
+  prepareError = new Error('This rule has a waiting one-time approval. The test would cancel it.');
+  const { TestRequests } = await import('./TestRequests');
+  let root!: ReactTestRenderer;
+  await act(async () => { root = create(createElement(TestRequests, { mandate })); });
+  await act(async () => { root.root.findByType('Pressable' as never).props.onPress(); });
+  assert.equal(confirmation, '');
+  assert.equal(sends, beforeSends);
+  assert.match(JSON.stringify(root.toJSON()), /waiting one-time approval.*test would cancel it/);
+  await act(async () => root.unmount());
+  prepareError = null;
 });

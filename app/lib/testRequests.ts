@@ -6,6 +6,7 @@ import { decodeEventsFromLogs } from './events';
 import { decodeMandateAccount, isActive, type MandateAccount } from './mandate';
 import { ledgerPda } from './ring';
 
+const PENDING_APPROVAL_MESSAGE = 'This rule has a waiting one-time approval. The test would cancel it.';
 const U64_MAX = 0xffffffffffffffffn;
 const DEVNET_GENESIS = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
 export function testRequestsVisible(rule: MandateAccount | null, agent: string | null, cluster: string | null, now: bigint): boolean {
@@ -23,7 +24,7 @@ function nextTestNonce(last: bigint, override: bigint): bigint {
   return start + 1n;
 }
 export function testRequestNonces(last: bigint, override: bigint): [bigint, bigint] {
-  // Never consume a pending owner override with the deliberately oversized request.
+  // Pending approvals are rejected by liveRule before allocating nonces.
   const start = last > override ? last : override;
   if (start > U64_MAX - 2n) throw new Error('This rule has no room for two more request nonces.');
   return [start + 1n, start + 2n];
@@ -72,6 +73,7 @@ async function liveRule(options: TestRequestOptions, allowExhausted = false): Pr
   if (!testRequestsVisible(allowExhausted && rule.status === STATUS_EXHAUSTED ? { ...rule, status: 0 } : rule, agent?.toBase58() ?? null, options.cluster, BigInt(Math.floor(Date.now() / 1000))) || rule.owner !== options.owner) {
     throw new Error('This rule is no longer active for the owner and test agent on this phone.');
   }
+  if (rule.overrideAmount > 0n && rule.overrideNonce > rule.lastNonce) throw new Error(PENDING_APPROVAL_MESSAGE);
   return rule;
 }
 
@@ -84,6 +86,7 @@ export async function prepareTestRequests(options: TestRequestOptions): Promise<
 /** Errors crossing the device/UI boundary use fixed text, never RPC or key-store payloads. */
 export function testRequestFailure(error: unknown): string {
   const text = error instanceof Error ? error.message.toLowerCase() : '';
+  if (text === PENDING_APPROVAL_MESSAGE.toLowerCase()) return PENDING_APPROVAL_MESSAGE;
   if (text === 'wallet fee transfer declined') return 'The wallet declined the fee transfer. No test requests were sent.';
   if (/insufficient|not enough/.test(text)) return 'Not enough SOL for fees. Fund the owner with devnet SOL and try again.';
   if (/(rule|payment account|agent).*(closed|no longer|unavailable|active)/.test(text)) return 'The rule or payment account is no longer available for this test. Refresh your rules.';

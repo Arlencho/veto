@@ -41,7 +41,7 @@ const sentNonces = (h: ReturnType<typeof harness>) =>
 // pending override: nextNonce() returns the override nonce and charge() with
 // guardPendingOverride refuses a different amount (sdk/src/agent.ts:463-472, 608-617).
 // Expected: no test charge is sent while an override is pending and the owner is
-// told why, by fixed text that names the override.
+// told why, by fixed text that explains the waiting one-time approval.
 test('critic r1: a pending owner override stops the run before any charge is sent', async () => {
   const h = harness({ lastNonce: 12n, overrideNonce: 30n, overrideAmount: 50_000_000n });
   let plan: Awaited<ReturnType<typeof prepareTestRequests>> | null = null;
@@ -49,7 +49,7 @@ test('critic r1: a pending owner override stops the run before any charge is sen
   if (plan) await runTestRequests(h.options, plan);
   assert.deepEqual(sentNonces(h), [], 'the runner charged at nonces above the pending override and buried it');
   assert.equal(h.walletTransactions.length, 0);
-  assert.match(h.updates.at(-1)?.text ?? '', /override/i);
+  assert.match(h.updates.at(-1)?.text ?? '', /waiting one-time approval.*test would cancel it/i);
 });
 
 // R2. After confirmTransaction returns, getTransaction can still answer null on a

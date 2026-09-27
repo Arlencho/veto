@@ -19,7 +19,7 @@ test('payment uses half the smaller limit with a one-unit minimum and skips an e
   assert.equal(testRequestAmounts({ ...rule, spent: 100n }).paid, null);
   assert.throws(() => testRequestAmounts({ ...rule, perTxMax: 0xffffffffffffffffn }));
 });
-test('nonces strictly increase beyond both the last request and any pending override', () => {
+test('nonces strictly increase beyond the last request and inactive override nonce', () => {
   assert.deepEqual(testRequestNonces(12n, 0n), [13n, 14n]);
   assert.deepEqual(testRequestNonces(12n, 30n), [31n, 32n]);
   assert.throws(() => testRequestNonces(0xffffffffffffffffn, 0n));
@@ -190,4 +190,44 @@ test('the above-limit request is still sent when the one-unit payment exhausts t
   assert.equal(h.w.fake.sent.length, 2);
   assert.ok(h.updates.some(row => row.text.startsWith('Paid 1 base units')));
   assert.ok(h.updates.some(row => row.text.startsWith('Refused 10000001 base units')));
+});
+
+
+test('a waiting one-time approval prevents confirmation and any fee transfer', async () => {
+  const h = harness(0, { overrideAmount: 50n, overrideNonce: 30n, lastNonce: 12n });
+  await assert.rejects(prepareTestRequests(h.options), /waiting one-time approval.*test would cancel it/);
+  assert.equal(h.walletTransactions.length, 0);
+  assert.equal(h.w.fake.sent.length, 0);
+});
+test('an approval added after confirmation stops the test before sending anything', async () => {
+  const h = harness(0);
+  const plan = await prepareTestRequests(h.options);
+  const data = h.w.fake.accounts.get(h.options.address)!.data;
+  data.writeBigUInt64LE(50n, 208);
+  data.writeBigUInt64LE(30n, 216);
+  await runTestRequests(h.options, plan);
+  assert.equal(h.walletTransactions.length, 0);
+  assert.equal(h.w.fake.sent.length, 0);
+  assert.match(h.updates.at(-1)!.text, /waiting one-time approval.*test would cancel it/);
+});
+test('an approval added after payment stops the oversized request', async () => {
+  const h = harness();
+  const getTransaction = h.w.connection.getTransaction.bind(h.w.connection);
+  h.w.connection.getTransaction = (async (...args: Parameters<typeof getTransaction>) => {
+    const tx = await getTransaction(...args);
+    const data = h.w.fake.accounts.get(h.options.address)!.data;
+    data.writeBigUInt64LE(50n, 208);
+    data.writeBigUInt64LE(30n, 216);
+    return tx;
+  }) as typeof h.w.connection.getTransaction;
+  await runTestRequests(h.options, await prepareTestRequests(h.options));
+  assert.equal(h.w.fake.sent.length, 1);
+  assert.match(h.updates.at(-1)!.text, /waiting one-time approval.*test would cancel it/);
+});
+test('zero-amount and already-consumed approvals do not block test requests', async () => {
+  for (const patch of [{ overrideAmount: 0n, overrideNonce: 30n }, { overrideAmount: 50n, overrideNonce: 12n, lastNonce: 12n }]) {
+    const h = harness(5_000_000, patch);
+    await runTestRequests(h.options, await prepareTestRequests(h.options));
+    assert.equal(h.w.fake.sent.length, 2);
+  }
 });

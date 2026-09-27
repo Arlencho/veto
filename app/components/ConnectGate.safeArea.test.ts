@@ -177,3 +177,12 @@ test('before the wallet connects, a stack route still keeps the Connect screen b
     walletOwner = 'owner';
   }
 });
+
+test('on a stack route the devnet line takes the screen side margin; inside a Screen it does not add its own', async () => {
+  const flat = (style: unknown): Record<string, unknown> =>
+    Array.isArray(style) ? Object.assign({}, ...style.map(flat)) : ((style ?? {}) as Record<string, unknown>);
+  const stack = await mount('stack');
+  assert.ok(Number(flat(notice(stack).props.style).paddingHorizontal) > 0, 'stack line has a side margin');
+  const tab = await mount('tab');
+  assert.equal(flat(notice(tab).props.style).paddingHorizontal, undefined, 'tab line relies on the Screen padding');
+});

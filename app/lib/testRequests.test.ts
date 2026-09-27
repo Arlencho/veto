@@ -97,7 +97,7 @@ test('funded phone agent pays then receives the program refusal with only agent 
   assert.ok(h.updates.some(row => row.text === 'Paid 5000000 base units to the payee.' && row.signature));
   assert.ok(h.updates.some(row => row.text === 'Refused 10000001 base units: over per-payment maximum.' && row.signature));
 });
-test('fee top-up is one transfer; charges wait for wallet confirmation and a second tap does nothing', async () => {
+test('an overlapping caller gets a clear message while only the original test spends fees', async () => {
   const h = harness(0);
   let finish!: () => void;
   h.options.signAndSend = async transactions => {
@@ -109,7 +109,8 @@ test('fee top-up is one transfer; charges wait for wallet confirmation and a sec
   const pending = runTestRequests(h.options, plan);
   while (!finish) await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.w.fake.sent.length, 0);
-  await runTestRequests(h.options, plan);
+  const overlappingUpdates: TestRequestUpdate[] = [];
+  await runTestRequests({ ...h.options, report: update => overlappingUpdates.push(update) }, plan);
   assert.equal(h.walletTransactions.length, 1);
   const tx = h.walletTransactions[0];
   assert.equal(tx.instructions.length, 1);
@@ -120,6 +121,10 @@ test('fee top-up is one transfer; charges wait for wallet confirmation and a sec
   finish();
   await pending;
   assert.equal(h.w.fake.sent.length, 2);
+  assert.deepEqual(overlappingUpdates, [{ text: 'A test is already running for this rule.' }]);
+  h.w.fake.balances.set(h.w.agent.publicKey.toBase58(), 5_000_000);
+  await runTestRequests(h.options, await prepareTestRequests(h.options));
+  assert.equal(h.w.fake.sent.length, 4);
 });
 test('wallet decline is visible and stops both charges', async () => {
   const h = harness(0);

@@ -113,7 +113,10 @@ async function readConfirmedTransaction(connection: Connection, signature: strin
 // Shared by both screen instances; an overlapping run must not spend twice.
 const running = new Set<string>();
 export async function runTestRequests(options: TestRequestOptions, plan: TestRequestPlan): Promise<void> {
-  if (running.has(options.address)) return;
+  if (running.has(options.address)) {
+    options.report({ text: 'A test is already running for this rule.' });
+    return;
+  }
   running.add(options.address);
   const { connection, report } = options;
   try {

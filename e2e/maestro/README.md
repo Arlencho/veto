@@ -84,10 +84,11 @@ If the fake wallet account changes, reconnect Veto and fund the new account.
 
 ## Run each flow
 
-Every flow is independently runnable from a cleared app. Each one starts with
+Flows 01 to 06 are independently runnable from a cleared app. Each one starts with
 `launchApp` with `clearState: true` and replays the steps it depends on through
 the chained helpers in `e2e/maestro/helpers/`, so no flow relies on screen
-state left by a previous Maestro invocation. The replay chain is:
+state left by a previous Maestro invocation. 07 is the exception and runs
+right after one of them. The replay chain is:
 
 | Helper | Replays | Ends on |
 | --- | --- | --- |
@@ -96,13 +97,12 @@ state left by a previous Maestro invocation. The replay chain is:
 | `helpers/enter-agent.yaml` | connect-wallet | Unsigned first-run review |
 | `helpers/approve-payment-rule.yaml` | enter-agent | First-run live screen |
 | `helpers/reach-main-tabs.yaml` | approve-payment-rule, then relaunches Veto | Main tabs |
-| `helpers/reconnect.yaml` | reach-authorize, AUTHORIZE, then relaunches Veto | Main tabs, no new rule |
 
 The top-level flows are thin wrappers: 01 runs reach-authorize, 02 runs
 connect-wallet, 03 runs enter-agent, 04 runs reach-main-tabs, and 05 and 06
-run reach-main-tabs before their own steps. 07 runs reconnect, never a rule
-approval: Decisions opens the wallet's newest live rule, and a replayed
-approval would become that rule and hide the refusal-bearing one. Because
+run reach-main-tabs before their own steps. 07 replays nothing: it relaunches
+Veto without clearing it, because the fake wallet creates a new account on
+every authorization and a reconnect would land on an account with no rules. Because
 each flow replays its prerequisites, environment requirements accumulate: 05
 also needs `PAYEE`, and 06 also needs `AGENT` and `PAYEE` for the replayed
 payment rule.
@@ -136,7 +136,7 @@ maestro --device emulator-5554 test e2e/maestro/07-decisions.yaml
 | 04 | 01, 02, 03 | Payee, limits, approval | Agent entered, payee pasted on the scan fallback, 0.1 per payment and 1 total typed, rule live, main tabs |
 | 05 | 01 through 04 | Trade rule | Trade rule, supplied agent, unchanged Trading bot defaults, chain detail |
 | 06 | 01 through 04 | Hold vault | Hold, amount 1, wait 1 day, second Seeker and reviewed safe address, live vault |
-| 07 | 01, 02 (reconnect only) | Refusal read | Pull refresh, refused row, detail says No money moved. |
+| 07 | nothing (keeps the previous flow's state) | Refusal read | Pull refresh, refused row, detail says No money moved. |
 
 The Connect wallet and Add your agent taps use anchored text with the inline
 `(?-i)` case-sensitive flag. Maestro text matching is case-insensitive by
@@ -221,10 +221,10 @@ Before 07, run a rule-creating flow (04 or later) in its own invocation; that
 invocation leaves Veto on the main tabs with its freshly approved rule as the
 wallet's newest live rule. Generate the refusal against that rule from the
 laptop. Do not run any other rule-creating flow between the refusal and 07:
-07 clears Veto, reconnects, and opens the wallet's newest live rule in
-Decisions, so the refusal-bearing rule must still be the newest. 07 replays
-only the introduction and authorization, never an approval, for exactly this
-reason. Its `Refused, recorded` assertion targets a real
+07 relaunches Veto without clearing it and opens the connected account's
+newest live rule in Decisions, so the refusal-bearing rule must still be the
+newest. It never reconnects, because the fake wallet would create a new
+account with no rules. Its `Refused, recorded` assertion targets a real
 row's accessibility text, not the `Refused` filter, and opens that row to assert
 `No money moved.`. A missing refusal should fail, not be skipped.
 

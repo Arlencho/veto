@@ -50,10 +50,10 @@ Agents grades each agent across every rule that agent is on. The four rules, fro
 |---|---|
 | Stayed inside its rule | Fewer than 1 request in 20 outside its rule. |
 | Tested its limit now and then | 1 to 4 requests in 20 outside its rule. |
-| Pushed its limit often | More than 4 requests in 20 outside its rule. |
+| Often asked outside its rule | More than 4 requests in 20 outside its rule. |
 | Too new to grade | Fewer than 10 requests, or fewer than 3 days running. The facts still show; the label waits. |
 
-A request is a payment the rule paid inside the rule, or refused. A payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. The agent's own signed declines are not requests. Money moved outside the rule is always 0. Two or more allowances, once the agent can be graded, move the shown grade one step lower. Pushed its limit often does not move further.
+A request is a payment the rule paid inside the rule, or refused. A payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. The agent's own signed declines are not requests. Money moved outside the rule is always 0. Two or more allowances, once the agent can be graded, move the shown grade one step lower. Often asked outside its rule does not move further.
 
 Plaques from one rule's history: First payment inside the rule, First refusal saved, Ten refusals, none allowed, 30 days inside the rule, and Rule finished, rest returned. Week in review is seven local days, with paid and refused counts and refusals grouped by reason. The track record card is an image whose QR is the rule address. On devnet it says Devnet, test tokens.
 

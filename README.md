@@ -269,14 +269,14 @@ An agent is graded across every rule that agent is on. The name comes from the p
 |---|---|
 | Stayed inside its rule | Fewer than 1 request in 20 outside its rule. |
 | Tested its limit now and then | 1 to 4 requests in 20 outside its rule. |
-| Pushed its limit often | More than 4 requests in 20 outside its rule. |
+| Often asked outside its rule | More than 4 requests in 20 outside its rule. |
 | Too new to grade | Fewer than 10 requests, or fewer than 3 days running. The facts still show; the label waits. |
 
 A request is a payment the rule paid inside the rule, or refused. A later payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. Outside means the rule refused it. The agent's own signed declines are not requests. Money moved outside the rule is always 0, and it is never credit.
 
 The day count starts at the earliest open on that agent's rules. If there is no open row, days count only once the earliest stamp is already 3 days old. Otherwise the grade stays Too new to grade.
 
-Two or more allowances move the shown grade one step lower, and only after the agent is old enough to grade. Stayed inside its rule becomes Tested its limit now and then. Tested its limit now and then becomes Pushed its limit often. Pushed its limit often does not move further.
+Two or more allowances move the shown grade one step lower, and only after the agent is old enough to grade. Stayed inside its rule becomes Tested its limit now and then. Tested its limit now and then becomes Often asked outside its rule. Often asked outside its rule does not move further.
 
 ### Record, week, renewal, quiet note
 

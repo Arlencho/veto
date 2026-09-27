@@ -259,11 +259,11 @@ test('the agents screen shows loading, an empty wallet, a read error, and a grad
   );
   const text = visibleText(normal);
   assert.match(text, /Charging agent/);
-  assert.match(text, /Pushed its limit often/);
+  assert.match(text, /Often asked outside its rule/);
   assert.match(text, /12 of its 18 requests outside its rule/);
   assert.match(text, /Devnet/);
   await act(async () => {
-    button(normal, `Open the full record of Charging agent. Grade: Pushed its limit often.`).props.onPress();
+    button(normal, `Open the full record of Charging agent. Grade: Often asked outside its rule.`).props.onPress();
   });
   assert.equal(opened, AGENT);
 });
@@ -341,7 +341,7 @@ test('how grades work shows loading, empty, error, and the four rules', async ()
   assert.match(normal, /Fewer than 1 request in 20 outside its rule/);
   assert.match(normal, /Tested its limit now and then/);
   assert.match(normal, /1 to 4 requests in 20 outside its rule/);
-  assert.match(normal, /Pushed its limit often/);
+  assert.match(normal, /Often asked outside its rule/);
   assert.match(normal, /More than 4 requests in 20 outside its rule/);
   assert.match(normal, /Too new to grade/);
   assert.match(normal, /Fewer than 10 requests/);
@@ -368,7 +368,7 @@ test('the agent record shows loading, a missing agent, an error, and the chain c
   assert.match(visibleText(await mount(createElement(AgentRecordScreen, { ...props, data: screenData({ status: 'empty' }) }))), /not on a rule/);
   assert.match(visibleText(await mount(createElement(AgentRecordScreen, { ...props, data: screenData({ status: 'error', error: 'Ledger missing.' }) }))), /Ledger missing/);
   const normal = visibleText(await mount(createElement(AgentRecordScreen, { ...props, data: screenData({ agents: readyAgents() }) })));
-  assert.match(normal, /Pushed its limit often/);
+  assert.match(normal, /Often asked outside its rule/);
   assert.match(normal, /12 of 18, all 12 refused/);
   assert.match(normal, /Its own signed declines, not in the grade/);
   assert.match(normal, /Ten refusals, none allowed/);

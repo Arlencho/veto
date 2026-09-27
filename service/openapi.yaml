@@ -467,7 +467,7 @@ components:
           enum:
           - Stayed inside its rule
           - Tested its limit now and then
-          - Pushed its limit often
+          - Often asked outside its rule
           - Too new to grade
         requests:
           $ref: '#/components/schemas/UInt'

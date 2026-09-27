@@ -104,7 +104,7 @@ The grade rules, from `app/lib/grade.ts`:
 |---|---|
 | Stayed inside its rule | Fewer than 1 request in 20 outside its rule. |
 | Tested its limit now and then | 1 to 4 requests in 20 outside its rule. |
-| Pushed its limit often | More than 4 requests in 20 outside its rule. |
+| Often asked outside its rule | More than 4 requests in 20 outside its rule. |
 | Too new to grade | Fewer than 10 requests, or fewer than 3 days running. The facts still show; the label waits. |
 
 A request is a payment the rule paid inside the rule, or refused. A later payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. The agent's own signed declines are not requests. Money moved outside the rule is always 0, and it is never credit. Fewer than 10 requests, or fewer than 3 days running, or a start that is not yet old enough to date, is Too new to grade. The facts still show. Two or more allowances, once the agent can be graded, move the shown grade one step lower: stayed becomes tested, tested becomes pushed, and pushed does not move further.

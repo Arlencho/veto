@@ -30,7 +30,7 @@ export const GRADE_MIN_DAYS = 3;
 export const GRADE_LABEL = {
   stayed: 'Stayed inside its rule',
   tested: 'Tested its limit now and then',
-  pushed: 'Pushed its limit often',
+  pushed: 'Often asked outside its rule',
   'too-new': 'Too new to grade',
 } as const;
 

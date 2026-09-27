@@ -147,6 +147,8 @@ function mintData(): Buffer {
 }
 
 let held: MandateAccount[] = [];
+let reads = 0;
+let paused: Promise<void> | null = null;
 
 const connection = {
   async getAccountInfo(address: PublicKey) {
@@ -162,6 +164,9 @@ const connection = {
     return null;
   },
   async getProgramAccounts() {
+    if (paused) {
+      await paused;
+    }
     return held.map((item) => ({
       pubkey: new PublicKey(item.address),
       account: { data: encodeMandate(item), owner: PROGRAM, executable: false, lamports: 1 },
@@ -171,13 +176,14 @@ const connection = {
     return [];
   },
   async getGenesisHash() {
+    reads += 1;
     return 'genesis';
   },
 };
 
 type Api = {
   mandate: MandateAccount | null;
-  refresh: () => Promise<void>;
+  refresh: (options?: { join?: boolean }) => Promise<void>;
   selectMandate: (address: string) => Promise<void>;
 };
 
@@ -222,6 +228,19 @@ function reset(): void {
   store.clear();
   held = [];
   api = null;
+  reads = 0;
+  paused = null;
+}
+
+function pause(): () => void {
+  let release = () => {};
+  paused = new Promise<void>((resolve) => {
+    release = () => {
+      paused = null;
+      resolve();
+    };
+  });
+  return release;
 }
 
 async function pickMandate(...args: Parameters<typeof import('./chain').pickMandate>) {
@@ -295,4 +314,83 @@ test('a rule the user picked stays picked when a newer rule appears', async () =
   await refresh();
   assert.equal(api?.mandate?.address, older.address);
   act(() => root.unmount());
+});
+
+test('a focus refresh during the launch read joins it, so one chain read goes out', async () => {
+  reset();
+  held = [rule()];
+  const release = pause();
+  const root = await mount();
+  assert.equal(reads, 0, 'the launch read is still waiting on the chain');
+  let joined: Promise<void> | undefined;
+  await act(async () => {
+    joined = api?.refresh({ join: true });
+  });
+  release();
+  await act(async () => {
+    await joined;
+  });
+  await settle();
+  assert.equal(reads, 1);
+  assert.equal(api?.mandate?.address, held[0]?.address);
+  act(() => root.unmount());
+});
+
+test('a rule picked while a read is in flight is shown once the reads finish', async () => {
+  reset();
+  const older = rule({ mandateId: 1_700_000_000_000n, purpose: 'VTEST rule' });
+  const newer = rule({ mandateId: 1_790_000_000_000n, purpose: 'USDC rule' });
+  held = [older, newer];
+  const root = await mount();
+  assert.equal(api?.mandate?.address, newer.address);
+  reads = 0;
+
+  const release = pause();
+  let focus: Promise<void> | undefined;
+  let picked: Promise<void> | undefined;
+  await act(async () => {
+    focus = api?.refresh({ join: true });
+  });
+  await act(async () => {
+    picked = api?.selectMandate(older.address);
+  });
+  await settle();
+  release();
+  await act(async () => {
+    await Promise.all([focus, picked]);
+  });
+  await settle();
+  assert.equal(api?.mandate?.address, older.address);
+  assert.equal(store.get('veto.mandate.selected'), older.address);
+  assert.equal(reads, 2, 'the pick gets its own read after the one in flight');
+  act(() => root.unmount());
+});
+
+test('explicit refreshes during a read share one follow-up read, and a join reuses the read in flight', async () => {
+  const { createRefreshGate } = await import('./useChain');
+  const gate = createRefreshGate();
+  let started = 0;
+  const finishers: Array<() => void> = [];
+  const read = () => {
+    started += 1;
+    return new Promise<void>((resolve) => {
+      finishers.push(resolve);
+    });
+  };
+  const first = gate('owner', true, read);
+  const joined = gate('owner', true, read);
+  const fresh = gate('owner', false, read);
+  const alsoFresh = gate('owner', false, read);
+  assert.equal(started, 1);
+  finishers[0]?.();
+  await first;
+  await joined;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(started, 2, 'one follow-up read for both explicit refreshes');
+  finishers[1]?.();
+  await Promise.all([fresh, alsoFresh]);
+  const other = gate('other owner', true, read);
+  assert.equal(started, 3, 'a different owner never waits on another owner read');
+  finishers[2]?.();
+  await other;
 });

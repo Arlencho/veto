@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import { NameAgentScreen } from '../../components/firstrun/NameAgentScreen';
 import { Screen } from '../../components/Screen';
+import { loadAddressBook, saveAddressBook, withSavedName } from '../../lib/addressBook';
+import { secureStore } from '../../lib/mwa';
 import { FIRST_RUN_ROUTES } from '../../lib/onboarding';
 import { canonicalAddress, parseRuleRequest } from '../../lib/ruleRequest';
 import { useWallet } from '../../lib/useWallet';
@@ -29,7 +31,7 @@ export default function NameRoute() {
         onPaste={setPaste}
         onBack={() => router.back()}
         onReject={() => router.back()}
-        onReview={() => {
+        onReview={async () => {
           const parsed = parseRuleRequest(paste);
           if (parsed.ok) {
             router.push(`${FIRST_RUN_ROUTES.approve}?url=${encodeURIComponent(paste)}`);
@@ -41,7 +43,16 @@ export default function NameRoute() {
             return;
           }
           setAddress(next);
-          router.push(FIRST_RUN_ROUTES.approve);
+          if (name.trim()) {
+            try {
+              await saveAddressBook(secureStore, withSavedName(await loadAddressBook(secureStore), next, name));
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'The name could not be saved.');
+              return;
+            }
+          }
+          // The approve step must open the rule for this agent; without it, opening creates another key (#362).
+          router.push(`${FIRST_RUN_ROUTES.approve}?agent=${encodeURIComponent(next)}`);
         }}
       />
     </Screen>

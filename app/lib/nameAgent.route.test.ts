@@ -113,3 +113,21 @@ test('the phone test agent and its name reach the approve step, so opening does 
     await act(async () => root.unmount());
   }
 });
+
+test('a second tap while the name is saving does not open the approve step twice', async () => {
+  existingAgent = agent;
+  const root = await mount();
+  try {
+    await act(async () => {
+      root.root.findByProps({ accessibilityLabel: 'Name your agent' }).props.onChangeText('Phone test');
+    });
+    await act(async () => {
+      const press = review(root).props.onPress;
+      await Promise.all([press(), press()]);
+    });
+    assert.deepEqual(destinations, [`${FIRST_RUN_ROUTES.approve}?agent=${agent}`]);
+  } finally {
+    existingAgent = null;
+    await act(async () => root.unmount());
+  }
+});

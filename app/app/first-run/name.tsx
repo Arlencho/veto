@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { NameAgentScreen } from '../../components/firstrun/NameAgentScreen';
 import { Screen } from '../../components/Screen';
@@ -16,6 +16,8 @@ export default function NameRoute() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState<string | null>(wallet.agentPublicKey);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const reviewing = useRef(false);
 
   return (
     <Screen>
@@ -26,35 +28,50 @@ export default function NameRoute() {
         onName={setName}
         facts={null}
         error={error}
+        busy={busy}
         showPaste
         paste={paste}
         onPaste={setPaste}
         onBack={() => router.back()}
         onReject={() => router.back()}
         onReview={async () => {
-          const parsed = parseRuleRequest(paste);
-          if (parsed.ok) {
-            router.push(`${FIRST_RUN_ROUTES.approve}?url=${encodeURIComponent(paste)}`);
+          if (reviewing.current) {
             return;
           }
-          const next = canonicalAddress(paste.trim()) ?? address;
-          if (!next) {
-            setError('That is not an agent address or a rule request.');
-            return;
+          reviewing.current = true;
+          setBusy(true);
+          try {
+            await review();
+          } finally {
+            reviewing.current = false;
+            setBusy(false);
           }
-          setAddress(next);
-          if (name.trim()) {
-            try {
-              await saveAddressBook(secureStore, withSavedName(await loadAddressBook(secureStore), next, name));
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'The name could not be saved.');
-              return;
-            }
-          }
-          // The approve step must open the rule for this agent; without it, opening creates another key (#362).
-          router.push(`${FIRST_RUN_ROUTES.approve}?agent=${encodeURIComponent(next)}`);
         }}
       />
     </Screen>
   );
+
+  async function review() {
+    const parsed = parseRuleRequest(paste);
+    if (parsed.ok) {
+      router.push(`${FIRST_RUN_ROUTES.approve}?url=${encodeURIComponent(paste)}`);
+      return;
+    }
+    const next = canonicalAddress(paste.trim()) ?? address;
+    if (!next) {
+      setError('That is not an agent address or a rule request.');
+      return;
+    }
+    setAddress(next);
+    if (name.trim()) {
+      try {
+        await saveAddressBook(secureStore, withSavedName(await loadAddressBook(secureStore), next, name));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'The name could not be saved.');
+        return;
+      }
+    }
+    // The approve step must open the rule for this agent; without it, opening creates another key (#362).
+    router.push(`${FIRST_RUN_ROUTES.approve}?agent=${encodeURIComponent(next)}`);
+  }
 }

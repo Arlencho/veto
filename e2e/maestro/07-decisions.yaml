@@ -1,7 +1,7 @@
 appId: com.veto.app
 ---
 # Run right after a rule-creating flow (04 or later) and a refusal generated
-# for its newest rule from the laptop, as described in README.md. The fake
+# against its payment rule from the laptop, as described in README.md. The fake
 # wallet creates a new account on every authorization, so reconnecting would
 # land on an account with no rules. This flow keeps Veto's state and its
 # connected account, and only relaunches onto the main tabs.

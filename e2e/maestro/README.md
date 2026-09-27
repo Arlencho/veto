@@ -3,7 +3,7 @@
 These flows target `com.veto.app` on devnet using the Solana Mobile fake wallet,
 `com.solana.mobilewalletadapter.fakewallet`. Device execution is reserved for the
 lead. All seven flows have passed on an Android emulator with the fake wallet
-against the devnet deployment; the offline checks below parse the YAML only.
+against the devnet deployment; the offline checks below cover YAML syntax and the funding helper.
 
 ## Prepare the emulator later
 
@@ -66,8 +66,9 @@ while sleep 6; do
 done
 ```
 
-Each call funds the newest account once and skips it on later calls, because
-an account that already holds SOL is left alone. Before approving, the payment
+Each call sends SOL and devnet USDC to the newest account only where it lacks
+them, so later calls leave a funded account alone and an account left with SOL
+but no USDC still gets its USDC. A balance that cannot be read counts as empty. Before approving, the payment
 flow waits up to 90 seconds for the app's wallet checks to see the funds.
 
 The helper requires an explicit `emulator-NNNN` serial and refuses any other,
@@ -76,9 +77,7 @@ reports the devnet genesis hash. It reads only the `public_key_b64` column of
 the newest row in the fake wallet key table through `adb exec-out run-as`,
 base64-decodes the 32 raw public key bytes (standard or URL-safe base64,
 padding optional), base58-encodes them into the account address, prints that
-address, and funds it from the given funder keypair with 1 SOL and 2 devnet
-USDC
-(mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`), passing
+address, and funds it from the given funder keypair with 1 SOL and 2 devnet USDC (mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`), passing
 `--fund-recipient` so the token account is created. One SOL covers rent, fees
 and the trade rule's 0.20 SOL cap; flow 04 sets aside 1 token and flow 06
 deposits 1 token. Fund the laptop agent with SOL for request transaction fees
@@ -130,8 +129,8 @@ maestro --device emulator-5554 test -e AGENT="$AGENT" e2e/maestro/03-add-agent-p
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/04-payment-rule.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" e2e/maestro/05-trade-rule.yaml
 maestro --device emulator-5554 test -e AGENT="$AGENT" -e PAYEE="$PAYEE" -e GUARDIAN="$GUARDIAN" -e SAFE="$SAFE" e2e/maestro/06-hold.yaml
-# Run 04 or later in its own invocation, then generate a refusal for its
-# newest rule from the laptop as described below, before 07.
+# Right after 04, 05 or 06, generate a refusal against that invocation's
+# payment rule from the laptop as described below, then run 07.
 maestro --device emulator-5554 test e2e/maestro/07-decisions.yaml
 ```
 
@@ -253,6 +252,7 @@ e2e/maestro/helpers/fund-fake-wallet.test.sh
 shellcheck -S error e2e/maestro/helpers/fund-fake-wallet.sh e2e/maestro/helpers/fund-fake-wallet.test.sh
 ```
 
-This checks YAML syntax and document shape only. It does not verify Android
+These check YAML syntax and document shape, and exercise the funding helper
+against stubbed tools. They do not verify Android
 layout, MWA interoperability, devnet availability or transaction success; the
 emulator runs above do. No production code is changed by this suite.

@@ -137,6 +137,8 @@ set -u
 printf 'spl-token %s\n' "$*" >> "$FAKE_SPL_LOG"
 case "${1:-}" in
   transfer)
+    # The real spl-token rejects --keypair; the funder is --owner and --fee-payer.
+    case " $* " in *" --keypair "*) echo "spl-token stub: --keypair is not a transfer flag" >&2; exit 2 ;; esac
     printf 'Signature: stubSplNoiseOnStdout222\n'
     ;;
   *)
@@ -268,7 +270,7 @@ if grep -F -q "solana transfer --keypair $FUNDER" "$FAKE_SOLANA_LOG" \
 else
   bad "solana transfer log: $(cat "$FAKE_SOLANA_LOG" 2>/dev/null)"
 fi
-if grep -F -q "spl-token transfer --keypair $FUNDER --fund-recipient $USDC_MINT 2 $NEW_PUB" "$FAKE_SPL_LOG"; then
+if grep -F -q "spl-token transfer --owner $FUNDER --fee-payer $FUNDER --fund-recipient --allow-unfunded-recipient $USDC_MINT 2 $NEW_PUB" "$FAKE_SPL_LOG"; then
   pass "funds the newest key with devnet USDC using --fund-recipient"
 else
   bad "spl-token transfer log: $(cat "$FAKE_SPL_LOG" 2>/dev/null)"

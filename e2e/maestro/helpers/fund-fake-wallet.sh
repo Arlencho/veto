@@ -148,7 +148,7 @@ PUBKEY="$(b64_to_base58 "$PUBKEY_B64")" \
 echo "fake wallet account: ${PUBKEY}" >&2
 echo "funding ${SOL_AMOUNT} SOL and ${USDC_AMOUNT} devnet USDC from ${FUNDER}" >&2
 solana transfer --keypair "$FUNDER" --allow-unfunded-recipient "$PUBKEY" "$SOL_AMOUNT" >&2
-spl-token transfer --keypair "$FUNDER" --fund-recipient \
+spl-token transfer --owner "$FUNDER" --fee-payer "$FUNDER" --fund-recipient --allow-unfunded-recipient \
   "$DEVNET_USDC_MINT" "$USDC_AMOUNT" "$PUBKEY" >&2
 
 printf '%s\n' "$PUBKEY"

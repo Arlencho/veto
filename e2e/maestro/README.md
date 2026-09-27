@@ -156,8 +156,8 @@ the wallet account list, before showing the guardian fields.
 
 03 tests paste/name/review without signing its first-run proposal. It ends on
 the review sentence, because the approve button only renders once a payee is
-set. 04 replays 01 through 03 back to that first-run review, explicitly enters
-the same agent, pastes the payee through the payee scan's paste field, types
+set. 04 replays 01 through 03 back to that first-run review, where the pasted
+agent is already kept, pastes the payee through the payee scan's paste field, types
 0.1 per payment and 1 total, and approves with the long press. The first-run
 live screen confirms the rule, then 04 relaunches Veto so it and every later
 flow start their own steps on the main tabs. The

@@ -1,18 +1,9 @@
 appId: com.veto.app
 ---
-# Replays first-run through the unsigned review, then stays there: enters the
-# agent, sets the payee through the payee scan's paste field, types the
-# limits, and approves. The approve button only renders once a payee is set.
+# Replays first-run through the unsigned review, then stays there. The pasted
+# agent stays on the review, so it is not typed again. Sets the payee through
+# the payee scan's paste field, types the limits, and approves. The approve button only renders once a payee is set.
 - runFlow: enter-agent.yaml
-- scrollUntilVisible:
-    element:
-      text: "(?-i)^Agent$"
-    direction: DOWN
-    timeout: 20000
-- tapOn: "(?-i)^Agent$"
-- eraseText
-- inputText: "${AGENT}"
-- hideKeyboard
 - scrollUntilVisible:
     element: "May only pay"
     direction: UP
@@ -28,29 +19,42 @@ appId: com.veto.app
 - extendedWaitUntil:
     visible: "Set your agent's limits"
     timeout: 20000
+# Amount inputs are matched by their exact-cased accessibility labels. The
+# upper-case section headings above them would also match without (?-i).
 - scrollUntilVisible:
-    element: "Most per payment"
+    element: "(?-i)^Most per payment$"
     direction: DOWN
     timeout: 20000
-- tapOn: "Most per payment"
+- tapOn: "(?-i)^Most per payment$"
 - eraseText
 - inputText: "0.1"
 - hideKeyboard
-- scrollUntilVisible:
-    element: "Most in total, ever"
-    direction: DOWN
-    timeout: 20000
-- tapOn: "Most in total, ever"
+- assertVisible: "0.1 USDC"
+- tapOn: "(?-i)^Most in total, ever$"
 - eraseText
 - inputText: "1"
 - hideKeyboard
+# Maestro scrolls by swiping from the middle of the screen, which lands on an
+# amount input here and does not move the page. Swipe from lower down instead.
+- repeat:
+    while:
+      notVisible: "10 payments of 0.1 .* at most"
+    times: 6
+    commands:
+      - swipe:
+          start: 50%, 88%
+          end: 50%, 45%
 # The block summary below the dials proves the typed limits were applied.
-- scrollUntilVisible:
-    element: "The 1 .* total"
-    direction: DOWN
-    timeout: 20000
 - assertVisible: "The 1 .* total"
 - assertVisible: "10 payments of 0.1 .* at most"
+- repeat:
+    while:
+      notVisible: "Press and hold to approve rule.*"
+    times: 6
+    commands:
+      - swipe:
+          start: 50%, 88%
+          end: 50%, 45%
 # Maestro longPressOn holds for 3 seconds.
 - assertVisible:
     text: "Press and hold to approve rule.*"

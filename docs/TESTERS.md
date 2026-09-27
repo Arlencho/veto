@@ -8,12 +8,12 @@ Its Hold vault makes withdrawals to new addresses wait so you can stop them.
 **Everything here is devnet test money with no value.**
 
 See the [release notes](RELEASE_NOTES.md) for features and known limits.
-The planned Try page is <https://veto-hq.github.io>, currently a placeholder.
+The Try page is <https://veto-hq.github.io/try/>.
 
 ## Setup
 
-1. Download and install the APK from the [latest release](https://github.com/Arlencho/veto/releases/latest)
-   when published. If no APK is attached, report setup as blocked.
+1. Download and install the APK from the [latest release](https://github.com/Arlencho/veto/releases/latest).
+   The release page lists the APK's SHA-256 so you can check the download.
 2. Use Seed Vault on Seeker, or a Solana wallet supporting Mobile Wallet Adapter
    on another Android phone. Set the wallet to devnet and copy your own wallet address.
 3. Get free devnet SOL at [Solana Faucet](https://faucet.solana.com) and free devnet USDC at

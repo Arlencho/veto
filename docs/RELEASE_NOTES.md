@@ -42,9 +42,9 @@ time to stop them.
   that the guardian does not control. A guardian on the same phone is
   convenient for testing but is not a separate device for protection.
 
-Start with the [tester guide](TESTERS.md). The planned Try page is
-<https://veto-hq.github.io>; this is a placeholder, not a confirmed APK download.
-Use the release link in the guide to find the APK when published.
+Start with the [tester guide](TESTERS.md) or the Try page at
+<https://veto-hq.github.io/try/>. The APK is attached to the
+[latest release](https://github.com/Arlencho/veto/releases/latest).
 
 ## Known limits
 

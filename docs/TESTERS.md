@@ -13,7 +13,7 @@ The Try page is <https://veto-hq.github.io/try/>.
 ## Setup
 
 1. Download and install the APK from the [latest release](https://github.com/Arlencho/veto/releases/latest).
-   The release notes list the APK's SHA-256 so you can check the download.
+   The release page lists the APK's SHA-256 so you can check the download.
 2. Use Seed Vault on Seeker, or a Solana wallet supporting Mobile Wallet Adapter
    on another Android phone. Set the wallet to devnet and copy your own wallet address.
 3. Get free devnet SOL at [Solana Faucet](https://faucet.solana.com) and free devnet USDC at

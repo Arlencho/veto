@@ -182,7 +182,8 @@ test('on a stack route the devnet line takes the screen side margin; inside a Sc
   const flat = (style: unknown): Record<string, unknown> =>
     Array.isArray(style) ? Object.assign({}, ...style.map(flat)) : ((style ?? {}) as Record<string, unknown>);
   const stack = await mount('stack');
-  assert.ok(Number(flat(notice(stack).props.style).paddingHorizontal) > 0, 'stack line has a side margin');
+  const { space } = await import('./theme');
+  assert.equal(flat(notice(stack).props.style).paddingHorizontal, space.screen, 'stack line has the screen side margin');
   const tab = await mount('tab');
   assert.equal(flat(notice(tab).props.style).paddingHorizontal, undefined, 'tab line relies on the Screen padding');
 });

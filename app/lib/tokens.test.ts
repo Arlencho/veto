@@ -160,3 +160,18 @@ test('remaining balances floor at the token display precision', () => {
   assert.equal(formatTokenDisplay(1n, 6, DEVNET_USDC_MINT, 'floor'), '<0.01 USDC');
   assert.equal(formatTokenDisplay(0n, 6, DEVNET_USDC_MINT, 'floor'), '0 USDC');
 });
+
+test('shown remaining plus shown spent equals the shown cap, and remaining is never shown high', () => {
+  const cap = 20_000_000n;
+  const spent = 973_721n;
+  const remaining = cap - spent;
+  assert.equal(remaining, 19_026_279n);
+  assert.equal(formatTokenDisplay(cap, 6, DEVNET_USDC_MINT), '20 USDC');
+  assert.equal(formatTokenDisplay(remaining, 6, DEVNET_USDC_MINT, 'floor'), '19.02 USDC');
+  assert.equal(formatTokenDisplay(spent, 6, DEVNET_USDC_MINT, 'ceil'), '0.98 USDC');
+  assert.equal(formatTokenDisplay(spent, 6, DEVNET_USDC_MINT), '0.97 USDC', 'nearest would not add up');
+  assert.equal(formatTokenDisplay(1n, 6, DEVNET_USDC_MINT, 'ceil'), '0.01 USDC');
+  assert.equal(formatTokenDisplay(970_000n, 6, DEVNET_USDC_MINT, 'ceil'), '0.97 USDC');
+  assert.equal(formatTokenDisplay(-973_721n, 6, DEVNET_USDC_MINT, 'ceil'), '-0.97 USDC');
+  assert.equal(formatTokenDisplay(1_999_994n, 9, WSOL_MINT, 'ceil'), '0.002 wrapped SOL');
+});

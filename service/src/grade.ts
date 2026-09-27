@@ -4,7 +4,7 @@ export const GRADE_MIN_REQUESTS = 10n;
 export const GRADE_MIN_DAYS = 3n;
 export const GRADE_LABEL = {
   stayed: 'Stayed inside its rule', tested: 'Tested its limit now and then',
-  pushed: 'Pushed its limit often', 'too-new': 'Too new to grade',
+  pushed: 'Often asked outside its rule', 'too-new': 'Too new to grade',
 } as const;
 export interface Counters {
   paid: bigint; outside: bigint; allowances: bigint; declines: bigint;

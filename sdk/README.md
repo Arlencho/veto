@@ -6,7 +6,7 @@ TypeScript client for one `charge`, for one `trade`, for reading the mandate, th
 npm install @veto-hq/agent-sdk
 ```
 
-Version 0.1.0 is prepared for release. The install command above becomes available after the maintainer publishes it.
+Version 0.1.0 was published to npm on 2026-09-27.
 
 See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for the maintainer release steps. `watcher/` is the full reference agent. The app does not import this package. It builds Hold instructions itself.
 

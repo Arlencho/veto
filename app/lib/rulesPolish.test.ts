@@ -198,6 +198,16 @@ test('a rule card with 39 days 22 hours left shows the time once', async () => {
   act(() => root.unmount());
 });
 
+test('a rule card shows remaining and spent that add up to the cap', async () => {
+  const root = await renderCard(mandate({ cap: 20_000_000n, spent: 973_721n }));
+  const texts = root.root.findAll((node) => isHost(node, 'Text')).map(textOf);
+  const all = texts.join('\n');
+  assert.ok(texts.includes('19.02 VTEST'), all);
+  assert.ok(texts.includes('0.98 VTEST spent'), all);
+  assert.ok(texts.includes('left of your 20 VTEST total'), all);
+  act(() => root.unmount());
+});
+
 test('a card with long 6 decimal amounts and a 5 letter symbol keeps every figure whole and lets it wrap or shrink', async () => {
   const row = mandate({
     cap: 987_654_321_123_456n,

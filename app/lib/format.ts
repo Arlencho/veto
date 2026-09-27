@@ -26,13 +26,20 @@ export function roundShownAmounts(text: string, rounding: 'nearest' | 'floor' = 
   });
 }
 
-export function formatDisplayAmount(amount: bigint, decimals: number, precision = 2, rounding: 'nearest' | 'floor' = 'nearest'): string {
+export type DisplayRounding = 'nearest' | 'floor' | 'ceil';
+
+/**
+ * Shown remaining is floored and shown spent is ceiled, so the two always add up to a shown cap
+ * that is whole at the display precision, and remaining is never shown above the truth.
+ */
+export function formatDisplayAmount(amount: bigint, decimals: number, precision = 2, rounding: DisplayRounding = 'nearest'): string {
   const places = Math.min(decimals, precision);
   const unit = 10n ** BigInt(decimals - places);
   const absolute = amount < 0n ? -amount : amount;
-  const rounded = rounding === 'floor'
-    ? (absolute + (amount < 0n ? unit - 1n : 0n)) / unit
-    : (absolute + unit / 2n) / unit;
+  const awayFromZero = rounding === 'floor' ? amount < 0n : rounding === 'ceil' ? amount > 0n : false;
+  const rounded = rounding === 'nearest'
+    ? (absolute + unit / 2n) / unit
+    : (absolute + (awayFromZero ? unit - 1n : 0n)) / unit;
   if (absolute > 0n && rounded === 0n) {
     const threshold = formatBaseUnits(1n, places);
     return amount < 0n ? `-<${threshold}` : `<${threshold}`;

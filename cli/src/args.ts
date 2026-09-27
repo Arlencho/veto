@@ -1,4 +1,5 @@
 import { CliError } from "./errors.js";
+import { TRADE_RULE_DISABLED } from "./features.js";
 
 const FLAGS = ["key", "rule", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster", "limit"] as const;
 
@@ -27,7 +28,7 @@ veto status
 veto decisions [--limit <n>]
 veto mcp
 
-the trade rule is not on this program yet`;
+${TRADE_RULE_DISABLED}`;
 
 function isFlag(name: string): name is Flag {
   return (FLAGS as readonly string[]).includes(name);

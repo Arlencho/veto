@@ -104,7 +104,7 @@ The grade rules, from `app/lib/grade.ts`:
 |---|---|
 | Stayed inside its rule | Fewer than 1 request in 20 outside its rule. |
 | Tested its limit now and then | 1 to 4 requests in 20 outside its rule. |
-| Pushed its limit often | More than 4 requests in 20 outside its rule. |
+| Often asked outside its rule | More than 4 requests in 20 outside its rule. |
 | Too new to grade | Fewer than 10 requests, or fewer than 3 days running. The facts still show; the label waits. |
 
 A request is a payment the rule paid inside the rule, or refused. A later payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. The agent's own signed declines are not requests. Money moved outside the rule is always 0, and it is never credit. Fewer than 10 requests, or fewer than 3 days running, or a start that is not yet old enough to date, is Too new to grade. The facts still show. Two or more allowances, once the agent can be graded, move the shown grade one step lower: stayed becomes tested, tested becomes pushed, and pushed does not move further.
@@ -132,7 +132,7 @@ The widgets redraw when the app process starts in the foreground, when the app r
 
 ## Hold
 
-Hold on the phone: big money waits, and a second key can say no. Overview and Rules each open it. The first screen states the promise: if someone gets your key, they can start a big withdrawal but they cannot finish it.
+Hold on the phone: big money waits, and a second key can say no. Overview and Rules each open it. The first screen states the promise: if someone gets your key, a big withdrawal or one to a new address has to wait, and you or your guardian can stop it before it goes through.
 
 The screens set the amount moved in, the everyday limit, a wait of 1, 2, or 3 days, and the four triggers (more than the daily limit in one day, any amount to an address this vault has never paid, more than a quarter of the vault within 24 hours, and any change that loosens these rules). Then the guardian key and the safe address, the live vault, a held withdrawal with a countdown from the chain clock (Stop is the main action, Freeze is beside it), the alert plan, the frozen state (Recover to the safe address, Unfreeze with both keys), skip a wait with both keys, and send from the vault.
 
@@ -140,7 +140,7 @@ Every owner or guardian signature goes through the Mobile Wallet Adapter and Pre
 
 The 15 minute local check also raises hold alerts: at creation, at 1 hour, at 12 hours, every 12 hours after that, at 6 hours and 1 hour before the end, and when the wait ends. Hold alerts cannot be muted in the app. The watcher raises the same alerts when `VETO_HOLD_VAULTS` is set. See [watcher/README.md](../watcher/README.md).
 
-The phone builds Hold instructions itself. It does not import `@veto-hq/agent-sdk`. That package is not yet published to npm. The program instructions are in the root [README](../README.md).
+The phone builds Hold instructions itself. It does not import `@veto-hq/agent-sdk`. That package is for agents, and version 0.1.0 is on npm. The program instructions are in the root [README](../README.md).
 
 Hold is merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows.
 

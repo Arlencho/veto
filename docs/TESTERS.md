@@ -55,8 +55,8 @@ then **Next: choose a guardian key**.
 Choose **A second key in Seed Vault on this phone** if available, or **Your second Seeker**
 and enter its address. The guardian must be a different key from the owner.
 Enter **Safe address** explicitly: a wallet you own that the guardian does not
-control. It cannot be the guardian address. Choosing the owner wallet requires
-confirming the risk that a stolen owner key could spend recovered money.
+control. It cannot be the guardian address or the owner wallet you sign with;
+the program refuses both.
 If you cannot access a separate guardian key and a suitable safe wallet, report
 this task as blocked. A second key on the same phone is useful for testing,
 but does not provide the separation of a guardian on another device.

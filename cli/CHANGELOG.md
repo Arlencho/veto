@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-09-27)
 
 - The veto command for agent pairing, payments, status, decisions, and MCP tools.
 - Public npm package metadata, clean distribution builds, and build plus test checks before publishing.

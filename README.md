@@ -2,15 +2,15 @@
 
 Seeker owner? [Try Veto on devnet before October 8](docs/TESTERS.md).
 
-**Everyone stops the overspend. Only this one can prove it stopped.**
+**Everyone stops the overspend. Veto also records why it stopped.**
 
 Veto enforces a spending rule on chain: when a charge breaks it, the transfer is never executed
 and no tokens move. That much is table stakes, and every serious design does it.
 
-What nothing else does is leave anything behind. Elsewhere a blocked overspend is a failed
-transaction: no artifact, no reason, no trail, nothing to audit. Here the decline is a first-class
-on-chain record, with a one-line why and the override that would have cleared it. On a phone, with
-the key in Seed Vault.
+The difference is what the stop leaves behind. Elsewhere a blocked overspend is usually a failed
+transaction: Solana keeps its logs and error code, but no program state changes. Here a refusal is a
+successful transaction that moves no payment tokens and writes a structured reason to program
+state, with the override that would have cleared it. On a phone, with the key in Seed Vault.
 
 AP2 standardised the record of a yes. This is the missing half.
 
@@ -26,7 +26,7 @@ Capped agent spending on Solana is not new, and this project does not claim it.
 
 | Prior art | What it does | What Veto adds |
 |---|---|---|
-| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops, and the stop leaves no record |
+| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
 | SPL `approve` / delegate | Caps what a delegate may pull | Cap only. No purpose, no expiry, no reason, no record |
 | [LazorKit](https://github.com/lazor-kit/lazor-kit) | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
 | [SolAgent Pay](https://github.com/altaranexus-ship-it/solagent-pay) | Session PDA with lifetime and per-request ceilings, merchant allowlist, TTL, revoke and sweep | An overspend "is not a policy violation logged after the fact, it is an impossible transaction". Funds are escrowed into a vault. Veto records the decline and leaves the funds in the owner's wallet |
@@ -42,7 +42,7 @@ When a rule fails, the token transfer instruction is never executed, so zero tok
 delegation on the source token account is a second ceiling the program itself cannot exceed.
 
 When `charge` declines it does not return an error. An error would roll back every account write,
-and the refusal would leave no trace. The instruction transfers nothing, writes a refusal to an
+and the refusal would leave nothing in program state, only the failed transaction's logs. The instruction transfers nothing, writes a refusal to an
 on-chain ledger with a reason code and the override that would have cleared it, logs a readable
 line, and returns `Ok`.
 
@@ -180,9 +180,9 @@ In the app, open a new rule and paste that public address into the field labeled
 npm install @veto-hq/agent-sdk
 ```
 
-Published to npm on <date>.
+Version 0.1.0 was published to npm on 2026-09-27.
 
-The package is published from this checkout by the maintainer. The same package exports `HoldVault` for the vault instructions. Those instructions are not on the deployed devnet program yet. The field-by-field checks are in [sdk/README.md](sdk/README.md). The example loads the agent key and the JSON block the app copies (Copy all, or the same block a QR scan returns), checks that block against the chain, reads the next nonce, submits one `charge` for the amount you pass, and prints the kind, reason code, reason text, suggested override, signature, and slot.
+The package is published from this checkout by the maintainer. The same package exports `HoldVault` for the vault instructions. Those instructions are on the deployed devnet program; [docs/DEVNET.md](docs/DEVNET.md) records the upgrade. The field-by-field checks are in [sdk/README.md](sdk/README.md). The example loads the agent key and the JSON block the app copies (Copy all, or the same block a QR scan returns), checks that block against the chain, reads the next nonce, submits one `charge` for the amount you pass, and prints the kind, reason code, reason text, suggested override, signature, and slot.
 
 `loadAgentConfig` accepts the JSON text or the parsed object and refuses a missing or extra field. `VetoAgent.fromConfig` pins the program to the id bundled in `sdk/idl/veto.json` unless the caller passes `{ programId }` in code, and a block whose `programId` differs from that id is refused. `mintDecimals` is checked against the mint account. `cluster` is checked against the endpoint's genesis hash (`devnet`, `testnet`, or `mainnet-beta`). A `Connection` passed to `fromConfig` is the endpoint. When it is omitted, the example opens `rpcUrl` from the block.
 
@@ -269,14 +269,14 @@ An agent is graded across every rule that agent is on. The name comes from the p
 |---|---|
 | Stayed inside its rule | Fewer than 1 request in 20 outside its rule. |
 | Tested its limit now and then | 1 to 4 requests in 20 outside its rule. |
-| Pushed its limit often | More than 4 requests in 20 outside its rule. |
+| Often asked outside its rule | More than 4 requests in 20 outside its rule. |
 | Too new to grade | Fewer than 10 requests, or fewer than 3 days running. The facts still show; the label waits. |
 
 A request is a payment the rule paid inside the rule, or refused. A later payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. Outside means the rule refused it. The agent's own signed declines are not requests. Money moved outside the rule is always 0, and it is never credit.
 
 The day count starts at the earliest open on that agent's rules. If there is no open row, days count only once the earliest stamp is already 3 days old. Otherwise the grade stays Too new to grade.
 
-Two or more allowances move the shown grade one step lower, and only after the agent is old enough to grade. Stayed inside its rule becomes Tested its limit now and then. Tested its limit now and then becomes Pushed its limit often. Pushed its limit often does not move further.
+Two or more allowances move the shown grade one step lower, and only after the agent is old enough to grade. Stayed inside its rule becomes Tested its limit now and then. Tested its limit now and then becomes Often asked outside its rule. Often asked outside its rule does not move further.
 
 ### Record, week, renewal, quiet note
 
@@ -326,7 +326,7 @@ Instructions, from `programs/veto/src/hold.rs`:
 
 Tightening is a lower daily limit, a longer delay, a lower share, or adding a guardian. Loosening is a higher limit, a shorter delay, a higher share, removing or changing the guardian, or changing the safe address. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
 
-The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. With only the owner key, an attacker can move at most the instant allowance before someone freezes the vault. No single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
+The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. With only the owner key, an attacker can move at once at most the instant allowance to destinations the vault has paid before, or the whole balance to the safe address, and nothing else. Anything else waits, and after the wait anyone can execute it unless the owner or guardian stops it or freezes the vault first. No single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
 
 `@veto-hq/agent-sdk` exports `HoldVault`. The package is published from this checkout by the maintainer. The watcher raises hold alerts when `VETO_HOLD_VAULTS` is set. The app has the Hold screens, and the phone raises the same alerts. Overview and Rules each open Hold. Details are in [app/README.md](app/README.md), [sdk/README.md](sdk/README.md), and [watcher/README.md](watcher/README.md).
 

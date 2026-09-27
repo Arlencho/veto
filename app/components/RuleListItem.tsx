@@ -26,7 +26,7 @@ export function RuleListItem({
 }) {
   const purpose = displayPurpose(mandate.purpose);
   const mint = mandate.mint;
-  const spent = formatTokenDisplay(mandate.spent, decimals, mint);
+  const spent = formatTokenDisplay(mandate.spent, decimals, mint, 'ceil');
   const cap = formatTokenDisplay(mandate.cap, decimals, mint);
   const per = formatTokenDisplay(mandate.perTxMax, decimals, mint);
   const remaining = mandateRemaining(mandate);

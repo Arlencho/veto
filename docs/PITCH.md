@@ -6,7 +6,7 @@ The claim is the recorded refusal. When a rule fails, the transfer is never exec
 
 > The agent tries to pay. The amount is over the ceiling you set. It does not pay. The chain records why, in one line, with the override that would clear it.
 >
-> The decline is a record. A blocked overspend elsewhere is a failed transaction: no artifact, no reason, no trail.
+> The decline is a record. A blocked overspend elsewhere is a failed transaction: logs and an error code, but nothing in program state. Here the refusal is a successful transaction that records a structured reason and moves no payment tokens.
 >
 > A rule opened in the app keeps its budget in its own token account, derived from the owner. The mandate is the delegate on that account. The key never leaves Seed Vault. One human, several agents, one rule each. A ruleset is written once and reused on the next agent. This one is on a phone.
 >
@@ -38,7 +38,7 @@ The recording uses mandate `3hgrSbPX2VTrfnVekoL2qi2qDWNGBhWP3QgADAWz6X6N`: purpo
 
 On an active rule the rule screen shows Connect your agent: the fields of one JSON block, Copy all, and a QR of that same block. A rule that is not active shows "This rule is not active, so there is no config to hand an agent." and does not show Copy all or the QR. `loadAgentConfig` reads the block. `VetoAgent.fromConfig` checks it against the chain. The program id is the one bundled with the SDK unless the caller passes a different id in code. Decimals are checked on the mint account. The cluster name is checked against the endpoint's genesis hash. A connection passed to `fromConfig` is the endpoint. The example is [sdk/examples/pay-once.ts](../sdk/examples/pay-once.ts).
 
-The agent package is `@veto-hq/agent-sdk`. It is not yet published to npm. `private` is still true. Install it from this checkout. The same package exports `HoldVault`. The app does not import the package.
+The agent package is `@veto-hq/agent-sdk`. Version 0.1.0 is on npm: `npm install @veto-hq/agent-sdk`. The same package exports `HoldVault`. The app does not import the package.
 
 ## On the phone
 
@@ -50,10 +50,10 @@ Agents grades each agent across every rule that agent is on. The four rules, fro
 |---|---|
 | Stayed inside its rule | Fewer than 1 request in 20 outside its rule. |
 | Tested its limit now and then | 1 to 4 requests in 20 outside its rule. |
-| Pushed its limit often | More than 4 requests in 20 outside its rule. |
+| Often asked outside its rule | More than 4 requests in 20 outside its rule. |
 | Too new to grade | Fewer than 10 requests, or fewer than 3 days running. The facts still show; the label waits. |
 
-A request is a payment the rule paid inside the rule, or refused. A payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. The agent's own signed declines are not requests. Money moved outside the rule is always 0. Two or more allowances, once the agent can be graded, move the shown grade one step lower. Pushed its limit often does not move further.
+A request is a payment the rule paid inside the rule, or refused. A payment that settles an allowance is not a payment inside the rule. An allowance whose refusal has fallen off the ring still counts as outside. The agent's own signed declines are not requests. Money moved outside the rule is always 0. Two or more allowances, once the agent can be graded, move the shown grade one step lower. Often asked outside its rule does not move further.
 
 Plaques from one rule's history: First payment inside the rule, First refusal saved, Ten refusals, none allowed, 30 days inside the rule, and Rule finished, rest returned. Week in review is seven local days, with paid and refused counts and refusals grouped by reason. The track record card is an image whose QR is the rule address. On devnet it says Devnet, test tokens.
 

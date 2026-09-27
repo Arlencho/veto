@@ -397,7 +397,7 @@ export default function RuleDetailScreen() {
               kicker={active ? 'Your agent can still spend' : 'Still in the rule'}
               remainingText={remainingText}
               ofText={active ? `of ${formatTokenDisplay(mandate.cap, amountDecimals, mandate.mint)}` : 'still in the rule, yours to take back'}
-              spentText={formatTokenDisplay(mandate.spent, amountDecimals, mandate.mint)}
+              spentText={formatTokenDisplay(mandate.spent, amountDecimals, mandate.mint, 'ceil')}
               spentCaption={active ? 'spent so far' : `of ${formatTokenDisplay(mandate.cap, amountDecimals, mandate.mint)} spent`}
               remaining={bars.remaining}
               cap={bars.cap}

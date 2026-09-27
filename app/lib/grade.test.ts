@@ -133,7 +133,7 @@ test('exactly 4 requests in 20 stay in tested its limit', () => {
   assert.equal(grade.outside, 4);
 });
 
-test('more than 4 requests in 20 is pushed its limit often', () => {
+test('more than 4 requests in 20 is often asked outside its rule', () => {
   const grade = gradeRules([rule([opened(), ...paid(6), ...refused(12)])], NOW);
   assert.equal(grade.id, 'pushed');
   assert.equal(grade.label, GRADE_LABEL.pushed);

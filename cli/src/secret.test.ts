@@ -23,7 +23,7 @@ test("pay, status, and decisions do not create a veto directory", async () => {
     const runtime = harness(home, chainOf(w.fake));
     assert.equal(await run([], runtime), 0);
     assert.equal(await run(["trade"], runtime), 1);
-    assert.equal(runtime.errs.at(-1), "the trade rule is not on this program yet");
+    assert.equal(runtime.errs.at(-1), "Trading from the companion is switched off in this version. Agents trade through the SDK's trade().");
     assert.equal(await run(["pay", "1000"], runtime), 1);
     assert.equal(await run(["status"], runtime), 1);
     assert.equal(await run(["decisions"], runtime), 1);

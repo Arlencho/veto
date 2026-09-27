@@ -7,7 +7,7 @@ import { useWallet } from '../lib/useWallet';
 import { clusterNotice } from '../lib/wallet';
 import { ConnectWalletScreen } from './firstrun/ConnectWalletScreen';
 import { SafeTop, useTopInset } from './SafeTop';
-import { colors, fonts } from './theme';
+import { colors, fonts, space } from './theme';
 
 type IntroProps = {
   showConnect: boolean;
@@ -134,7 +134,9 @@ export function ConnectGate({
 
   const body = (
     <View style={styles.block}>
-      {showNetwork && networkLine ? <Text style={styles.thesis}>{networkLine}</Text> : null}
+      {showNetwork && networkLine ? (
+        <Text style={insetAbove ? styles.thesis : [styles.thesis, styles.thesisOwn]}>{networkLine}</Text>
+      ) : null}
       {children}
     </View>
   );
@@ -151,6 +153,10 @@ const styles = StyleSheet.create({
     gap: 16,
     alignSelf: 'stretch',
     flex: 1,
+  },
+  // Outside a Screen (stack routes) the gate owns the line, so it takes the screen's side margin.
+  thesisOwn: {
+    paddingHorizontal: space.screen,
   },
   thesis: {
     color: colors.body,

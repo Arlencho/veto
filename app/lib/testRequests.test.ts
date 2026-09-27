@@ -152,13 +152,49 @@ test('empty cap skips payment but still sends the above-limit request', async ()
   assert.equal(h.w.fake.sent.length, 1);
   assert.ok(h.updates.some(row => row.text === 'Payment skipped: the remaining cap is zero.'));
 });
-test('RPC failure after submission preserves the explorer receipt and reports uncertainty', async () => {
+for (const result of ['null', 'error'] as const) test(`unreadable confirmed payment (${result}) polls for 22 seconds and keeps its receipt`, async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const h = harness();
-  h.w.connection.getTransaction = async () => { throw new Error('RPC failed'); };
-  await runTestRequests(h.options, await prepareTestRequests(h.options));
+  let reads = 0;
+  h.w.connection.getTransaction = async () => {
+    reads++;
+    if (result === 'error') throw new Error('RPC failed');
+    return null;
+  };
+  const pending = runTestRequests(h.options, await prepareTestRequests(h.options));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(reads, 1);
+  let expectedReads = 1;
+  for (const delay of [1000, 1500, 2000, 2500, 3000, 3000, 3000, 3000, 3000]) {
+    t.mock.timers.tick(delay - 1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(reads, expectedReads);
+    t.mock.timers.tick(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(reads, ++expectedReads);
+  }
+  await pending;
+  assert.equal(reads, 10);
   assert.equal(h.w.fake.sent.length, 1);
-  assert.ok(h.updates.some(row => row.signature));
-  assert.match(h.updates.at(-1)!.text, /may still land/);
+  assert.match(h.updates.at(-1)!.text, /first request was sent.*result.*not.*read/i);
+  assert.doesNotMatch(h.updates.at(-1)!.text, /may still land/);
+  assert.equal(h.updates.at(-1)!.signature, h.updates.find(row => row.signature)!.signature);
+});
+test('a payment result available on the tenth read still allows the refused request', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness();
+  const getTransaction = h.w.connection.getTransaction.bind(h.w.connection);
+  let reads = 0;
+  h.w.connection.getTransaction = (async (...args: Parameters<typeof getTransaction>) => ++reads < 10 ? null : getTransaction(...args)) as typeof h.w.connection.getTransaction;
+  const pending = runTestRequests(h.options, await prepareTestRequests(h.options));
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await new Promise(resolve => setImmediate(resolve));
+    t.mock.timers.tick(3000);
+  }
+  await pending;
+  assert.equal(h.w.fake.sent.length, 2);
+  assert.ok(h.updates.some(row => row.text.startsWith('Paid 5000000 base units')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10000001 base units')));
 });
 test('agent secret never reaches UI updates or logging even in an RPC error', async () => {
   const h = harness();

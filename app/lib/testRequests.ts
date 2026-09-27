@@ -95,6 +95,21 @@ export function testRequestFailure(error: unknown): string {
   return 'The test could not finish. Check the outcomes and explorer links below, then refresh Decisions before retrying. A submitted transaction may still land.';
 }
 
+async function readConfirmedTransaction(connection: Connection, signature: string) {
+  // Confirmed transactions can take time to become readable on another RPC node.
+  // Ten reads with bounded backoff allow 22 seconds for that propagation.
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const transaction = await connection.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
+      if (transaction) return transaction;
+    } catch {
+      // Transient RPC failures get the same bounded retry as a missing result.
+    }
+    if (attempt < 9) await new Promise(resolve => setTimeout(resolve, Math.min(1000 + attempt * 500, 3000)));
+  }
+  return null;
+}
+
 // Shared by both screen instances; an overlapping run must not spend twice.
 const running = new Set<string>();
 export async function runTestRequests(options: TestRequestOptions, plan: TestRequestPlan): Promise<void> {
@@ -142,10 +157,17 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
       report({ text: `Request for ${amount} base units submitted; waiting for confirmation.`, signature });
       const confirmation = await connection.confirmTransaction({ ...block, signature }, 'confirmed');
       if (confirmation.value.err) throw new Error('Transaction failed');
-      const tx = await connection.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
-      if (!tx || tx.meta?.err) throw new Error('Decision not yet available');
-      const decisions = decodeEventsFromLogs(signature, tx.meta?.logMessages ?? []).filter(row => row.amount === amount && row.nonce === nonce && (row.kind === KIND_PAID || row.kind === KIND_REFUSED));
-      if (decisions.length !== 1) throw new Error('Decision not yet available');
+      const tx = await readConfirmedTransaction(connection, signature);
+      if (tx?.meta?.err) {
+        report({ text: 'The request failed on chain. Check its explorer link before retrying.', signature });
+        return;
+      }
+      const decisions = decodeEventsFromLogs(signature, tx?.meta?.logMessages ?? []).filter(row => row.amount === amount && row.nonce === nonce && (row.kind === KIND_PAID || row.kind === KIND_REFUSED));
+      if (decisions.length !== 1) {
+        const which = amount === plan.paid || plan.paid === null ? 'first' : 'second';
+        report({ text: `The ${which} request was sent and confirmed, but its result could not be read. Check its explorer link and refresh Decisions before retrying.`, signature });
+        return;
+      }
       const decision = decisions[0];
       report({ text: decision.kind === KIND_PAID ? `Paid ${amount} base units to the payee.` : `Refused ${amount} base units: ${reasonText(decision.reason)}.`, signature });
       previous = nonce;

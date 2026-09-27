@@ -18,9 +18,10 @@ export function PromiseScreen({
       <HoldTop title="Hold" network={network} onBack={onBack} backLabel="Close" />
       <Text style={styles.h1}>Hold: big money waits, and a second key can say no.</Text>
       <Text style={styles.body}>
-        If someone gets your key, they can start a big withdrawal but they cannot finish it. Anything
-        large waits 1, 2 or 3 days on the blockchain clock, and you or your second key can stop it,
-        freeze the vault, or move everything to a safe address you chose while calm.
+        If someone gets your key, a big withdrawal or one to a new address has to wait, and you or your
+        guardian can stop it before it goes through. The wait is 1, 2 or 3 days on the blockchain
+        clock. In that time either of you can also freeze the vault or move everything to a safe
+        address you chose while calm. If nobody stops it, it goes through when the wait ends.
       </Text>
       <View style={styles.doors}>
         <View style={styles.fast}>
@@ -37,8 +38,8 @@ export function PromiseScreen({
         or not your phone was awake.
       </Text>
       <Text style={styles.fact}>
-        {GUARDIAN_RECOVERY_COPY} {SAFE_WALLET_GUIDANCE} {OWNER_SAFE_REASON} A stolen owner key can take at
-        most the everyday amount until you freeze. Only money inside the vault is protected. Lose both
+        {GUARDIAN_RECOVERY_COPY} {SAFE_WALLET_GUIDANCE} {OWNER_SAFE_REASON} Without a wait, a stolen owner
+        key can move at most the everyday amount, and only to addresses this vault has paid before. Only money inside the vault is protected. Lose both
         keys and nobody, Veto included, can reach the money.
       </Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Set up a vault" onPress={onStart} style={styles.cta}>

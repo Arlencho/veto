@@ -17,7 +17,7 @@ export function HoldEntry({ cluster }: { cluster: string | null | undefined }) {
         <Text style={styles.kicker}>Hold</Text>
         <Text style={styles.title}>Big money waits, and a second key can say no.</Text>
         <Text style={styles.body}>
-          If someone gets your key, they can start a big withdrawal but they cannot finish it.
+          If someone gets your key, a big withdrawal or one to a new address has to wait, and you or your guardian can stop it before it goes through.
         </Text>
       </View>
       <Text style={styles.action}>Open</Text>

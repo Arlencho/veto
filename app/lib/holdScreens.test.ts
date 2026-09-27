@@ -159,7 +159,9 @@ test('the promise screen states the Hold promise', async () => {
   const text = textOf(
     await mount(createElement(PromiseScreen, { network: 'Test tokens', onBack() {}, onStart() {} })),
   );
-  assert.match(text, /If someone gets your key, they can start a big withdrawal but they cannot finish it/);
+  assert.match(text, /If someone gets your key, a big withdrawal or one to a new address has to wait, and you or your guardian can stop it before it goes through/);
+  assert.doesNotMatch(text, /cannot finish/);
+  assert.match(text, /If nobody stops it, it goes through when the wait ends/);
   assert.match(text, /1, 2 or 3 days on the blockchain clock/);
   assert.match(text, /Everyday door/);
   assert.match(text, /Big door/);
@@ -695,7 +697,8 @@ test('home and rules share one Hold entry', async () => {
   const { HoldEntry } = await import('../components/hold/HoldEntry');
   const text = textOf(await mount(createElement(HoldEntry, { cluster: 'devnet' })));
   assert.match(text, /Big money waits, and a second key can say no/);
-  assert.match(text, /they cannot finish it/);
+  assert.match(text, /has to wait, and you or your guardian can stop it before it goes through/);
+  assert.doesNotMatch(text, /cannot finish/);
 });
 
 const guardBase = {

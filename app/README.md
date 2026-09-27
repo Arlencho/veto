@@ -132,7 +132,7 @@ The widgets redraw when the app process starts in the foreground, when the app r
 
 ## Hold
 
-Hold on the phone: big money waits, and a second key can say no. Overview and Rules each open it. The first screen states the promise: if someone gets your key, they can start a big withdrawal but they cannot finish it.
+Hold on the phone: big money waits, and a second key can say no. Overview and Rules each open it. The first screen states the promise: if someone gets your key, a big withdrawal or one to a new address has to wait, and you or your guardian can stop it before it goes through.
 
 The screens set the amount moved in, the everyday limit, a wait of 1, 2, or 3 days, and the four triggers (more than the daily limit in one day, any amount to an address this vault has never paid, more than a quarter of the vault within 24 hours, and any change that loosens these rules). Then the guardian key and the safe address, the live vault, a held withdrawal with a countdown from the chain clock (Stop is the main action, Freeze is beside it), the alert plan, the frozen state (Recover to the safe address, Unfreeze with both keys), skip a wait with both keys, and send from the vault.
 

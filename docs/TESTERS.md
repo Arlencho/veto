@@ -33,12 +33,18 @@ Set **Payee**, **Purpose**, **Most per payment** and **Most in total, ever** to 
 small test budget you can fund. Use a payee address you control, different from the
 agent address. Use **Press and hold to approve rule** and approve in Seed Vault.
 
-Open **Decisions**. The goal is to see one payment within the rule and one refusal
-above **Most per payment**. Current limitation: the phone test-agent path creates a
-key but does not submit payments, and the app has no button to run these two requests.
-If you only have the phone test agent, report this task as blocked rather than waiting
-for decisions to appear. A separately running agent must submit requests under its own
-approved rule for those records to appear.
+On the live screen or the payment rule detail, tap **Send two test requests**.
+Review the exact amounts and payee, then confirm. If the test agent has less than
+0.005 SOL for fees, approve one transfer of 0.01 devnet SOL in your wallet.
+The phone then signs both requests with its stored agent key; no other owner
+signature is needed. Read the inline paid/refused outcomes and explorer links,
+then open **Decisions**, which refreshes after the run. An empty remaining cap
+skips the paid request with a message.
+
+The button appears only for an active, unexpired payment rule using this phone's
+stored test agent on devnet. Other agents and trade rules need a separately
+running agent. If a request fails, check the inline outcome and explorer before
+retrying; submitted transactions may still land.
 
 ### 2. Hold a withdrawal, then stop it
 

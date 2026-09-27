@@ -1,3 +1,4 @@
+import { TestRequests } from '../../components/TestRequests';
 import { redactRpc } from '../../lib/rpcPrivacy';
 import { PublicKey } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
@@ -526,6 +527,8 @@ export default function RuleDetailScreen() {
                 Limits are fixed once the rule is opened. They cannot be widened later.
               </EmptyState>
             )}
+
+            <TestRequests key={mandate.address} mandate={mandate} />
 
             <ConnectAgentPanel
               rows={chargeConfig ? agentChargeRows(chargeConfig) : []}

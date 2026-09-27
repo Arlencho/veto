@@ -1,3 +1,4 @@
+import { TestRequests } from '../../components/TestRequests';
 import { useRouter } from 'expo-router';
 
 import { liveFactsFromMandate, RuleLiveScreen } from '../../components/firstrun/RuleLiveScreen';
@@ -13,6 +14,7 @@ export default function LiveRoute() {
   return (
     <Screen>
       <RuleLiveScreen
+        testRequests={<TestRequests key={chain.mandate?.address} mandate={chain.tradeRule ? null : chain.mandate} />}
         cluster={wallet.cluster}
         facts={
           chain.mandate

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { explorerTxUrl } from '../../lib/format';
@@ -78,6 +79,7 @@ export function RuleLiveScreen({
   onSetup,
   onOverview,
   view,
+  testRequests,
 }: {
   cluster: string | null;
   facts: LiveRuleFacts | null;
@@ -85,6 +87,7 @@ export function RuleLiveScreen({
   onSetup: () => void;
   onOverview: () => void;
   view?: ScreenView;
+  testRequests?: ReactNode;
 }) {
   const resolved = view ?? (error ? 'error' : facts ? 'normal' : 'empty');
   return (
@@ -96,9 +99,10 @@ export function RuleLiveScreen({
       empty="No rule is live yet."
       footer={
         <>
+          {testRequests}
           <BrassButton label="Give your agent its setup" onPress={onSetup} />
           <QuietButton label="Next: protect your money" onPress={onOverview} />
-          <Text style={styles.note}>No money has moved yet. Your agent has to ask first.</Text>
+          {!facts?.paid ? <Text style={styles.note}>No money has moved yet. Your agent has to ask first.</Text> : null}
         </>
       }
     >

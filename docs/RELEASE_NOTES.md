@@ -49,10 +49,13 @@ Start with the [tester guide](TESTERS.md) or the Try page at
 ## Known limits
 
 - Devnet only, with test money. Do not send real funds.
-- Creating a test agent on the phone creates a key, but does not run payment
-  or trade requests. A separately running agent is needed to produce those
-  decisions. The hacked-agent demo is a scripted devnet demonstration,
-  not a button in the APK.
+- **Send two test requests** on the first-run live screen or payment rule detail
+  sends a small payment and an above-limit request for an active, unexpired
+  devnet payment rule belonging to this phone's stored test agent. It asks for
+  one wallet transfer of 0.01 devnet SOL only if the agent has less than 0.005 SOL
+  for fees. An empty remaining cap skips the payment. Outcomes and explorer
+  links appear inline, then Decisions refreshes. Other agents and trade requests
+  still need a separately running agent; the hacked-agent trade demo is scripted.
 - The trade demo uses a test pool. Its rate is not a market-price claim.
 - Records describe requests that reach the program's decision logic, not
   every possible attempt. An unsubmitted request or an account-validation

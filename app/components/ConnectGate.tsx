@@ -1,12 +1,12 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { showsIntroduction } from '../lib/onboarding';
 import { useOnboarding } from '../lib/useOnboarding';
 import { useWallet } from '../lib/useWallet';
 import { clusterNotice } from '../lib/wallet';
 import { ConnectWalletScreen } from './firstrun/ConnectWalletScreen';
+import { SafeTop, useTopInset } from './SafeTop';
 import { colors, fonts } from './theme';
 
 type IntroProps = {
@@ -58,13 +58,12 @@ function Guide({ onFinish }: { onFinish: () => void }) {
 
 export function ConnectGate({
   children,
-  padNetwork = false,
   showNetwork = true,
 }: {
   children: ReactNode;
-  padNetwork?: boolean;
   showNetwork?: boolean;
 }) {
+  const insetAbove = useTopInset();
   const wallet = useWallet();
   const onboarding = useOnboarding();
   const connected = wallet.ownerPublicKey !== null;
@@ -134,14 +133,12 @@ export function ConnectGate({
       {children}
     </View>
   );
-  if (!padNetwork) {
+  // Tab screens wrap the gate in their own safe area. Stack routes such as /week/<agent> put the
+  // gate outside the screen shell, so the gate insets itself and the shell inside drops its top edge.
+  if (insetAbove) {
     return body;
   }
-  return (
-    <SafeAreaView edges={['top']} style={styles.safe}>
-      {body}
-    </SafeAreaView>
-  );
+  return <SafeTop style={styles.safe}>{body}</SafeTop>;
 }
 
 const styles = StyleSheet.create({

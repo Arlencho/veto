@@ -97,7 +97,7 @@ mock.module('./mwa', {
 });
 
 type Loaded = {
-  ConnectGate: (props: { children: ReactNode; padNetwork?: boolean }) => ReactNode;
+  ConnectGate: (props: { children: ReactNode }) => ReactNode;
   WalletProvider: (props: { children: ReactNode }) => ReactNode;
   OnboardingProvider: (props: { children: ReactNode }) => ReactNode;
   Text: ComponentType<{ children?: ReactNode }>;
@@ -122,7 +122,7 @@ function button(root: ReactTestRenderer, label: string): ReactTestInstance | und
     .find((node) => node.props.accessibilityLabel === label);
 }
 
-async function mount(padNetwork = false): Promise<ReactTestRenderer> {
+async function mount(): Promise<ReactTestRenderer> {
   let root: ReactTestRenderer | null = null;
   await act(async () => {
     root = create(
@@ -133,7 +133,6 @@ async function mount(padNetwork = false): Promise<ReactTestRenderer> {
           ui.OnboardingProvider,
           null,
           createElement(ui.ConnectGate, {
-            padNetwork,
             children: createElement(ui.Text, null, 'home'),
           }),
         ),
@@ -181,7 +180,7 @@ test.beforeEach(() => {
 });
 
 test('the devnet notice on a screen outside the safe area sits below the status bar', async () => {
-  const root = await mount(true);
+  const root = await mount();
   await settle(root, (value) => value.includes(SEEKER_LINE));
   const connectButton = button(root, 'Open Solana Mobile wallet');
   assert.ok(connectButton);

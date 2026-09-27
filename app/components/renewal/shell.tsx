@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Path, Svg } from 'react-native-svg';
 
+import { SafeTop } from '../SafeTop';
 import { colors, fonts, radii, space, touchTarget } from '../theme';
 
 export function RenewalShell({
@@ -15,7 +15,7 @@ export function RenewalShell({
   onRefresh?: () => void;
 }) {
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeTop style={styles.safe}>
       <View pointerEvents="none" style={styles.glow} />
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -28,7 +28,7 @@ export function RenewalShell({
       >
         {children}
       </ScrollView>
-    </SafeAreaView>
+    </SafeTop>
   );
 }
 

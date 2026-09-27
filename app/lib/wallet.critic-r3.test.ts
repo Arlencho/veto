@@ -8,6 +8,7 @@ import { PROGRAM_ID } from '../../sdk/src/idl';
 import { world, paidLog, refusedLog } from '../../sdk/src/testkit';
 import { decodeMandateAccount } from './mandate';
 import { prepareTestRequests, runTestRequests, testChargeInstruction, type TestRequestUpdate } from './testRequests';
+import { tokenSymbol } from './tokens';
 import { AGENT_SECRET_STORE_KEY, signWithAgent, type WalletStore } from './wallet';
 
 mock.module('expo-constants', { defaultExport: { expoConfig: { extra: {
@@ -52,8 +53,8 @@ test('critic r3: the runner still signs and lands both test charges through the 
     assert.equal(tx.signatures.length, 1);
     assert.equal(tx.verifySignatures(), true);
   }
-  assert.ok(updates.some(row => row.text === 'Paid 5000000 base units to the payee.' && row.signature));
-  assert.ok(updates.some(row => row.text === 'Refused 10000001 base units: over per-payment maximum.' && row.signature));
+  assert.ok(updates.some(row => row.text === `Paid 5 ${tokenSymbol(w.mint.publicKey.toBase58())} to the payee.` && row.signature));
+  assert.ok(updates.some(row => row.text === `Refused 10.000001 ${tokenSymbol(w.mint.publicKey.toBase58())}: over per-payment maximum.` && row.signature));
   assert.equal(updates.some(row => row.text === REFUSED || /could not finish/.test(row.text)), false, 'the guard never fired on the runner');
 });
 

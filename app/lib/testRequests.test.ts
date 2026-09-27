@@ -32,13 +32,14 @@ test('fee top-up is needed only below 0.005 SOL', () => {
 
 import { readFileSync } from 'node:fs';
 import { mock } from 'node:test';
-import { SystemInstruction, Transaction, type TransactionInstruction, type TransactionResponse } from '@solana/web3.js';
+import { PublicKey, SystemInstruction, Transaction, type TransactionInstruction, type TransactionResponse } from '@solana/web3.js';
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { VetoAgent } from '../../sdk/src/agent';
 import { PROGRAM_ID } from '../../sdk/src/idl';
 import { world, paidLog, refusedLog, tokenAccountData } from '../../sdk/src/testkit';
 import { decodeMandateAccount } from './mandate';
 import { prepareTestRequests, runTestRequests, testChargeInstruction, testRequestFailure, type TestRequestUpdate } from './testRequests';
+import { DEVNET_USDC_MINT, tokenSymbol } from './tokens';
 
 for (const tokenProgram of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
   for (const useAta of [false, true]) test(`charge matches SDK accounts and data (${tokenProgram}, ATA ${useAta})`, async () => {
@@ -94,8 +95,40 @@ test('funded phone agent pays then receives the program refusal with only agent 
     assert.equal(tx.signatures.length, 1);
     assert.equal(tx.verifySignatures(), true);
   }
-  assert.ok(h.updates.some(row => row.text === 'Paid 5000000 base units to the payee.' && row.signature));
-  assert.ok(h.updates.some(row => row.text === 'Refused 10000001 base units: over per-payment maximum.' && row.signature));
+  assert.ok(h.updates.some(row => row.text === `Paid 5 ${tokenSymbol(h.w.mint.publicKey.toBase58())} to the payee.` && row.signature));
+  assert.ok(h.updates.some(row => row.text === `Refused 10.000001 ${tokenSymbol(h.w.mint.publicKey.toBase58())}: over per-payment maximum.` && row.signature));
+});
+test('a 6-decimal USDC rule reports every request in USDC', async () => {
+  const usdc = new PublicKey(DEVNET_USDC_MINT);
+  const h = harness(5_000_000, { mint: usdc, perTxMax: 100_000n });
+  const fake = h.w.fake;
+  fake.accounts.set(DEVNET_USDC_MINT, fake.accounts.get(h.w.mint.publicKey.toBase58())!);
+  fake.accounts.get(h.w.source.publicKey.toBase58())!.data.set(usdc.toBuffer(), 0);
+  for (const row of fake.tokenAccounts) { row.mint = DEVNET_USDC_MINT; row.data.set(usdc.toBuffer(), 0); }
+  h.w.connection.getTransaction = async () => {
+    const data = Transaction.from(fake.sent.at(-1)!).instructions[0].data;
+    const amount = data.readBigUInt64LE(8), nonce = data.readBigUInt64LE(16);
+    return { meta: { err: null, logMessages: [amount <= 100_000n ? paidLog(h.w.mandate, amount, nonce, amount) : refusedLog(h.w.mandate, amount, nonce, 5, amount)] } } as unknown as TransactionResponse;
+  };
+  const plan = await prepareTestRequests(h.options);
+  assert.equal(plan.decimals, 6);
+  await runTestRequests(h.options, plan);
+  assert.deepEqual(h.updates.map(row => row.text), [
+    'Sending a request for 0.05 USDC.', 'Request for 0.05 USDC submitted; waiting for confirmation.', 'Paid 0.05 USDC to the payee.',
+    'Sending a request for 0.100001 USDC.', 'Request for 0.100001 USDC submitted; waiting for confirmation.', 'Refused 0.100001 USDC: over per-payment maximum.',
+  ]);
+});
+test('a missing mint account stops the test before confirmation', async () => {
+  const h = harness();
+  h.w.fake.accounts.delete(h.w.mint.publicKey.toBase58());
+  await assert.rejects(prepareTestRequests(h.options), /token mint of this rule is unavailable/);
+});
+test('a plan with different mint decimals is treated as a changed rule', async () => {
+  const h = harness();
+  const plan = await prepareTestRequests(h.options);
+  await runTestRequests(h.options, { ...plan, decimals: 9 });
+  assert.equal(h.w.fake.sent.length, 0);
+  assert.match(h.updates.at(-1)!.text, /rule changed/);
 });
 test('an overlapping caller gets a clear message while only the original test spends fees', async () => {
   const h = harness(0);
@@ -198,8 +231,8 @@ test('a payment result available on the tenth read still allows the refused requ
   }
   await pending;
   assert.equal(h.w.fake.sent.length, 2);
-  assert.ok(h.updates.some(row => row.text.startsWith('Paid 5000000 base units')));
-  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10000001 base units')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Paid 5 ')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10.000001 ')));
 });
 test('agent secret never reaches UI updates or logging even in an RPC error', async () => {
   const h = harness();
@@ -229,8 +262,8 @@ test('the above-limit request is still sent when the one-unit payment exhausts t
   }) as typeof h.w.connection.getTransaction;
   await runTestRequests(h.options, await prepareTestRequests(h.options));
   assert.equal(h.w.fake.sent.length, 2);
-  assert.ok(h.updates.some(row => row.text.startsWith('Paid 1 base units')));
-  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10000001 base units')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Paid 0.000001 ')));
+  assert.ok(h.updates.some(row => row.text.startsWith('Refused 10.000001 ')));
 });
 
 

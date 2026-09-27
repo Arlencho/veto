@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import type { MandateAccount } from '../lib/mandate';
 import { explorerTxUrl } from '../lib/format';
+import { knownToken, formatTokenAmount } from '../lib/tokens';
 import { prepareTestRequests, runTestRequests, testRequestFailure, testRequestsVisible, type TestRequestUpdate } from '../lib/testRequests';
 import { useChain } from '../lib/useChain';
 import { useWallet } from '../lib/useWallet';
@@ -36,10 +37,12 @@ export function TestRequests({ mandate }: { mandate: MandateAccount | null }) {
     };
     try {
       const plan = await prepareTestRequests(options);
+      const shown = (amount: bigint) => formatTokenAmount(amount, plan.decimals, plan.rule.mint);
       const payment = plan.paid === null
         ? 'The paid request will be skipped because the remaining cap is zero.'
-        : `One payment of ${plan.paid} base units within the per-payment limit goes to payee ${plan.rule.merchant}.`;
-      Alert.alert('Send two test requests?', `${payment} One request of ${plan.refused} base units above the per-payment limit will be refused. Amounts are in base units of token ${plan.rule.mint}. If the test agent has less than 0.005 SOL for fees, your wallet first sends it 0.01 devnet SOL. This is the only owner signature requested.`, [
+        : `One payment of ${shown(plan.paid)} within the per-payment limit goes to payee ${plan.rule.merchant}.`;
+      const token = knownToken(plan.rule.mint) ? '' : ` Amounts are in token ${plan.rule.mint}.`;
+      Alert.alert('Send two test requests?', `${payment} One request of ${shown(plan.refused)}, just above the per-payment limit, will be refused.${token} If the test agent has less than 0.005 SOL for fees, your wallet first sends it 0.01 devnet SOL. This is the only owner signature requested.`, [
         { text: 'Cancel', style: 'cancel', onPress: release },
         { text: 'Send requests', onPress: () => {
           void (async () => {

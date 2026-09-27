@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Circle, Path, Svg } from 'react-native-svg';
 
 import { QuietReading, quietRefreshControl } from '../QuietRefresh';
+import { SafeTop } from '../SafeTop';
 import { CatchMark } from '../backglass/CatchMark';
 import { Lamp } from '../backglass/Lamp';
 import { motionAllowed, useReducedMotion } from '../backglass/motion';
@@ -24,7 +24,7 @@ export function Cabinet({
   showReading?: boolean;
 }) {
   return (
-    <SafeAreaView style={styles.safe} edges={edges}>
+    <SafeTop style={styles.safe} edges={edges}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -33,7 +33,7 @@ export function Cabinet({
         {showReading ? <QuietReading busy={refreshing} /> : null}
         {children}
       </ScrollView>
-    </SafeAreaView>
+    </SafeTop>
   );
 }
 

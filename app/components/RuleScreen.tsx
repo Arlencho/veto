@@ -10,8 +10,7 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { SafeTop } from './SafeTop';
 import { colors } from './theme';
 
 const RuleFieldFocusContext = createContext<(target: number) => void>(() => {});
@@ -56,7 +55,7 @@ export function RuleScreen({ children, footer, refreshControl }: {
   }, [scrollToTarget]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeTop style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -73,7 +72,7 @@ export function RuleScreen({ children, footer, refreshControl }: {
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </RuleFieldFocusContext.Provider>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeTop>
   );
 }
 

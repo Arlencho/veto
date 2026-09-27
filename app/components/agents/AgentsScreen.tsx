@@ -52,19 +52,16 @@ export function AgentsScreen({
   onOpenAgent,
   onHowGrades,
   onNameAgent,
-  topInset = true,
 }: {
   data: AgentScreenData;
   onOpenAgent: (agent: string) => void;
   onHowGrades: () => void;
   onNameAgent?: (agent: string, name: string) => void;
-  topInset?: boolean;
 }) {
   return (
     <Cabinet
       refreshing={data.refreshing}
       onRefresh={data.refresh}
-      edges={topInset ? ['top'] : []}
       showReading={false}
     >
       <View style={styles.header}>

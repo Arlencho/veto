@@ -89,7 +89,7 @@ export function WeekScreen({
             <View style={styles.reels}>
               <View style={styles.reel}>
                 <ScoreReel value={review.paidCount} tone="paid" accessibilityLabel={`${review.paidCount} payments paid`} />
-                <View>
+                <View style={styles.reelCopy}>
                   <Text style={styles.reelKicker}>Paid</Text>
                   <Text style={styles.reelValue}>{review.paidAmountLabel} in total</Text>
                   <Text style={styles.reelMeta}>all within the rule</Text>
@@ -97,7 +97,7 @@ export function WeekScreen({
               </View>
               <View style={styles.reel}>
                 <ScoreReel value={review.refusedCount} tone="refused" accessibilityLabel={`${review.refusedCount} payments refused`} />
-                <View>
+                <View style={styles.reelCopy}>
                   <Text style={styles.reelKicker}>Refused</Text>
                   <Text style={styles.reelValue}>0 moved</Text>
                   <Text style={styles.reelMeta}>{review.allowances === 0 ? 'none allowed after' : `${review.allowances} allowed after`}</Text>
@@ -254,6 +254,8 @@ const styles = StyleSheet.create({
   legendText: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted },
   reels: { flexDirection: 'row', gap: 10 },
   reel: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // The copy takes the width the reel leaves, so a long amount wraps inside the tile instead of clipping.
+  reelCopy: { flex: 1, minWidth: 0 },
   reelKicker: {
     fontFamily: fonts.sansBold,
     fontSize: 11,

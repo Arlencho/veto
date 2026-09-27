@@ -460,6 +460,44 @@ test('week in review shows loading, empty, error, and the seven-day counts', asy
   assert.match(saved, /Every line is read from the blockchain/);
 });
 
+test('week in review lets the paid and refused tiles wrap a long amount instead of clipping it', async () => {
+  const { WeekScreen } = await import('../components/agents/WeekScreen');
+  const root = await mount(
+    createElement(WeekScreen, {
+      agent: AGENT,
+      data: screenData({ agents: readyAgents(), nowSec: START + 3600n }),
+      onBack() {},
+      onSaveFile: async () => undefined,
+      onShareCard: async () => undefined,
+      onReason() {},
+    }),
+  );
+  const texts = root.root.findAll((node) => (node.type as unknown) === 'Text');
+  const flat = (style: unknown): Record<string, unknown> =>
+    Array.isArray(style) ? Object.assign({}, ...style.map(flat)) : style && typeof style === 'object' ? (style as Record<string, unknown>) : {};
+  const own = (node: ReactTestInstance) => [node.props.children].flat().join('');
+  const hostParent = (node: ReactTestInstance): ReactTestInstance | null => {
+    for (let parent = node.parent; parent; parent = parent.parent) {
+      if (typeof parent.type === 'string') return parent;
+    }
+    return null;
+  };
+  for (const pattern of [/ in total$/, /^0 moved$/]) {
+    const value = texts.find((node) => pattern.test(own(node)));
+    assert.ok(value, `no text matching ${pattern}`);
+    assert.equal(value.props.numberOfLines, undefined, 'the amount can wrap');
+    assert.equal(flat(value.props.style).width, undefined);
+    assert.ok(Number(flat(value.props.style).fontSize) >= 14, 'the amount keeps its design size');
+    const copy = hostParent(value);
+    assert.ok(copy);
+    const copyStyle = flat(copy.props.style);
+    assert.ok(copyStyle.flex === 1 || copyStyle.flexShrink === 1, 'the copy column takes only the width the tile leaves');
+    const tile = hostParent(copy);
+    assert.ok(tile);
+    assert.equal(flat(tile.props.style).flexDirection, 'row');
+  }
+});
+
 test('an agent with no saved name is Unnamed agent, the address shows once, and it can be named', async () => {
   const { AgentsScreen } = await import('../components/agents/AgentsScreen');
   const unnamed = buildAgentRecords([sampleRule()], {}, NOW);

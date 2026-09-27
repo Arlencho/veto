@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { QuietReading, quietRefreshControl } from './QuietRefresh';
+import { SafeTop } from './SafeTop';
 import { colors, space } from './theme';
 
 export function Screen({
@@ -26,7 +25,7 @@ export function Screen({
     </View>
   );
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeTop style={styles.safe}>
       {scroll ? (
         <ScrollView
           contentContainerStyle={styles.grow}
@@ -38,7 +37,7 @@ export function Screen({
       ) : (
         body
       )}
-    </SafeAreaView>
+    </SafeTop>
   );
 }
 

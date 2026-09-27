@@ -38,7 +38,7 @@ The recording uses mandate `3hgrSbPX2VTrfnVekoL2qi2qDWNGBhWP3QgADAWz6X6N`: purpo
 
 On an active rule the rule screen shows Connect your agent: the fields of one JSON block, Copy all, and a QR of that same block. A rule that is not active shows "This rule is not active, so there is no config to hand an agent." and does not show Copy all or the QR. `loadAgentConfig` reads the block. `VetoAgent.fromConfig` checks it against the chain. The program id is the one bundled with the SDK unless the caller passes a different id in code. Decimals are checked on the mint account. The cluster name is checked against the endpoint's genesis hash. A connection passed to `fromConfig` is the endpoint. The example is [sdk/examples/pay-once.ts](../sdk/examples/pay-once.ts).
 
-The agent package is `@veto-hq/agent-sdk`. It is not yet published to npm. `private` is still true. Install it from this checkout. The same package exports `HoldVault`. The app does not import the package.
+The agent package is `@veto-hq/agent-sdk`. Version 0.1.0 is on npm: `npm install @veto-hq/agent-sdk`. The same package exports `HoldVault`. The app does not import the package.
 
 ## On the phone
 

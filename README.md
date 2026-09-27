@@ -180,9 +180,9 @@ In the app, open a new rule and paste that public address into the field labeled
 npm install @veto-hq/agent-sdk
 ```
 
-Published to npm on <date>.
+Version 0.1.0 was published to npm on 2026-09-27.
 
-The package is published from this checkout by the maintainer. The same package exports `HoldVault` for the vault instructions. Those instructions are not on the deployed devnet program yet. The field-by-field checks are in [sdk/README.md](sdk/README.md). The example loads the agent key and the JSON block the app copies (Copy all, or the same block a QR scan returns), checks that block against the chain, reads the next nonce, submits one `charge` for the amount you pass, and prints the kind, reason code, reason text, suggested override, signature, and slot.
+The package is published from this checkout by the maintainer. The same package exports `HoldVault` for the vault instructions. Those instructions are on the deployed devnet program; [docs/DEVNET.md](docs/DEVNET.md) records the upgrade. The field-by-field checks are in [sdk/README.md](sdk/README.md). The example loads the agent key and the JSON block the app copies (Copy all, or the same block a QR scan returns), checks that block against the chain, reads the next nonce, submits one `charge` for the amount you pass, and prints the kind, reason code, reason text, suggested override, signature, and slot.
 
 `loadAgentConfig` accepts the JSON text or the parsed object and refuses a missing or extra field. `VetoAgent.fromConfig` pins the program to the id bundled in `sdk/idl/veto.json` unless the caller passes `{ programId }` in code, and a block whose `programId` differs from that id is refused. `mintDecimals` is checked against the mint account. `cluster` is checked against the endpoint's genesis hash (`devnet`, `testnet`, or `mainnet-beta`). A `Connection` passed to `fromConfig` is the endpoint. When it is omitted, the example opens `rpcUrl` from the block.
 

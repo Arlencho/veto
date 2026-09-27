@@ -1,6 +1,6 @@
 # Publishing the SDK and companion CLI
 
-The packages are prepared at version 0.1.0. This change does not publish them.
+Version 0.1.0 of both packages was published to npm on 2026-09-27. The steps below are for the next release.
 Only the founder runs the publish commands below, from an approved checkout,
 using an npm account authorized for the `@veto-hq` scope and its two-factor code.
 Use Node 22 or newer, matching the package engines and CI.

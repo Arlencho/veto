@@ -16,7 +16,7 @@ Or run without a global install:
 npx @veto-hq/veto connect
 ```
 
-Version 0.1.0 is prepared for release. See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for maintainer release steps.
+Version 0.1.0 was published to npm on 2026-09-27. See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for maintainer release steps.
 
 ## One command, one scan, one hold
 
@@ -63,4 +63,4 @@ veto decisions --limit 20
 
 `veto decisions` lists the newest decisions from the rule. Each row names the token and the signature.
 
-the trade rule is not on this program yet
+The trade rule is on the devnet program ([docs/DEVNET.md](https://github.com/Arlencho/veto/blob/main/docs/DEVNET.md)), but this version of the companion has no `veto trade` command.

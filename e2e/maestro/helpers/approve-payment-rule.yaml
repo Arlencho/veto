@@ -34,31 +34,41 @@ appId: com.veto.app
 - eraseText
 - inputText: "1"
 - hideKeyboard
-# Maestro scrolls by swiping from the middle of the screen, which lands on an
-# amount input here and does not move the page. Swipe from lower down instead.
+# A drag that starts on a text input does not scroll this page, and Maestro's
+# own scroll starts mid-screen, on an amount input. Swipe in the left margin,
+# which holds no inputs.
 - repeat:
     while:
       notVisible: "10 payments of 0.1 .* at most"
     times: 6
     commands:
       - swipe:
-          start: 50%, 88%
-          end: 50%, 45%
+          start: 5%, 85%
+          end: 5%, 40%
 # The block summary below the dials proves the typed limits were applied.
 - assertVisible: "The 1 .* total"
 - assertVisible: "10 payments of 0.1 .* at most"
+# Maestro counts rows that are drawn but still off-screen as visible, so a
+# visibility loop can stop early. Swipe a fixed number of times instead; at
+# the end of the page a swipe does nothing.
 - repeat:
-    while:
-      notVisible: "Press and hold to approve rule.*"
-    times: 6
+    times: 4
     commands:
       - swipe:
-          start: 50%, 88%
-          end: 50%, 45%
+          start: 5%, 85%
+          end: 5%, 40%
+# The newest fake wallet account may still be receiving test funds. Until the
+# wallet checks see the token, the app shows a receive prompt and the press
+# does not open the wallet.
+- extendedWaitUntil:
+    notVisible: "You do not hold this token yet"
+    timeout: 90000
+- extendedWaitUntil:
+    visible:
+      text: "Press and hold to approve rule.*"
+      enabled: true
+    timeout: 60000
 # Maestro longPressOn holds for 3 seconds.
-- assertVisible:
-    text: "Press and hold to approve rule.*"
-    enabled: true
 - longPressOn: "Press and hold to approve rule.*"
 - runFlow: fake-wallet-transaction.yaml
 - extendedWaitUntil:

@@ -17,9 +17,20 @@ import {
 // The decision task imports this module. Native widget packages stay behind
 // a dynamic import so loading the task does not parse react-native.
 
+export async function anyHomeWidgetPlaced(
+  getWidgetInfo: (widgetName: string) => Promise<readonly unknown[]>,
+): Promise<boolean> {
+  const placed = await Promise.all([getWidgetInfo(SPEND_WIDGET_NAME), getWidgetInfo(RULE_WIDGET_NAME)]);
+  return placed.some((widgets) => widgets.length > 0);
+}
+
 export async function refreshHomeWidgets(): Promise<void> {
   try {
-    const { requestWidgetUpdate } = await import('react-native-android-widget');
+    const { getWidgetInfo, requestWidgetUpdate } = await import('react-native-android-widget');
+    if (!(await anyHomeWidgetPlaced(getWidgetInfo))) {
+      // No widget on the home screen, so no chain reads for one.
+      return;
+    }
     const { widgetElement } = await import('./androidWidget');
     const board = await loadWidgetBoard(Date.now());
     const bindings = await readWidgetBindings();

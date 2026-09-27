@@ -329,7 +329,8 @@ test.describe('ledger transaction links', { concurrency: 1 }, () => {
     const pending = loaded.fetchLedgerRows(
       clientFor({
         mandate,
-        entries: [],
+        // An entry in the same second keeps every body in the window the ring can match.
+        entries: [refusedEntry()],
         signatures,
         getTransaction: async (signature: string) => {
           active += 1;

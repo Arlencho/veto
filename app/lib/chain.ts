@@ -63,6 +63,7 @@ import {
   decodeLedgerAccount,
   ledgerPda,
   mandatePda,
+  oldestMatchableBlockTime,
   type DecodedTxDecision,
   type LedgerRow,
   type LedgerSnapshot,
@@ -1071,15 +1072,19 @@ export async function fetchLedgerRows(
 ): Promise<{ snapshot: LedgerSnapshot; rows: LedgerRow[] }> {
   const snapshot = await fetchLedger(client, mandate);
   const ledgerAddress = new PublicKey(snapshot.address);
+  // Only a body that can match a ring entry is read. An untimed signature is always read.
+  const oldest = oldestMatchableBlockTime(snapshot.entries);
   let signatures: ConfirmedSignatureInfo[];
   try {
-    signatures = await listSignatures(client, ledgerAddress, 4);
+    signatures = await listSignatures(client, ledgerAddress, 4, oldest);
   } catch (err) {
     const detail = err instanceof Error ? redactRpc(err.message) : redactRpc(String(err));
     throw new Error(`Failed to list ledger signatures: ${detail}`);
   }
 
-  const ok = signatures.filter((info) => !info.err);
+  const ok = signatures.filter(
+    (info) => !info.err && (info.blockTime == null || info.blockTime >= oldest),
+  );
   const cache = signaturesForLedger(ledgerAddress.toBase58());
   const decodedByIndex: DecodedTxDecision[][] = ok.map(() => []);
   const missing: number[] = [];
@@ -1131,6 +1136,7 @@ export async function listSignatures(
   client: ChainClient,
   address: PublicKey,
   maxPages = 4,
+  oldestBlockTime?: number,
 ): Promise<ConfirmedSignatureInfo[]> {
   const out: ConfirmedSignatureInfo[] = [];
   let before: string | undefined;
@@ -1146,6 +1152,13 @@ export async function listSignatures(
     }
     out.push(...batch);
     if (batch.length < 50) {
+      break;
+    }
+    if (
+      oldestBlockTime != null &&
+      batch.every((info) => info.blockTime != null && info.blockTime < oldestBlockTime)
+    ) {
+      // Pages come newest first, so every later page is older still.
       break;
     }
     const last = batch[batch.length - 1];

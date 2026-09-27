@@ -87,7 +87,7 @@ export type ChainState = {
   nowMs: number;
   genesisHash: string | null;
   submitHeld: boolean;
-  refresh: () => Promise<void>;
+  refresh: (options?: RefreshOptions) => Promise<void>;
   selectMandate: (address: string) => Promise<void>;
   open: (input: Omit<OpenMandateInput, 'owner' | 'agent'> & { agent?: PublicKey }) => Promise<OpenMandateResult>;
   openTrade: (input: Omit<OpenTradeInput, 'owner' | 'agent' | 'cluster'> & { agent?: PublicKey }) => Promise<OpenTradeResult>;
@@ -96,6 +96,63 @@ export type ChainState = {
   probeOverride: (mandateAddress: string, row: LedgerRow) => Promise<OverrideAssessment>;
   grantOverride: (mandateAddress: string, row: LedgerRow) => Promise<GrantOverrideResult>;
 };
+
+export type RefreshOptions = {
+  /** Reuse a read already in flight for this owner. Only for mount and focus. */
+  join?: boolean;
+};
+
+type RefreshSlot = { owner: string; done: Promise<void> };
+
+/**
+ * One chain read per owner at a time. A join reuses the read in flight. Any other refresh may
+ * follow a change that read did not see, so it runs once after it, and refreshes arriving in
+ * the meantime share that one follow-up read.
+ */
+export function createRefreshGate() {
+  let running: RefreshSlot | null = null;
+  let queued: RefreshSlot | null = null;
+  let latestOwner: string | null = null;
+  const start = (owner: string, read: () => Promise<void>): Promise<void> => {
+    const slot: RefreshSlot = { owner, done: Promise.resolve() };
+    slot.done = read().finally(() => {
+      if (running === slot) {
+        running = null;
+      }
+    });
+    running = slot;
+    return slot.done;
+  };
+  return (owner: string, join: boolean, read: () => Promise<void>): Promise<void> => {
+    latestOwner = owner;
+    const current = running;
+    if (!current || current.owner !== owner) {
+      return start(owner, read);
+    }
+    if (join) {
+      return current.done;
+    }
+    if (queued && queued.owner === owner) {
+      return queued.done;
+    }
+    const slot: RefreshSlot = { owner, done: Promise.resolve() };
+    slot.done = current.done
+      .catch(() => undefined)
+      .then(() => {
+        if (queued === slot) {
+          queued = null;
+        }
+        // A follow-up for an owner the wallet has since left must not overwrite the new owner.
+        if (latestOwner !== owner) {
+          return undefined;
+        }
+        // A read that started after this request already satisfies it.
+        return running && running.owner === owner ? running.done : start(owner, read);
+      });
+    queued = slot;
+    return slot.done;
+  };
+}
 
 async function loadChosen(store: WalletStore): Promise<string | null> {
   return store.getItem(CHOSEN_MANDATE_KEY);
@@ -150,7 +207,9 @@ function useChainState(): ChainState {
     setSubmitHeld(true);
   }, []);
 
-  const refresh = useCallback(async () => {
+  const [gate] = useState(() => createRefreshGate());
+
+  const readChain = useCallback(async () => {
     const epochAtStart = submitEpoch.current;
     const releaseIfCurrent = () => {
       if (submitEpoch.current !== epochAtStart) {
@@ -310,8 +369,14 @@ function useChainState(): ChainState {
     }
   }, [wallet.ownerPublicKey]);
 
+  const refresh = useCallback(
+    (options?: RefreshOptions) =>
+      gate(wallet.ownerPublicKey ?? '', options?.join === true, readChain),
+    [gate, readChain, wallet.ownerPublicKey],
+  );
+
   useEffect(() => {
-    void refresh();
+    void refresh({ join: true });
   }, [refresh]);
 
   const selectMandate = useCallback(

@@ -96,7 +96,7 @@ test("veto_trade is disabled and is not a tool", async () => {
     assert.ok(trade);
     assert.equal(trade.enabled, false);
     assert.equal(trade.disabledMessage, TRADE_RULE_DISABLED);
-    assert.equal(TRADE_RULE_DISABLED, "the trade rule is not on this program yet");
+    assert.equal(TRADE_RULE_DISABLED, "Trading from the companion is switched off in this version. Agents trade through the SDK's trade().");
     const w = openedWorld();
     const runtime = harness(home, chainOf(w.fake));
     await withClient(runtime, async (client) => {

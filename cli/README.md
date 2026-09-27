@@ -63,4 +63,4 @@ veto decisions --limit 20
 
 `veto decisions` lists the newest decisions from the rule. Each row names the token and the signature.
 
-The trade rule is on the devnet program ([docs/DEVNET.md](https://github.com/Arlencho/veto/blob/main/docs/DEVNET.md)), but this version of the companion has no `veto trade` command.
+The trade rule is on the devnet program ([docs/DEVNET.md](https://github.com/Arlencho/veto/blob/main/docs/DEVNET.md)). Trading from the companion is switched off in this version, and `veto --help` says so. Agents trade through the SDK's `trade()`.

@@ -394,3 +394,34 @@ test('explicit refreshes during a read share one follow-up read, and a join reus
   finishers[2]?.();
   await other;
 });
+
+test('a failed read does not jam the gate, and a follow-up for a previous owner is dropped', async () => {
+  const { createRefreshGate } = await import('./useChain');
+  const gate = createRefreshGate();
+  let started = 0;
+  const failing = () => {
+    started += 1;
+    return Promise.reject(new Error('read failed'));
+  };
+  await assert.rejects(gate('owner', true, failing));
+  const ok = () => {
+    started += 1;
+    return Promise.resolve();
+  };
+  await gate('owner', false, ok);
+  assert.equal(started, 2, 'a new read starts after a failed one');
+
+  let finish!: () => void;
+  const slow = () => {
+    started += 1;
+    return new Promise<void>((resolve) => { finish = resolve; });
+  };
+  const first = gate('owner', true, slow);
+  const followUp = gate('owner', false, ok);
+  const switched = gate('other owner', true, ok);
+  await switched;
+  finish();
+  await first;
+  await followUp;
+  assert.equal(started, 4, 'the old owner follow-up does not run after the switch');
+});

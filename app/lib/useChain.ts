@@ -112,6 +112,7 @@ type RefreshSlot = { owner: string; done: Promise<void> };
 export function createRefreshGate() {
   let running: RefreshSlot | null = null;
   let queued: RefreshSlot | null = null;
+  let latestOwner: string | null = null;
   const start = (owner: string, read: () => Promise<void>): Promise<void> => {
     const slot: RefreshSlot = { owner, done: Promise.resolve() };
     slot.done = read().finally(() => {
@@ -123,15 +124,16 @@ export function createRefreshGate() {
     return slot.done;
   };
   return (owner: string, join: boolean, read: () => Promise<void>): Promise<void> => {
-    if (queued && queued.owner === owner) {
-      return queued.done;
-    }
+    latestOwner = owner;
     const current = running;
     if (!current || current.owner !== owner) {
       return start(owner, read);
     }
     if (join) {
       return current.done;
+    }
+    if (queued && queued.owner === owner) {
+      return queued.done;
     }
     const slot: RefreshSlot = { owner, done: Promise.resolve() };
     slot.done = current.done
@@ -140,7 +142,8 @@ export function createRefreshGate() {
         if (queued === slot) {
           queued = null;
         }
-        return start(owner, read);
+        // A follow-up for an owner the wallet has since left must not overwrite the new owner.
+        return latestOwner === owner ? start(owner, read) : undefined;
       });
     queued = slot;
     return slot.done;

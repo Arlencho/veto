@@ -85,3 +85,24 @@ Does the explanation make sense? A grade describes behaviour, not safety.
 [Send tester feedback](https://github.com/Arlencho/veto/issues/new?template=tester-feedback.yml),
 including anything that blocked a task. The optional wallet address is for the tester list;
 issues are public. Never include a recovery phrase or private key.
+
+## Building the public tester APK
+
+The owner sets `VETO_TESTER_RPC` in the EAS `preview` environment to a
+separate, capped devnet RPC key, then builds:
+
+```bash
+cd app
+npx eas-cli build -p android --profile tester
+```
+
+The build refuses a missing key and never uses `EXPO_PUBLIC_VETO_RPC`.
+The key is extractable from the public APK, so its quota is separate from
+production. Do not put the key in feedback or release notes.
+
+The tester APK uses `com.veto.app` and the same program, devnet cluster and
+devnet USDC mint as production. It runs without Metro and replaces the
+production app when signed with the same key. Before publishing, run
+`./scripts/release-apk.sh /path/to/tester.apk` from the repository root.
+The inspection reports the profile and selected RPC host with the key masked,
+and enforces the release permission, scheme, signature and devnet checks.

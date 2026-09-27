@@ -82,21 +82,64 @@ mint=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 program_present=no
 mint_present=no
 rpc_present=no
-if grep -aFq "$program" "$work/bundle"; then program_present=yes; fi
-if grep -aFq "$mint" "$work/bundle"; then mint_present=yes; fi
-# The release bundle is a devnet build. mainnet-beta must never appear.
-if grep -aFq 'mainnet-beta' "$work/bundle"; then fail 'the bundle names mainnet-beta; do not release this APK'; fi
-devnet_named=no
-if grep -aFq 'devnet' "$work/bundle"; then devnet_named=yes; fi
-# Known limit: the release RPC is an EAS sensitive variable inlined at build
-# time. It remains extractable from the APK. Never print it or matching lines.
-# An optional EXPO_PUBLIC_VETO_RPC permits exact matching for custom hosts.
-# Otherwise this is a known-provider URL heuristic, not proof of connectivity
-# or of the selected endpoint. Unrecognized hosts report no.
-if [[ -n "${EXPO_PUBLIC_VETO_RPC:-}" ]]; then
-  if grep -aFq -- "$EXPO_PUBLIC_VETO_RPC" "$work/bundle"; then rpc_present=yes; fi
-elif grep -aEq 'https?://([a-zA-Z0-9-]+\.)*(solana\.com|helius-rpc\.com|helius\.xyz|quiknode\.pro|rpcpool\.com|ankr\.com)([^a-zA-Z0-9.-]|$)' "$work/bundle"; then
-  rpc_present=yes
+# expo-constants embeds the selected config in assets/app.config. Older APKs
+# without it retain the bundle heuristic. Never print URLs or parser diagnostics.
+unzip -p "$apk" assets/app.config >"$work/app.config" 2>"$work/errors" || true
+node - "$work/app.config" "$work/bundle" "$program" "$mint" >"$work/rpc" 2>"$work/errors" <<'NODE' || fail 'invalid embedded release config or RPC'
+const fs = require('node:fs');
+const [configPath, bundlePath, program, mint] = process.argv.slice(2);
+const raw = fs.readFileSync(configPath, 'utf8');
+const extra = raw ? JSON.parse(raw).extra : undefined;
+if (raw && (!extra || typeof extra !== 'object' || Array.isArray(extra))) {
+  throw new Error('Missing embedded config');
+}
+const bundle = fs.readFileSync(bundlePath).toString('latin1');
+const tester = extra?.vetoBuildProfile === 'tester';
+if (extra?.vetoBuildProfile && !tester && extra.vetoBuildProfile !== 'production') {
+  throw new Error('Unsupported profile');
+}
+if (extra && (extra.vetoExplorerCluster !== 'devnet' ||
+    extra.vetoProgramId !== program || extra.vetoMint !== mint)) {
+  throw new Error('Unexpected release chain or addresses');
+}
+let rpc;
+const profile = tester ? 'tester' : 'production (inferred from devnet release identity)';
+if (extra) {
+  rpc = extra.vetoRpc;
+  if (typeof rpc !== 'string' || !rpc.trim()) throw new Error('Missing embedded RPC');
+} else if (process.env.EXPO_PUBLIC_VETO_RPC) {
+  if (bundle.includes(process.env.EXPO_PUBLIC_VETO_RPC)) rpc = process.env.EXPO_PUBLIC_VETO_RPC;
+} else {
+  // Heuristic only for legacy APKs; a provider match is not connectivity proof.
+  rpc = bundle.match(/https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:solana\.com|helius-rpc\.com|helius\.xyz|quiknode\.pro|rpcpool\.com|ankr\.com)(?=[^a-zA-Z0-9.-]|$)/)?.[0];
+}
+let host = 'unavailable';
+if (rpc) {
+  const url = new URL(rpc);
+  if (!['https:', 'http:'].includes(url.protocol) ||
+      !/^[a-zA-Z0-9.:[\]-]+$/.test(url.hostname)) throw new Error('Invalid RPC');
+  host = url.hostname;
+}
+console.log(profile);
+console.log(host);
+console.log(rpc ? 'yes' : 'no');
+console.log(extra ? 'yes' : 'no');
+NODE
+profile="$(sed -n '1p' "$work/rpc")"
+rpc_host="$(sed -n '2p' "$work/rpc")"
+rpc_present="$(sed -n '3p' "$work/rpc")"
+if [[ "$(sed -n '4p' "$work/rpc")" == yes ]]; then
+  # Selected Expo config is authoritative. Hermes can contain every supported
+  # cluster name and omit values only supplied through expo-constants.
+  program_present=yes
+  mint_present=yes
+  devnet_named=yes
+else
+  if grep -aFq "$program" "$work/bundle"; then program_present=yes; fi
+  if grep -aFq "$mint" "$work/bundle"; then mint_present=yes; fi
+  if grep -aFq 'mainnet-beta' "$work/bundle"; then fail 'the bundle names mainnet-beta; do not release this APK'; fi
+  devnet_named=no
+  if grep -aFq 'devnet' "$work/bundle"; then devnet_named=yes; fi
 fi
 if command -v sha256sum >/dev/null 2>&1; then
   digest="$(sha256sum <"$apk" | sed 's/ .*//')"
@@ -119,7 +162,8 @@ checkout_commit="$(git -C "$root" rev-parse HEAD 2>"$work/errors")" || fail 'che
   while IFS= read -r fingerprint; do printf 'Signing certificate SHA-256: %s\n' "$fingerprint"; done <<<"$fingerprints"
   printf 'Signature verifies: %s\nFile SHA-256: %s\nSize (bytes): %s\n' "$signature" "$digest" "$size"
   printf 'Program id %s present: %s\nDevnet USDC mint %s present: %s\n' "$program" "$program_present" "$mint" "$mint_present"
-  printf 'RPC present: %s\nBundle names devnet: %s\nCheckout commit: %s\nadb install %s\n' "$rpc_present" "$devnet_named" "$checkout_commit" "$name"
+  printf 'Build profile: %s\nRPC host: %s (key masked)\n' "$profile" "$rpc_host"
+  printf 'RPC present: %s\nDevnet confirmed: %s\nCheckout commit: %s\nadb install %s\n' "$rpc_present" "$devnet_named" "$checkout_commit" "$name"
   printf 'Solana devnet. Devnet USDC is a test token with no value.\n'
 } >"$work/notes"
 cat "$work/notes"

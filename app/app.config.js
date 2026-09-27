@@ -6,9 +6,14 @@ function pluginName(plugin) {
 
 function shapeConfig(config, env) {
   const mainnetPreview = env.EAS_BUILD_PROFILE === 'mainnet-preview';
-  const production = env.EAS_BUILD_PROFILE === 'production' || mainnetPreview;
+  const tester = env.EAS_BUILD_PROFILE === 'tester';
+  const production = env.EAS_BUILD_PROFILE === 'production' || mainnetPreview || tester;
   // VETO_MAINNET_PREVIEW_RPC must be an EAS secret in the preview environment.
-  const rpc = mainnetPreview ? env.VETO_MAINNET_PREVIEW_RPC : env.EXPO_PUBLIC_VETO_RPC;
+  const rpc = tester ? env.VETO_TESTER_RPC
+    : mainnetPreview ? env.VETO_MAINNET_PREVIEW_RPC : env.EXPO_PUBLIC_VETO_RPC;
+  if (tester && env.EAS_BUILD === 'true' && !rpc?.trim()) {
+    throw new Error('Set the VETO_TESTER_RPC EAS secret before building tester.');
+  }
   if (mainnetPreview && env.EAS_BUILD === 'true' && !rpc?.trim()) {
     throw new Error('Set the VETO_MAINNET_PREVIEW_RPC EAS secret before building mainnet-preview.');
   }
@@ -29,6 +34,7 @@ function shapeConfig(config, env) {
     plugins: nextPlugins,
     extra: {
       ...(config.extra ?? {}),
+      ...(tester ? { vetoBuildProfile: 'tester' } : {}),
       vetoRpc: rpc ?? '',
       vetoProgramId: env.EXPO_PUBLIC_VETO_PROGRAM_ID ?? '',
       vetoMint: env.EXPO_PUBLIC_VETO_MINT ?? '',

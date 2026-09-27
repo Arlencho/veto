@@ -70,8 +70,9 @@ test('a production manifest keeps the app scheme and drops the dev-client scheme
   assert.deepEqual(schemes(next), ['veto']);
 });
 
-test('the dev-client scheme strip applies to the production and mainnet-preview profiles only', () => {
+test('the dev-client scheme strip applies to the production, mainnet-preview and tester profiles only', () => {
   assert.equal(stripsDevClientScheme('production'), true);
+  assert.equal(stripsDevClientScheme('tester'), true);
   assert.equal(stripsDevClientScheme('mainnet-preview'), true);
   assert.equal(stripsDevClientScheme('development'), false);
   assert.equal(stripsDevClientScheme(undefined), false);

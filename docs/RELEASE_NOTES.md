@@ -1,4 +1,4 @@
-# First public APK release: devnet
+# Veto APK v1.0.0-devnet.2: devnet
 
 Veto is an Android app for setting rules on what an agent can spend or trade
 on Solana. You approve the rule with your wallet. The program checks requests
@@ -8,7 +8,24 @@ time to stop them.
 
 **This release is devnet only. All money used here is test money with no value.**
 
-## Added
+## Changed since v1.0.0-devnet.1
+
+- **Send two test requests.** On the first-run live screen or a payment rule's
+  detail, the phone's test agent sends one payment inside the rule's limit and
+  one request just above it, which the program refuses. Both are devnet
+  transactions with explorer links, and amounts are shown in the token (for
+  example 0.05 USDC). See Known limits for when it appears.
+- **Fixed: the test agent is kept after approval.** Approving a rule for a test
+  agent created on the phone no longer creates a second key: the rule is opened
+  for the agent the app showed, and the name you typed is saved with that
+  agent's address.
+- **Lighter start.** A cold start sends far fewer network requests: the home
+  screen widget reads only when a widget is placed, the start-up read runs once,
+  and only the ledger transactions the Decisions list can show are fetched. On a
+  Seeker with three payment rules and a Hold vault, three cold starts logged 40,
+  60 and 42 rate-limit retries before this change and none after.
+
+## What the app does
 
 - **Payment rule.** Choose an agent, payee, purpose, maximum per payment,
   total budget and expiry. Review the terms before signing. Requests that

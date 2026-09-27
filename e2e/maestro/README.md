@@ -119,8 +119,8 @@ payment rule.
 
 Execute from the repository root, one flow per invocation, with the funding
 loop running. Run 01 to 06 in any order; run 07 last, right after a
-rule-creating flow and a refusal generated from the laptop against its rule,
-as described below.
+rule-creating flow and a refusal generated from the laptop against that
+flow's payment rule, as described below.
 
 ```bash
 maestro --device emulator-5554 test e2e/maestro/01-onboarding.yaml

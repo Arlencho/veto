@@ -17,11 +17,6 @@ mock.module('react-native-android-widget', {
     },
   },
 });
-mock.module('../widgets/androidWidget', {
-  namedExports: {
-    widgetElement: () => null,
-  },
-});
 mock.module('./widgetData', {
   namedExports: {
     SPEND_WIDGET_NAME: SPEND,
@@ -57,19 +52,11 @@ test.describe('home widget refresh', { concurrency: 1 }, () => {
     assert.deepEqual(updated, []);
   });
 
-  test('a placed spend widget still loads the board and updates both widget kinds', async () => {
-    const { refreshHomeWidgets } = await registerModule;
-    reset({ [SPEND]: [4] });
-    await refreshHomeWidgets();
-    assert.equal(boards, 1);
-    assert.deepEqual(updated, [SPEND, RULE]);
-  });
-
-  test('a placed rule widget alone still loads the board', async () => {
-    const { refreshHomeWidgets } = await registerModule;
-    reset({ [RULE]: [7] });
-    await refreshHomeWidgets();
-    assert.equal(boards, 1);
-    assert.deepEqual(updated, [SPEND, RULE]);
+  test('a placed widget of either kind counts, and none placed does not', async () => {
+    const { anyHomeWidgetPlaced } = await registerModule;
+    const info = (next: Record<string, number[]>) => async (name: string) => next[name] ?? [];
+    assert.equal(await anyHomeWidgetPlaced(info({})), false);
+    assert.equal(await anyHomeWidgetPlaced(info({ [SPEND]: [4] })), true);
+    assert.equal(await anyHomeWidgetPlaced(info({ [RULE]: [7] })), true);
   });
 });

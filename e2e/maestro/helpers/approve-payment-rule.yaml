@@ -2,7 +2,8 @@ appId: com.veto.app
 ---
 # Replays first-run through the unsigned review, then stays there. The pasted
 # agent stays on the review, so it is not typed again. Sets the payee through
-# the payee scan's paste field, types the limits, and approves. The approve button only renders once a payee is set.
+# the payee scan's paste field, types the limits, and approves. The approve
+# button only renders once a payee is set.
 - runFlow: enter-agent.yaml
 - scrollUntilVisible:
     element: "May only pay"

@@ -50,7 +50,7 @@ veto pay 500000
 
 That is one charge, in base units, on the rule `veto connect` saved in `~/.veto/config.json`. `--rule <address>` charges that rule instead. A newer rule for the same key is never picked up on its own, because anyone can open one. A pending override is the nonce the SDK would use, and a different amount is not sent, so the override is not cleared by accident.
 
-A refusal is a successful decision. The command exits 0 and prints the kind, the amount in the token and in base units, the payee, the reason code and text, the override that would have cleared it, the signature, and the explorer link. Amounts in that printout are named in the token. An RPC or key problem exits 1.
+A refusal is a successful decision. The command exits 0 and prints the kind, the amount in the token and in base units, the payee, the reason code and text, the override that would have cleared it, the signature, and the explorer link. Amounts in that printout are named in the token. An RPC or key problem exits 1. Error text never includes a URL, so an API key in the RPC address stays out of the terminal and out of MCP tool results.
 
 ## Status and decisions
 

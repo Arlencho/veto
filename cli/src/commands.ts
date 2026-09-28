@@ -10,7 +10,7 @@ import {
 import type { AgentMandate, Decision, RuleRequest } from "@veto-hq/agent-sdk";
 import { USAGE, parseArgs, rejectPositionals, rejectUnused, type Args } from "./args.js";
 import { DEFAULT_RPC, assertGenesis, explorerTx, parseCluster, type Cluster } from "./cluster.js";
-import { CliError, FILTERS_REFUSED, isForeignAgent, rpcRefusesFilters } from "./errors.js";
+import { CliError, FILTERS_REFUSED, errorText, isForeignAgent, rpcRefusesFilters } from "./errors.js";
 import { TRADE_RULE_DISABLED, tradeRuleEnabled } from "./features.js";
 import { loadOrCreateKey, readConfig, readKeyFile, writeConfig } from "./files.js";
 import {
@@ -133,7 +133,7 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     else throw new CliError(`Unknown command ${args.command}.`);
     return 0;
   } catch (err) {
-    runtime.stderr(err instanceof Error ? err.message : String(err));
+    runtime.stderr(errorText(err));
     return 1;
   }
 }

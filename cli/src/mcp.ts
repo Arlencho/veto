@@ -11,7 +11,7 @@ import {
   payLines,
   statusLines,
 } from "./commands.js";
-import { CliError } from "./errors.js";
+import { CliError, errorText } from "./errors.js";
 import { assertAgentKeyMode } from "./files.js";
 import { renderQrPng } from "./qr.js";
 import type { Runtime } from "./runtime.js";
@@ -100,8 +100,9 @@ async function guard(body: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
     return await body();
   } catch (err) {
-    if (err instanceof CliError) return toolError(err.message);
-    throw err;
+    // Every failure becomes a tool error here, so the MCP SDK never forwards a raw message
+    // that could hold the RPC URL and its API key.
+    return toolError(errorText(err));
   }
 }
 

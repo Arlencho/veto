@@ -4,13 +4,27 @@ This file lists public addresses only. Keypairs live under gitignored `keys/` an
 
 Do not put funds you cannot lose under this program on mainnet
 
+## Upgrade authority plan
+
+The plan is the one in the README threat model and in [SECURITY_REVIEW.md](SECURITY_REVIEW.md) F8 (decided in #110): after an external audit, the mainnet upgrade authority is set to none before the first mandate is opened. A fix after that is a new program id and a new mandate. A multisig was considered and not chosen.
+
+`scripts/mainnet-deploy.sh` deploys with the deployer key, `keys/deployer.json`, as upgrade authority. That is the state between deployment and the step below, and no mandate is opened in that window. The script does not perform the step below.
+
+```bash
+solana program set-upgrade-authority 3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV --final --upgrade-authority keys/deployer.json --keypair keys/deployer.json --url "$VETO_MAINNET_RPC"
+solana program show 3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV --url "$VETO_MAINNET_RPC"
+```
+
+The second command must show no upgrade authority before any mandate is opened.
+
+An earlier version of this file listed "Upgrade authority is held by the deployer key" as a containment rule while mandates were open. That line is superseded by the plan above.
+
 ## Containment
 
 - Own wallet only. No third-party funds.
-- Mandate path only, capped at 200 SKR total and 10 SKR per payment.
+- Mandate path only, capped at 200 SKR total and 10 SKR per payment, and only after the upgrade authority is set to none.
 - No Hold vault is ever opened on mainnet.
 - The store build stays on devnet.
-- Upgrade authority is held by the deployer key, `keys/deployer.json`.
 
 These are operator containment rules. The deploy script does not configure payment limits or open mandates or vaults.
 
@@ -37,7 +51,7 @@ These are operator containment rules. The deploy script does not configure payme
 | File | Whose key |
 |---|---|
 | `keys/program.json` | Backed-up program key matching `declare_id!` |
-| `keys/deployer.json` | Deployer, fee payer and upgrade authority |
+| `keys/deployer.json` | Deployer and fee payer; upgrade authority only until it is set to none |
 
 ## Deployment gates
 

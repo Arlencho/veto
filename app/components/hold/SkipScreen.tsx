@@ -17,6 +17,7 @@ export function SkipScreen({
   whenBoth,
   payload,
   onPayload,
+  request = null,
   onBack,
   onSign,
   signLabel,
@@ -37,6 +38,8 @@ export function SkipScreen({
   whenBoth: readonly string[];
   payload: string;
   onPayload: (text: string) => void;
+  /** What the pasted request does, checked against this vault, or why it was refused. */
+  request?: { ok: true; lines: readonly string[] } | { ok: false; reason: string } | null;
   onBack: () => void;
   onSign: () => Promise<void>;
   signLabel: string;
@@ -83,19 +86,39 @@ export function SkipScreen({
           onChangeText={onPayload}
           hint="Paste this only on the phone that still has to sign."
         />
+        {request ? (
+          <View accessibilityRole="text" accessibilityLiveRegion="polite" style={request.ok ? styles.when : styles.refused}>
+            <Text style={styles.kicker}>{request.ok ? 'This request, checked against this vault' : 'This request was refused'}</Text>
+            {request.ok ? (
+              request.lines.map((line) => (
+                <Text key={line} style={styles.body} selectable>
+                  {line}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.refusedText}>{request.reason}</Text>
+            )}
+          </View>
+        ) : null}
         {signedHere ? (
           <View accessibilityRole="text" accessibilityLiveRegion="polite" style={styles.status}>
             <Text style={styles.statusText}>{waitingLine}</Text>
           </View>
         ) : (
-          <HoldSign name="both-keys" label={signLabel} hint={signHint} disabled={signingDisabled} onSign={onSign} />
+          <HoldSign
+            name="both-keys"
+            label={signLabel}
+            hint={signHint}
+            disabled={signingDisabled || request?.ok === false}
+            onSign={onSign}
+          />
         )}
         {signedHere && payload.length > 0 ? (
           <HoldSign
             name="finish-both"
             label="Press and hold to sign with the key on this phone"
             hint="This finishes the request the other phone started."
-            disabled={signingDisabled}
+            disabled={signingDisabled || request?.ok === false}
             onSign={onSign}
           />
         ) : null}
@@ -155,6 +178,15 @@ const styles = StyleSheet.create({
     padding: space.xl,
     gap: space.sm,
   },
+  refused: {
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 185, 75, 0.6)',
+    backgroundColor: colors.surface,
+    padding: space.xl,
+    gap: space.sm,
+  },
+  refusedText: { color: colors.bone, fontFamily: fonts.sansBold, fontSize: 14, lineHeight: 20 },
   kicker: {
     color: colors.muted,
     fontFamily: fonts.sansBold,

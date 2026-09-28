@@ -78,12 +78,35 @@ test("pay prints a refusal and exits 0", async () => {
       output(runtime),
       [
         "kind refused",
+        "amount 0.001 USDC (1000 base units)",
+        `payee ${w.merchant.publicKey.toBase58()}`,
         "reason 5 over per-payment maximum",
         "override 0.50 USDC",
         "signature sig-charge",
         "https://explorer.solana.com/tx/sig-charge?cluster=devnet",
       ].join("\n"),
     );
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("pay states the amount in the token and in base units, the payee, and the signature", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    retargetMint(w, DEVNET_USDC_MINT);
+    await saveSetup(home, w);
+    plantCharge(w, w.mandate, 5n, 1n, "paid");
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["pay", "5"], runtime);
+    assert.equal(code, 0);
+    assert.deepEqual(runtime.lines.slice(0, 3), [
+      "kind paid",
+      "amount 0.000005 USDC (5 base units)",
+      `payee ${w.merchant.publicKey.toBase58()}`,
+    ]);
+    assert.ok(runtime.lines.includes("signature sig-charge"));
   } finally {
     removeHome(home);
   }

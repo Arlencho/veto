@@ -89,6 +89,55 @@ test("the tool list is pay, status, decisions, and request rule", async () => {
   }
 });
 
+test("veto_pay is annotated as spending and not idempotent, and says it spends money", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const runtime = harness(home, chainOf(w.fake));
+    await withClient(runtime, async (client) => {
+      const listed = await client.listTools();
+      const pay = listed.tools.find((tool) => tool.name === "veto_pay");
+      assert.ok(pay);
+      assert.equal(pay.annotations?.readOnlyHint, false);
+      assert.equal(pay.annotations?.destructiveHint, true);
+      assert.equal(pay.annotations?.idempotentHint, false);
+      assert.match(pay.description ?? "", /^Spends money\./);
+      assert.match(pay.description ?? "", /within the rule's per-payment maximum and total/);
+      for (const name of ["veto_status", "veto_decisions"]) {
+        const tool = listed.tools.find((row) => row.name === name);
+        assert.equal(tool?.annotations?.readOnlyHint, true);
+      }
+      const request = listed.tools.find((tool) => tool.name === "veto_request_rule");
+      assert.equal(request?.annotations?.destructiveHint, false);
+    });
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("veto_pay text states the amount in the token and base units, the payee, and the signature", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    retargetMint(w, DEVNET_USDC_MINT);
+    await saveSetup(home, w);
+    plantCharge(w, w.mandate, 5n, 1n, "paid");
+    const runtime = harness(home, chainOf(w.fake));
+    await withClient(runtime, async (client) => {
+      const result = asResult(await client.callTool({ name: "veto_pay", arguments: { amount: "5" } }));
+      assert.equal(result.isError, undefined);
+      const text = textOf(result);
+      assert.ok(text.includes("amount 0.000005 USDC (5 base units)"));
+      assert.ok(text.includes(`payee ${w.merchant.publicKey.toBase58()}`));
+      assert.ok(text.includes("signature sig-charge"));
+      assert.equal(result.structuredContent?.amount, "0.000005 USDC");
+      assert.equal(result.structuredContent?.amountBaseUnits, "5");
+    });
+  } finally {
+    removeHome(home);
+  }
+});
+
 test("veto_trade is disabled and is not a tool", async () => {
   const home = tempHome();
   try {
@@ -127,6 +176,11 @@ test("veto_pay returns a paid decision", async () => {
       assert.equal(result.isError, undefined);
       assert.deepEqual(result.structuredContent, {
         kind: "paid",
+        amount: "0.001 USDC",
+        amountBaseUnits: "1000",
+        token: "USDC",
+        mint: DEVNET_USDC_MINT,
+        payee: w.merchant.publicKey.toBase58(),
         reasonCode: 0,
         reasonText: "ok",
         override: "0 USDC",
@@ -153,6 +207,11 @@ test("veto_pay returns a refusal as a normal result", async () => {
       assert.equal(result.isError, undefined);
       assert.deepEqual(result.structuredContent, {
         kind: "refused",
+        amount: "0.001 USDC",
+        amountBaseUnits: "1000",
+        token: "USDC",
+        mint: DEVNET_USDC_MINT,
+        payee: w.merchant.publicKey.toBase58(),
         reasonCode: 5,
         reasonText: "over per-payment maximum",
         override: "0.50 USDC",

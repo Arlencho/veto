@@ -38,7 +38,7 @@ The terminal waits until a rule that answers this request is on chain: it must n
 "veto": { "command": "npx", "args": ["-y", "@veto-hq/veto", "mcp"] }
 ```
 
-The owner should remove any other tool that holds a funded key, because the companion cannot stop a second key. The server does not take a key. It refuses to start when `~/.veto/agent.json` is more open than mode 0600.
+The owner should remove any other tool that holds a funded key, because the companion cannot stop a second key. The server does not take a key. It refuses to start when `~/.veto/agent.json` is more open than mode 0600. Its `veto_pay` tool is marked as spending and not idempotent, so MCP clients that honour tool annotations can ask before each payment.
 
 The rule and the RPC are saved in `~/.veto/config.json`. If the RPC refuses `getProgramAccounts` filters, pass `--rule` with the rule address. That checks the rule you name and skips the request.
 
@@ -50,7 +50,7 @@ veto pay 500000
 
 That is one charge, in base units, on the rule `veto connect` saved in `~/.veto/config.json`. `--rule <address>` charges that rule instead. A newer rule for the same key is never picked up on its own, because anyone can open one. A pending override is the nonce the SDK would use, and a different amount is not sent, so the override is not cleared by accident.
 
-A refusal is a successful decision. The command exits 0 and prints the kind, the reason code and text, the override that would have cleared it, the signature, and the explorer link. Amounts in that printout are named in the token. An RPC or key problem exits 1.
+A refusal is a successful decision. The command exits 0 and prints the kind, the amount in the token and in base units, the payee, the reason code and text, the override that would have cleared it, the signature, and the explorer link. Amounts in that printout are named in the token. An RPC or key problem exits 1.
 
 ## Status and decisions
 

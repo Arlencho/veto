@@ -27,6 +27,11 @@ const payInput = z
 
 const payOutput = z.object({
   kind: z.enum(["paid", "refused"]),
+  amount: z.string(),
+  amountBaseUnits: z.string(),
+  token: z.string(),
+  mint: z.string(),
+  payee: z.string(),
   reasonCode: z.number().int(),
   reasonText: z.string(),
   override: z.string(),
@@ -125,9 +130,16 @@ function registerPay(server: McpServer, runtime: Runtime): void {
     "veto_pay",
     {
       description:
-        "Pay an amount in base units from the active rule. A refusal is a normal result: kind, reason, override, signature, and explorer link.",
+        "Spends money. Pays an amount in base units from the owner's tokens to the rule's payee, within the rule's per-payment maximum and total. A paid call moves real tokens and cannot be undone, and calling twice pays twice. A refusal is a normal result. The result states the amount in the token and in base units, the token, the payee, the reason, the override, the signature, and the explorer link.",
       inputSchema: payInput,
       outputSchema: payOutput,
+      annotations: {
+        title: "Pay from the Veto rule",
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (args) =>
       guard(async () => {
@@ -148,6 +160,7 @@ function registerStatus(server: McpServer, runtime: Runtime): void {
         "What the rule can still pay today, the cap, the largest payment, the expiry, and the agent's fee in SOL. Amounts name the token.",
       inputSchema: statusInput,
       outputSchema: statusOutput,
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () =>
       guard(async () => {
@@ -174,6 +187,7 @@ function registerDecisions(server: McpServer, runtime: Runtime): void {
       description: "Decisions on the rule, newest first. Each amount names the token.",
       inputSchema: decisionsInput,
       outputSchema: decisionsOutput,
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (args) =>
       guard(async () => {
@@ -193,6 +207,7 @@ function registerRequestRule(server: McpServer, runtime: Runtime): void {
       description: "Build a rule request. The owner scans the QR on the phone and holds to approve.",
       inputSchema: requestInput,
       outputSchema: requestOutput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async (args) =>
       guard(async () => {

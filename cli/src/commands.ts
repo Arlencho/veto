@@ -73,6 +73,13 @@ export const COMMANDS: readonly CommandSpec[] = [
 
 export type PayOutcome = {
   kind: "paid" | "refused";
+  /** The amount asked, in the token, such as "0.50 USDC". Paid only when kind is paid. */
+  amount: string;
+  amountBaseUnits: string;
+  /** Token symbol when the mint is known, the shortened mint otherwise. */
+  token: string;
+  mint: string;
+  payee: string;
   reasonCode: number;
   reasonText: string;
   override: string;
@@ -166,6 +173,8 @@ async function pay(args: Args, runtime: Runtime): Promise<void> {
 export function payLines(outcome: PayOutcome): string[] {
   return [
     `kind ${outcome.kind}`,
+    `amount ${outcome.amount} (${outcome.amountBaseUnits} base units)`,
+    `payee ${outcome.payee}`,
     `reason ${outcome.reasonCode} ${outcome.reasonText}`,
     `override ${outcome.override}`,
     `signature ${outcome.signature}`,
@@ -190,6 +199,11 @@ export async function executePay(runtime: Runtime, amountText: string, rule?: st
   const outcome = await veto.charge({ amount, nonce, guardPendingOverride: true });
   return {
     kind: outcome.kind,
+    amount: `${formatTokenUnits(amount, decimals)} ${symbol}`,
+    amountBaseUnits: amount.toString(),
+    token: symbol,
+    mint: view.mint,
+    payee: view.merchant,
     reasonCode: outcome.reasonCode,
     reasonText: outcome.reasonText,
     override: `${formatTokenUnits(outcome.suggestedOverride, decimals)} ${symbol}`,

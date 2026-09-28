@@ -396,11 +396,26 @@ solana account {program_id} -u {rpc}
 
 ## Upgrades
 
-### Pending upgrade: guardian changes wait (not deployed)
+### Hold guardian and safe-address upgrade, 2026-09-28
 
-Not deployed. Nothing in this section has been uploaded to devnet, and the
-program on devnet is still the build recorded in the upgrade sections below.
-The pending change is in `programs/veto/src/hold.rs`:
+The lead upgraded the program from main commit `74c9e99`, containing
+[PR 374](https://github.com/Arlencho/veto/pull/374) and
+[PR 376](https://github.com/Arlencho/veto/pull/376). The lead verified the
+following facts on 2026-09-28:
+
+- Program: `3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV`.
+- Build: `make build`; `target/deploy/veto.so` is 632104 bytes, SHA-256 `31dd22337359e3c31951e312b130b6de71b244d884e2530140182d5ee9529bd2`. This is identical to the build the independent red-team review approved for both PRs.
+- Upgrade signature: `5yM7C5C9ytqKG1dfnkqDDTm98cfPQ9zg8LntNLDR4M35AzjeaA8KZYj8HAA3qYLZMHu5eTDF11nCHEwA7w6muyxq` ([transaction](https://explorer.solana.com/tx/5yM7C5C9ytqKG1dfnkqDDTm98cfPQ9zg8LntNLDR4M35AzjeaA8KZYj8HAA3qYLZMHu5eTDF11nCHEwA7w6muyxq?cluster={cluster})), status Finalized. Last Deployed In Slot 505155110.
+- Upgrade authority unchanged: `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`.
+- Program data length 632416 bytes; no extension was needed.
+- `solana program dump` of the program: the first 632104 bytes hash to the SHA-256 above, and the remaining 312 bytes are zero padding.
+- The program test suite at that commit passed 164 of 164: unit 4, Hold 31, Hold red-team 41, payment red-team 20, refusal recording 6, SKR mint 2, token-swap fixture 3, trade 27, trade red-team 30.
+
+No post-upgrade devnet journey or IDL comparison is recorded for this upgrade.
+
+#### Rules now deployed
+
+This upgrade deploys these rules from `programs/veto/src/hold.rs`:
 
 - `propose_change` treats any guardian change, including adding one to a vault
   with none, as a loosening change. It waits `delay_secs` and applies through
@@ -417,18 +432,18 @@ The pending change is in `programs/veto/src/hold.rs`:
 - On a vault with safe equal to owner and a guardian, a hostile guardian can
   freeze the vault and cancel every repair, leaving only the guardian able to
   release funds, through `recover` to the owner wallet. No theft is possible.
-  Repair any vault with safe equal to owner before this upgrade lands, while
-  the current devnet program still lets the owner recover to itself. No vault
-  documented here has safe equal to owner: the demo vault
-  `7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` and the legacy vault
-  `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` (issue #368) have safe equal
-  to guardian, and the Hold journey vaults use a freshly generated safe address.
 
-Until the upgrade is deployed and verified here, devnet keeps the old rules:
-adding a guardian to a vault with none applies at once, and on a vault whose
-safe address is its guardian (for example the demo vault
-`7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` below) the guardian alone can
-recover the balance.
+Repair any vault whose safe address equals its guardian or its owner: the owner
+proposes an independent safe address with `propose_change`, and it applies
+through `apply_change` after the delay (see [Hold migrations](HOLD_MIGRATIONS.md)).
+No vault documented here has safe equal to owner. The demo vault
+`7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` and the legacy vault
+`8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` (issue #368) still have safe
+equal to guardian and still need their owner's repair. The Hold journey vaults
+use a freshly generated safe address.
+
+Before this upgrade, devnet applied an added guardian at once, and on a vault
+whose safe address is its guardian the guardian alone could recover the balance.
 
 ### Hold migration and safe-address upgrade, 2026-09-26
 
@@ -1039,8 +1054,8 @@ rules, queued changes and release accounting. The upgraded binary was deployed
 on 2026-09-26, and the owner migrated the legacy vault the same day (signature
 under "Hold migration and safe-address upgrade, 2026-09-26" above). The owner can
 still resolve any holds and freeze, then call `close_hold_vault` to sweep tokens
-to the configured safe address and reclaim rent. After the pending upgrade, the safe address must differ from the owner for
-the owner to close. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
+to the configured safe address and reclaim rent. Since the 2026-09-28 upgrade, the safe address must differ from the owner
+for the owner to close. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
 These instructions do not authorize or record a deployment or recovery transaction.
 """
 Path("docs/DEVNET.md").write_text(md)

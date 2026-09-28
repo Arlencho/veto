@@ -108,7 +108,7 @@ async function guard(body: () => Promise<ToolResult>): Promise<ToolResult> {
 
 export async function createMcpServer(runtime: Runtime): Promise<McpServer> {
   await assertAgentKeyMode(runtime.home);
-  const server = new McpServer({ name: "veto", version: "0.1.0" });
+  const server = new McpServer({ name: "veto", version: "0.1.1" });
   for (const command of COMMANDS) {
     if (command.tool === undefined || !command.enabled) continue;
     if (command.tool === "veto_pay") registerPay(server, runtime);

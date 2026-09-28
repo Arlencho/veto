@@ -1,6 +1,6 @@
 {
   "name": "@veto-hq/agent-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "TypeScript client for one charge, for reading a mandate and its decisions, and for a Hold vault.",
   "license": "Apache-2.0",

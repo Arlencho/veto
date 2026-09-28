@@ -122,7 +122,7 @@ test("R11 the README install line is the published package and the example usage
     repository: { url: string; directory?: string };
   };
   assert.equal(pkg.name, "@veto-hq/agent-sdk");
-  assert.equal(pkg.version, "0.1.0");
+  assert.equal(pkg.version, "0.1.1");
   assert.equal(pkg.private, false);
   assert.equal(pkg.license, "Apache-2.0");
   assert.equal(pkg.homepage, "https://github.com/Arlencho/veto");

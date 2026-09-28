@@ -26,7 +26,10 @@ Closure refuses any pending withdrawal or freeze, transfers the full balance,
 and closes the token account, vault and ledger, returning their rent to the owner.
 Resolve holds and unfreeze through the existing rules first. A guardian cannot
 migrate or close alone, and closure cannot redirect funds or apply a queued safe
-address change early. Existing Recover semantics are unchanged.
+address change early. The safe address must differ from the owner for the owner
+to close: on a pre-#344 vault whose safe address is the owner key, close is
+refused with `SafeAddressIsOwner` until the safe address is repaired.
+Existing Recover semantics are unchanged.
 
 The old devnet demo vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
 needed the upgraded program and its owner's signature. Its owner migrated it on
@@ -55,12 +58,26 @@ the program cannot tell an honest repair from a stolen owner key moving the safe
 address.
 
 An existing vault with safe equal to owner is refused the same way: the owner
-alone cannot `recover` (`SafeAddressIsOwner`), the guardian still can, and the
-owner repairs it with `propose_change` then `apply_change` after the delay.
+alone cannot `recover` or `close_hold_vault` (`SafeAddressIsOwner`), the
+guardian still can recover, and the owner repairs it with `propose_change` then
+`apply_change` after the delay.
+
+The guardian keeps its cancel on that repair too. On a vault with safe equal to
+owner and a guardian, a hostile guardian can freeze the vault and cancel every
+repair, leaving only the guardian able to release funds, through `recover` to
+the owner wallet. No theft is possible: the owner key alone cannot recover or
+close to itself, and the guardian can only pay the owner. Repair any vault with
+safe equal to owner before this upgrade is deployed, while the current devnet
+program still lets the owner recover to itself. No vault documented in
+[DEVNET.md](DEVNET.md) has safe equal to owner: the demo vault
+`7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` and the legacy vault
+`8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` (issue #368) have safe equal to
+guardian, and the Hold journey vaults use a freshly generated safe address.
 
 These checks compare keys only. A safe address that is a different wallet the
 guardian (or the owner) also controls cannot be detected on chain.
 
-On a vault with safe equal to guardian, repair the safe address before
-tightening any rule. `require_rules` runs on every proposal, so a tightening
-proposal that keeps the old safe address is refused with `SafeAddressIsGuardian`.
+On a vault with safe equal to the guardian or the owner, repair the safe
+address before tightening any rule. `require_rules` runs on every proposal, so a
+tightening proposal that keeps the old safe address is refused with
+`SafeAddressIsGuardian` or `SafeAddressIsOwner`.

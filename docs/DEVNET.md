@@ -169,6 +169,18 @@ The pending change is in `programs/veto/src/hold.rs`:
 - `recover` refuses the owner alone with `SafeAddressIsOwner` when the safe
   address is the owner key (a pre-#344 vault). The guardian can still recover,
   and the owner repairs the safe address through `propose_change`.
+- `close_hold_vault` refuses the owner with `SafeAddressIsOwner` when the safe
+  address is the owner key. Close still cannot redirect funds, and the safe
+  address must differ from the owner for the owner to close.
+- On a vault with safe equal to owner and a guardian, a hostile guardian can
+  freeze the vault and cancel every repair, leaving only the guardian able to
+  release funds, through `recover` to the owner wallet. No theft is possible.
+  Repair any vault with safe equal to owner before this upgrade lands, while
+  the current devnet program still lets the owner recover to itself. No vault
+  documented here has safe equal to owner: the demo vault
+  `7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` and the legacy vault
+  `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` (issue #368) have safe equal
+  to guardian, and the Hold journey vaults use a freshly generated safe address.
 
 Until the upgrade is deployed and verified here, devnet keeps the old rules:
 adding a guardian to a vault with none applies at once, and on a vault whose
@@ -785,5 +797,6 @@ rules, queued changes and release accounting. The upgraded binary was deployed
 on 2026-09-26, and the owner migrated the legacy vault the same day (signature
 under "Hold migration and safe-address upgrade, 2026-09-26" above). The owner can
 still resolve any holds and freeze, then call `close_hold_vault` to sweep tokens
-to the configured safe address and reclaim rent. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
+to the configured safe address and reclaim rent. After the pending upgrade, the safe address must differ from the owner for
+the owner to close. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
 These instructions do not authorize or record a deployment or recovery transaction.

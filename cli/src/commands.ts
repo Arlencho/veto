@@ -5,13 +5,14 @@ import {
   createRuleRequest,
   decisionsForMandate,
   mandatesForAgent,
+  parseRuleRequest,
 } from "@veto-hq/agent-sdk";
-import type { Decision } from "@veto-hq/agent-sdk";
+import type { AgentMandate, Decision, RuleRequest } from "@veto-hq/agent-sdk";
 import { USAGE, parseArgs, rejectPositionals, rejectUnused, type Args } from "./args.js";
 import { DEFAULT_RPC, assertGenesis, explorerTx, parseCluster, type Cluster } from "./cluster.js";
-import { CliError, FILTERS_REFUSED, isForeignAgent, rpcRefusesFilters } from "./errors.js";
+import { CliError, FILTERS_REFUSED, errorText, isForeignAgent, rpcRefusesFilters } from "./errors.js";
 import { TRADE_RULE_DISABLED, tradeRuleEnabled } from "./features.js";
-import { loadOrCreateKey, readConfig, readKeyFile, writeConfig } from "./files.js";
+import { loadOrCreateKey, readConfig, readKeyFile, writeConfig, type VetoConfig } from "./files.js";
 import {
   DEVNET_USDC_MINT,
   MCP_CONFIG_LINE,
@@ -30,8 +31,11 @@ import type { Runtime } from "./runtime.js";
 import { PublicKey, canonicalAddress, type Connection, type Keypair as AgentKey, type PublicKey as Address } from "./web3.js";
 
 const POLL_MS = 5_000;
+/** Clock skew allowed between this machine and the phone when checking the approved expiry. */
+const EXPIRY_SLACK_SECONDS = 3_600n;
+const SECONDS_PER_DAY = 86_400n;
 const AIRDROP_LAMPORTS = 1_000_000_000;
-const CONNECT_FLAGS = ["key", "rule", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster"] as const;
+const CONNECT_FLAGS = ["key", "rule", "owner", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster"] as const;
 
 type RuleFields = {
   payee: string;
@@ -69,6 +73,13 @@ export const COMMANDS: readonly CommandSpec[] = [
 
 export type PayOutcome = {
   kind: "paid" | "refused";
+  /** The amount asked, in the token, such as "0.50 USDC". Paid only when kind is paid. */
+  amount: string;
+  amountBaseUnits: string;
+  /** Token symbol when the mint is known, the shortened mint otherwise. */
+  token: string;
+  mint: string;
+  payee: string;
   reasonCode: number;
   reasonText: string;
   override: string;
@@ -122,7 +133,7 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     else throw new CliError(`Unknown command ${args.command}.`);
     return 0;
   } catch (err) {
-    runtime.stderr(err instanceof Error ? err.message : String(err));
+    runtime.stderr(errorText(err));
     return 1;
   }
 }
@@ -138,6 +149,9 @@ async function connect(args: Args, runtime: Runtime): Promise<void> {
   const connection = runtime.connect(rpc);
   await assertGenesis(connection, cluster);
   await maybeAirdrop(connection, loaded.keypair.publicKey, cluster, runtime);
+  if (args.rule !== undefined && args.owner !== undefined) {
+    throw new CliError("Use --rule or --owner, not both.");
+  }
   const address =
     args.rule !== undefined
       ? await namedRule(connection, args.rule, loaded.keypair, runtime)
@@ -162,6 +176,8 @@ async function pay(args: Args, runtime: Runtime): Promise<void> {
 export function payLines(outcome: PayOutcome): string[] {
   return [
     `kind ${outcome.kind}`,
+    `${outcome.kind === "paid" ? "amount" : "asked"} ${outcome.amount} (${outcome.amountBaseUnits} base units)`,
+    `payee ${outcome.payee}`,
     `reason ${outcome.reasonCode} ${outcome.reasonText}`,
     `override ${outcome.override}`,
     `signature ${outcome.signature}`,
@@ -174,7 +190,7 @@ export async function executePay(runtime: Runtime, amountText: string, rule?: st
   const stored = await readConfig(runtime.home);
   const keypair = await readKeyFile(stored.key);
   const connection = runtime.connect(stored.rpc);
-  const address = await selectRule(connection, keypair, runtime, rule);
+  const address = rule !== undefined ? canonicalAddress(rule, "Rule address") : stored.rule;
   const veto = await openMandate(connection, address, keypair);
   const view = await veto.status();
   if (!isActive(view.status, view.expiresAt, unixSeconds(runtime.now()))) {
@@ -186,6 +202,11 @@ export async function executePay(runtime: Runtime, amountText: string, rule?: st
   const outcome = await veto.charge({ amount, nonce, guardPendingOverride: true });
   return {
     kind: outcome.kind,
+    amount: `${formatTokenUnits(amount, decimals)} ${symbol}`,
+    amountBaseUnits: amount.toString(),
+    token: symbol,
+    mint: view.mint,
+    payee: view.merchant,
     reasonCode: outcome.reasonCode,
     reasonText: outcome.reasonText,
     override: `${formatTokenUnits(outcome.suggestedOverride, decimals)} ${symbol}`,
@@ -259,13 +280,15 @@ export async function executeDecisions(runtime: Runtime, limit?: string | number
 }
 
 export async function executeRequestRule(runtime: Runtime, fields: RuleRequestInput): Promise<string> {
-  const cluster = await savedCluster(runtime.home);
+  const stored = await savedConfig(runtime.home);
+  const cluster = stored?.cluster ?? "devnet";
   const mint = fields.mint !== undefined ? fields.mint : cluster === "devnet" ? DEVNET_USDC_MINT : undefined;
   if (mint === undefined || mint.trim() === "") {
     throw new CliError("Mint address is required.");
   }
-  const loaded = await loadOrCreateKey(runtime.home, undefined);
-  return ruleRequestUrl(loaded.keypair.publicKey.toBase58(), {
+  // After veto connect, the request names the key that config saved, never a new one.
+  const keypair = stored ? await savedKey(stored.key) : (await loadOrCreateKey(runtime.home, undefined)).keypair;
+  return ruleRequestUrl(keypair.publicKey.toBase58(), {
     payee: fields.payee,
     max: fields.max,
     cap: fields.cap,
@@ -343,8 +366,12 @@ async function requestAndWait(
 ): Promise<string> {
   const fields = await askRule(args, cluster, runtime);
   const url = ruleRequestUrl(keypair.publicKey.toBase58(), fields);
+  const parsed = parseRuleRequest(url);
+  if (!parsed.ok) throw new CliError("The rule request could not be read back.");
+  const request = parsed.request;
   runtime.stdout(url);
   runtime.stdout(runtime.qr(url));
+  const owner = args.owner === undefined ? undefined : ownerKey(args.owner);
   runtime.stdout("Waiting for you to approve on the phone.");
   for (let poll = 0; poll < runtime.maxPolls; poll += 1) {
     let rules;
@@ -355,13 +382,56 @@ async function requestAndWait(
       throw err;
     }
     const now = unixSeconds(runtime.now());
-    const match = rules.find(
-      (rule) => rule.agent.equals(keypair.publicKey) && isActive(rule.status, rule.expiresAt, now),
+    const matches = rules.filter(
+      (rule) => matchesRequest(rule, keypair.publicKey, request, now) && (!owner || rule.owner.equals(owner)),
     );
-    if (match) return match.address.toBase58();
+    if (matches.length > 1) {
+      for (const rule of matches) {
+        runtime.stdout(`Matching rule ${rule.address.toBase58()} from owner ${rule.owner.toBase58()}`);
+      }
+      throw new CliError(
+        "Several rules match this request, so none was chosen. Run veto connect --owner <your wallet address> to pick the rule you approved.",
+      );
+    }
+    const match = matches[0];
+    if (match) {
+      runtime.stdout(`Rule ${match.address.toBase58()}`);
+      runtime.stdout(`Owner ${match.owner.toBase58()}`);
+      if (!owner) {
+        runtime.stdout("Check that this owner is your wallet. If it is not, stop and run veto connect --owner <your wallet address>.");
+      }
+      return match.address.toBase58();
+    }
     await runtime.sleep(POLL_MS);
   }
   throw new CliError("Still waiting for you to approve on the phone.");
+}
+
+function ownerKey(text: string): Address {
+  try {
+    const key = new PublicKey(text.trim());
+    if (key.toBase58() === text.trim()) return key;
+  } catch {
+    // Fall through to the plain error below.
+  }
+  throw new CliError("--owner must be a wallet address.");
+}
+
+/**
+ * A rule answers the request only when it names this agent, the requested payee, mint and
+ * purpose, and stays within the requested total, per-payment maximum and days. The owner may
+ * lower the limits on the phone but never raise them. Anyone can open a rule for this agent, so
+ * the newest rule for the key proves nothing.
+ */
+function matchesRequest(rule: AgentMandate, agent: Address, request: RuleRequest, now: bigint): boolean {
+  if (!rule.agent.equals(agent) || !isActive(rule.status, rule.expiresAt, now)) return false;
+  if (rule.merchant.toBase58() !== request.payee) return false;
+  if (rule.mint.toBase58() !== request.mint) return false;
+  if (rule.purpose !== request.purpose) return false;
+  if (rule.cap <= 0n || rule.cap > request.cap) return false;
+  if (rule.perTxMax <= 0n || rule.perTxMax > request.max) return false;
+  const latest = now + BigInt(request.days) * SECONDS_PER_DAY + EXPIRY_SLACK_SECONDS;
+  return rule.expiresAt <= latest;
 }
 
 async function askRule(args: Args, cluster: Cluster, runtime: Runtime): Promise<RuleFields> {
@@ -406,28 +476,6 @@ async function showRule(
   runtime.stdout(MCP_CONFIG_LINE);
 }
 
-async function selectRule(
-  connection: Connection,
-  keypair: AgentKey,
-  runtime: Runtime,
-  named: string | undefined,
-): Promise<string> {
-  if (named !== undefined) return canonicalAddress(named, "Rule address");
-  let rules;
-  try {
-    rules = await mandatesForAgent(connection, keypair.publicKey);
-  } catch (err) {
-    if (rpcRefusesFilters(err)) throw new CliError(FILTERS_REFUSED);
-    throw err;
-  }
-  const now = unixSeconds(runtime.now());
-  const match = rules.find(
-    (rule) => rule.agent.equals(keypair.publicKey) && isActive(rule.status, rule.expiresAt, now),
-  );
-  if (!match) throw new CliError("No active rule.");
-  return match.address.toBase58();
-}
-
 async function openSaved(runtime: Runtime): Promise<{ connection: Connection; veto: VetoAgent }> {
   const stored = await readConfig(runtime.home);
   const keypair = await readKeyFile(stored.key);
@@ -445,11 +493,22 @@ async function openMandate(connection: Connection, address: string, keypair: Age
   }
 }
 
-async function savedCluster(home: string): Promise<Cluster> {
+async function savedConfig(home: string): Promise<VetoConfig | null> {
   try {
-    return (await readConfig(home)).cluster;
+    return await readConfig(home);
   } catch (err) {
-    if (err instanceof CliError && err.code === "config-missing") return "devnet";
+    if (err instanceof CliError && err.code === "config-missing") return null;
+    throw err;
+  }
+}
+
+async function savedKey(path: string): Promise<AgentKey> {
+  try {
+    return await readKeyFile(path);
+  } catch (err) {
+    if (err instanceof CliError && err.code === "key-missing") {
+      throw new CliError("The agent key file saved by veto connect was not found. Run veto connect again.");
+    }
     throw err;
   }
 }

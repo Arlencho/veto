@@ -189,7 +189,7 @@ In the app, open a new rule and paste that public address into the field labeled
 npm install @veto-hq/agent-sdk
 ```
 
-Version 0.1.0 was published to npm on 2026-09-27.
+Version 0.1.1 was published to npm on 2026-09-28 (0.1.0 on 2026-09-27).
 
 The package is published from this checkout by the maintainer. The same package exports `HoldVault` for the vault instructions. Those instructions are on the deployed devnet program; [docs/DEVNET.md](docs/DEVNET.md) records the upgrade. The field-by-field checks are in [sdk/README.md](sdk/README.md). The example loads the agent key and the JSON block the app copies (Copy all, or the same block a QR scan returns), checks that block against the chain, reads the next nonce, submits one `charge` for the amount you pass, and prints the kind, reason code, reason text, suggested override, signature, and slot.
 

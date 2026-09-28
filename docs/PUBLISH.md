@@ -1,12 +1,6 @@
 # Publishing the SDK and companion CLI
 
-Version 0.1.0 of both packages was published to npm on 2026-09-27. The steps below are for the next release.
-
-Version 0.1.1 of both packages is prepared for release: the manifests, lockfiles, MCP server
-version and changelogs say 0.1.1, and it is not on npm until the founder runs the commands below.
-The READMEs keep stating 0.1.0 as the published version until then. After both 0.1.1 registry
-checks pass, change those README lines (root `README.md`, `sdk/README.md`, `cli/README.md`) and
-the other docs that name 0.1.0 as the npm version. In the same change, update the expected sentence in `sdk/src/critic-r2-pr195.test.ts` (it pins "Version 0.1.0 was published to npm on 2026-09-27."), or the sdk suite and the next `prepublishOnly` fail.
+Version 0.1.1 of both packages was published to npm on 2026-09-28 (0.1.0 on 2026-09-27). The steps below are for the next release. Bump the version in the commands below together with the manifests. When a version is published, update the README version lines and the expected sentence in `sdk/src/critic-r2-pr195.test.ts`, which pins the root README's publish line.
 
 Only the founder runs the publish commands below, from an approved checkout,
 using an npm account authorized for the `@veto-hq` scope and its two-factor code.
@@ -80,6 +74,4 @@ npx veto --help
 ```
 
 The import should print `function function`. The CLI should print its help.
-These checks do not charge a rule or access a phone. The 0.1.1 changelogs are
-dated 2026-09-28; correct the date if the publish happens on another day. Change
-the README version lines only after both registry checks pass.
+These checks do not charge a rule or access a phone. For the next release, date the changelog entries on the day of the publish, and change the README version lines only after both registry checks pass.

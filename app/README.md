@@ -140,7 +140,7 @@ Every owner or guardian signature goes through the Mobile Wallet Adapter and Pre
 
 The 15 minute local check also raises hold alerts: at creation, at 1 hour, at 12 hours, every 12 hours after that, at 6 hours and 1 hour before the end, and when the wait ends. Hold alerts cannot be muted in the app. The watcher raises the same alerts when `VETO_HOLD_VAULTS` is set. See [watcher/README.md](../watcher/README.md).
 
-The phone builds Hold instructions itself. It does not import `@veto-hq/agent-sdk`. That package is for agents, and version 0.1.0 is on npm. The program instructions are in the root [README](../README.md).
+The phone builds Hold instructions itself. It does not import `@veto-hq/agent-sdk`. That package is for agents, and version 0.1.1 is on npm. The program instructions are in the root [README](../README.md).
 
 Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 

@@ -142,7 +142,7 @@ mints further supply of that same mint. Addresses are in [DEVNET.md](DEVNET.md).
 >
 > Submissions close October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 
-The phone now also has the Backglass first run (Learn, Connect wallet, Add your agent, Approve the rule, Live), four tabs (Overview, Rules, Agents, Decisions), grades, plaques, a week in review, a track record card, renewal, a quiet note, and two home screen widgets. The agent package is `@veto-hq/agent-sdk`, version 0.1.0 on npm. Authorize identifies the app as `https://veto-hq.github.io`. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. The slides above are still the refusal on the quoted rule.
+The phone now also has the Backglass first run (Learn, Connect wallet, Add your agent, Approve the rule, Live), four tabs (Overview, Rules, Agents, Decisions), grades, plaques, a week in review, a track record card, renewal, a quiet note, and two home screen widgets. The agent package is `@veto-hq/agent-sdk`, version 0.1.1 on npm. Authorize identifies the app as `https://veto-hq.github.io`. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. The slides above are still the refusal on the quoted rule.
 
 ---
 

@@ -397,6 +397,60 @@ export function renewalSearchParams(
   };
 }
 
+export type RenewalChange = { from: string; to: string };
+
+function sameAmount(left: string, right: string, decimals: number): boolean {
+  try {
+    return parseBaseUnits(left, decimals) === parseBaseUnits(right, decimals);
+  } catch {
+    return left.trim() === right.trim();
+  }
+}
+
+function daysPhrase(expiryDays: string): string {
+  const trimmed = expiryDays.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return trimmed;
+  }
+  const days = Number.parseInt(trimmed, 10);
+  return days === 1 ? '1 day' : `${days.toString()} days`;
+}
+
+/**
+ * Each field of a renewal form that differs from the rule being renewed, as the form shows it.
+ * A renewal link prefills every field, so the owner sees what changed before signing.
+ */
+export function renewalChanges(
+  source: MandateAccount,
+  fields: { merchant: string; cap: string; perTxMax: string; expiryDays: string; purpose: string },
+  decimals: number,
+  nowSec: bigint,
+): Partial<Record<RenewalEditField, RenewalChange>> {
+  const changes: Partial<Record<RenewalEditField, RenewalChange>> = {};
+  const merchant = fields.merchant.trim();
+  if (merchant !== source.merchant) {
+    changes.merchant = { from: source.merchant, to: merchant };
+  }
+  const cap = formatBaseUnits(source.cap, decimals);
+  if (!sameAmount(fields.cap, cap, decimals)) {
+    changes.cap = { from: cap, to: fields.cap.trim() };
+  }
+  const per = formatBaseUnits(source.perTxMax, decimals);
+  if (!sameAmount(fields.perTxMax, per, decimals)) {
+    changes.perTxMax = { from: per, to: fields.perTxMax.trim() };
+  }
+  const left = endsInPhrase(source.expiresAt, nowSec);
+  const days = daysPhrase(fields.expiryDays);
+  if (days !== left) {
+    changes.expiryDays = { from: `${left} left`, to: days };
+  }
+  const purpose = displayPurpose(source.purpose);
+  if (fields.purpose.trim() !== purpose.trim()) {
+    changes.purpose = { from: `"${purpose}"`, to: `"${fields.purpose.trim()}"` };
+  }
+  return changes;
+}
+
 export function parseLetEnd(raw: string | null): string[] {
   if (!raw) {
     return [];

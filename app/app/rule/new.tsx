@@ -37,6 +37,7 @@ import { mainnetPreviewNote, devnetTestTokenNote, formatTokenAmount, tokenSymbol
 import { useOwnerTokenBalance } from '../../lib/useOwnerTokenBalance';
 import type { MandateAccount } from '../../lib/mandate';
 import { displayPurpose } from '../../lib/ruleView';
+import { renewalChanges, type RenewalChange } from '../../lib/renewal';
 import {
   applyRuleset,
   assertPurposeMayOpen,
@@ -219,8 +220,10 @@ function RuleCompose({
   const [openedAddress, setOpenedAddress] = useState<string | null>(null);
   const [holdReset, setHoldReset] = useState(0);
   const openingRef = useRef(false);
-  const payeeChangedFrom =
-    renewing && sourceMandate && fields.merchant.trim() !== sourceMandate.merchant ? sourceMandate.merchant : null;
+  const changed =
+    renewing && sourceMandate
+      ? renewalChanges(sourceMandate, fields, chain.decimals, BigInt(Math.floor(Date.now() / 1000)))
+      : {};
   const formMint = chain.config?.mint ?? null;
   const formSymbol = tokenSymbol(formMint);
   const formCluster = chain.config?.explorerCluster ?? null;
@@ -496,6 +499,7 @@ function RuleCompose({
             onUp={() => stepAmount('cap', 1)}
           />
         </View>
+        <ChangedLine change={changed.cap} />
         {showFaucet && wallet.ownerPublicKey ? <GetDevnetUsdc owner={wallet.ownerPublicKey} /> : null}
         <View style={styles.dial}>
           <View style={styles.dialField}>
@@ -518,6 +522,7 @@ function RuleCompose({
             onUp={() => stepAmount('perTxMax', 1)}
           />
         </View>
+        <ChangedLine change={changed.perTxMax} />
         <View style={styles.dial}>
           <View style={styles.dialField}>
             <Field
@@ -537,6 +542,7 @@ function RuleCompose({
             onUp={() => stepDays(1)}
           />
         </View>
+        <ChangedLine change={changed.expiryDays} />
         <Field
           label="Payee"
           value={fields.merchant}
@@ -548,11 +554,7 @@ function RuleCompose({
           }
           hint={PAYEE_GUIDANCE}
         />
-        {payeeChangedFrom ? (
-          <Text style={styles.changed} accessibilityRole="text" selectable>
-            Changed from {payeeChangedFrom} to {fields.merchant.trim()}
-          </Text>
-        ) : null}
+        <ChangedLine change={changed.merchant} />
         <AddressActions
           target="payee"
           onAddress={(address) => setField('merchant', address)}
@@ -574,6 +576,7 @@ function RuleCompose({
           multiline
           editable={!applying}
         />
+        <ChangedLine change={changed.purpose} />
         {board ? (
           <SpendBoard
             kicker="Your agent's board"
@@ -590,6 +593,18 @@ function RuleCompose({
         ) : null}
       </ConnectGate>
     </RuleScreen>
+  );
+}
+
+/** Under a renewal field: what the rule being renewed had, and what this form will sign. */
+function ChangedLine({ change }: { change: RenewalChange | undefined }) {
+  if (!change) {
+    return null;
+  }
+  return (
+    <Text style={styles.changed} accessibilityRole="text" selectable>
+      {`Changed from ${change.from} to ${change.to || 'nothing'}`}
+    </Text>
   );
 }
 

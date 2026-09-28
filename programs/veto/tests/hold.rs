@@ -871,7 +871,7 @@ fn unfreeze_and_skip_do_nothing_unless_both_keys_sign() {
 }
 
 #[test]
-fn tightening_applies_at_once_and_loosening_waits_out_the_current_delay() {
+fn tightening_applies_at_once_and_loosening_or_any_guardian_change_waits_out_the_current_delay() {
     let (mut w, dest) = known_world(Rules {
         delay_secs: HOLD_DELAY_3_DAYS,
         guardian: false,
@@ -884,23 +884,44 @@ fn tightening_applies_at_once_and_loosening_waits_out_the_current_delay() {
     tighten.delay_secs = HOLD_DELAY_3_DAYS;
     tighten.big_share_bps = 1_000;
     tighten.guardian = guardian.pubkey();
+    let clock = now(&w.svm);
     let logs = propose(&mut w, tighten).expect("tighten");
     assert_recorded(
         &logs,
         "HOLD CHANGE APPLIED",
         HoldChangeApplied::DISCRIMINATOR,
     );
+    // Adding a guardian is not a tightening: the new key could co-sign skip
+    // and unfreeze, so it waits out the delay like any other loosening.
+    assert_recorded(
+        &logs,
+        "HOLD CHANGE PROPOSED",
+        HoldChangeProposed::DISCRIMINATOR,
+    );
     let vault = read_vault(&w.svm, &w.vault);
     assert_eq!(vault.daily_limit, 40 * ONE);
     assert_eq!(vault.big_share_bps, 1_000);
-    assert_eq!(vault.guardian, guardian.pubkey());
-    assert!(!vault.change.active);
+    assert_eq!(vault.guardian, Pubkey::default());
+    assert!(vault.change.active);
+    assert_eq!(vault.change.fields, CHANGE_GUARDIAN);
+    assert_eq!(vault.change.guardian, guardian.pubkey());
+    assert_eq!(vault.change.effective_at, clock + HOLD_DELAY_3_DAYS);
+    assert_err(freeze(&mut w, &guardian), "NotOwnerOrGuardian");
     let logs = withdraw(&mut w, 40 * ONE, &dest).expect("inside the new limit");
     assert_recorded(&logs, "HOLD PAID", HoldPaid::DISCRIMINATOR);
     let held_at = token_balance(&w.svm, &w.vault_token);
     let logs = withdraw(&mut w, 1 * ONE, &dest).expect("over the new limit is held");
     assert_recorded(&logs, "HOLD HELD", HoldHeld::DISCRIMINATOR);
     assert_eq!(token_balance(&w.svm, &w.vault_token), held_at);
+    let owner = w.owner.insecure_clone();
+    let effective = read_vault(&w.svm, &w.vault).change.effective_at;
+    warp(&mut w.svm, effective - 1);
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    assert_eq!(read_vault(&w.svm, &w.vault).guardian, Pubkey::default());
+    warp(&mut w.svm, effective);
+    apply_change(&mut w, &owner).expect("guardian applies after the delay");
+    assert_eq!(read_vault(&w.svm, &w.vault).guardian, guardian.pubkey());
+    freeze(&mut w, &guardian).expect("the applied guardian can freeze");
 
     let (mut w, dest) = known_world(Rules {
         delay_secs: HOLD_DELAY_3_DAYS,

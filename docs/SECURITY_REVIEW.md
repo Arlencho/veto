@@ -263,4 +263,4 @@ What it does not do:
 Known issue, fix pending: on a vault created without a guardian, the deployed program applies
 adding a guardian at once, so whoever holds the owner key could add a guardian key and then `skip`
 a held withdrawal with both keys. The guarantees above do not hold for that vault. The fix makes
-any guardian change wait out the vault's delay and needs a program upgrade, which is pending.
+any guardian change wait out the vault's delay and needs a program upgrade: the source fix is merged (PR #374) and not yet deployed.

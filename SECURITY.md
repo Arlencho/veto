@@ -5,7 +5,7 @@
 Do not open a public issue, pull request or discussion for a vulnerability.
 
 Report it through GitHub private vulnerability reporting on this repository: open the
-**Security** tab and choose **Report a vulnerability**. The report is visible only to the repository maintainers.
+**Security** tab and choose **Report a vulnerability**. The report is visible only to you and the repository maintainers.
 
 Include what you found, the affected file or instruction, the commit you read, and the steps or
 transactions that show it. A devnet transaction signature is the most useful evidence.

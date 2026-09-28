@@ -370,7 +370,7 @@ What it does not do:
 deployed program treats adding a guardian as a tightening and applies it at once, so whoever holds
 the owner key could add a guardian key and then use `skip` with both keys to pay a held withdrawal
 without waiting out the delay. The guarantees above do not hold for that vault. The fix makes any
-guardian change wait out the vault's delay. It needs a program upgrade, which is pending; until
+guardian change wait out the vault's delay. It needs a program upgrade: the source fix is merged (PR #374) and not yet deployed; until
 that upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md), the deployed program behaves as
 described here.
 

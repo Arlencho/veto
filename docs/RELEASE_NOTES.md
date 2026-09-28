@@ -1,4 +1,4 @@
-# Veto APK v1.0.0-devnet.3: devnet
+# Veto APK v1.0.0-devnet.4: devnet
 
 Veto is an Android app for setting rules on what an agent can spend or trade
 on Solana. You approve the rule with your wallet. The program checks requests
@@ -8,25 +8,15 @@ time to stop them.
 
 **This release is devnet only. All money used here is test money with no value.**
 
-## Changed since v1.0.0-devnet.2
+## Changed since v1.0.0-devnet.3
 
-- **Hold rules are stricter on chain.** The devnet program was upgraded on
-  2026-09-28. Any change to a vault's guardian now waits the vault's delay, like
-  other loosening changes. The guardian cannot recover a vault to itself, and
-  the owner cannot recover or close a vault to itself.
-- **Both-keys requests are checked before you sign.** When you paste a skip or
-  unfreeze request signed by the other key, the app rebuilds the request it
-  expects, shows what it checked, and signs only if the pasted request matches
-  it exactly and carries the other key's valid signature.
-- **Renewal shows what changes.** A renewal link cannot change the rule's
-  agent, and every field that differs from the current rule shows what it
-  changed from.
-- **Fewer failed reads.** When the tester RPC refuses a read (401, 403 or 429),
-  the app retries it on the public endpoint of the same cluster. Transactions
-  are never sent through the fallback.
-- **Clearer, exact wording.** The Hold card, spent amounts (rounded up) and
-  grade labels now say exactly what the program enforces.
-  The devnet line stays below the status bar, and long week amounts wrap.
+- **Allowed-once payments say so.** A payment above the rule's per-payment
+  limit can only go through after you allow it once. Decisions, the decision
+  screen, notifications, trade rows and the Today card now say "Allowed once by
+  you: above your limit" for such a payment, instead of "Inside your limit".
+  Amounts are rounded so the shown payment never equals the shown limit.
+- **Plain words.** Screens say "request" where they said "nonce". Exported
+  records keep the program's exact reason text, so they still verify.
 
 ## What the app does
 

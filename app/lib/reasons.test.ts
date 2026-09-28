@@ -13,7 +13,7 @@ import {
   REASON_STALE_NONCE,
   REASON_TEXT,
   REASON_ZERO_AMOUNT,
-  reasonText as reasonLabel,
+  ownerReasonText as reasonLabel,
 } from './constants';
 import { formatBaseUnits } from './format';
 import { notActiveHint, reasonText, refusalWhyLine, renderReason } from './reasons';
@@ -22,7 +22,7 @@ test('reason text matches the indexer table', () => {
   assert.equal(reasonText(0), 'ok');
   assert.equal(reasonText(1), 'mandate not active');
   assert.equal(reasonText(2), 'past expiry');
-  assert.equal(reasonText(3), 'request already settled');
+  assert.equal(reasonText(3), 'nonce already settled');
   assert.equal(reasonText(4), 'merchant not allowed');
   assert.equal(reasonText(5), 'over per-payment maximum');
   assert.equal(reasonText(6), 'over remaining cap');

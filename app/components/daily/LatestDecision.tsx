@@ -7,7 +7,7 @@ import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, REASON_OVER_PER_TX_MAX } from '
 import { encodeDecisionId } from '../../lib/exportRecord';
 import { formatTokenAmount, formatTokenDisplay, tokenSymbol } from '../../lib/tokens';
 import { overrideRowView, paidAboveLimit } from '../../lib/override';
-import { reasonText } from '../../lib/reasons';
+import { ownerReasonText } from '../../lib/reasons';
 import type { LedgerRow } from '../../lib/ring';
 import { payeeLabel } from '../../lib/wallet';
 import { colors, fonts, space } from '../theme';
@@ -51,7 +51,7 @@ export function LatestDecision({
   const advisory = row.kind === KIND_ADVISORY_DECLINE;
   const tone = refused || advisory ? colors.refused : colors.paid;
 
-  let title = reasonText(row.reason);
+  let title = ownerReasonText(row.reason);
   let detail = 'Saved on the blockchain.';
   let side = amount;
   if (refused && row.reason === REASON_OVER_PER_TX_MAX && limit) {
@@ -59,7 +59,7 @@ export function LatestDecision({
     detail = 'No money moved. Reason saved.';
     side = zeroPaid;
   } else if (refused) {
-    title = `Refused: ${reasonText(row.reason)}`;
+    title = `Refused: ${ownerReasonText(row.reason)}`;
     detail = 'No money moved. Reason saved.';
     side = zeroPaid;
   } else if (paid) {

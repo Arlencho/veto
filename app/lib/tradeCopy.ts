@@ -4,7 +4,7 @@ import {
   REASON_OUTPUT_ACCOUNT_NOT_ALLOWED,
   REASON_OVER_PER_TX_MAX,
   REASON_POOL_NOT_ALLOWED,
-  reasonText,
+  ownerReasonText,
 } from './constants';
 import type { DisplayRounding } from './format';
 import { formatTokenAmount, formatTokenDisplay } from './tokens';
@@ -68,12 +68,12 @@ export function tradeDecisionTitle(args: {
     args.reason === REASON_POOL_NOT_ALLOWED
   ) {
     const tried = truncateAddress(args.counterparty);
-    const label = args.reason === REASON_POOL_NOT_ALLOWED ? 'pool account not allowed' : reasonText(args.reason);
+    const label = args.reason === REASON_POOL_NOT_ALLOWED ? 'pool account not allowed' : ownerReasonText(args.reason);
     return `Refused: ${label} (tried ${tried})`;
   }
   if (args.reason === REASON_OVER_PER_TX_MAX && args.perTradeMax != null) {
     const limit = format(args.perTradeMax, args.inDecimals, args.inMint);
     return `Refused: your agent asked ${sold}, your limit is ${limit} per trade`;
   }
-  return `Refused: ${reasonText(args.reason)} (${sold})`;
+  return `Refused: ${ownerReasonText(args.reason)} (${sold})`;
 }

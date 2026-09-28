@@ -7,7 +7,7 @@ import {
   STATUS_ACTIVE,
   STATUS_EXHAUSTED,
   STATUS_REVOKED,
-  reasonText,
+  ownerReasonText,
   statusName,
 } from './constants';
 import { formatTokenAmount } from './tokens';
@@ -77,7 +77,7 @@ export function overrideOfferForReason(reason: number, suggestedOverride: bigint
   }
   return {
     offer: false,
-    why: `The program records no override for this reason (${reasonText(reason)}).`,
+    why: `The program records no override for this reason (${ownerReasonText(reason)}).`,
   };
 }
 
@@ -309,7 +309,7 @@ export function sequenceLine(seq: NonceSequence, decimals: number, mint?: string
     parts.push(`Asked for ${formatTokenAmount(seq.asked, decimals, mint)}.`);
   }
   if (seq.refused) {
-    const why = seq.reason != null ? ` (${reasonText(seq.reason)})` : '';
+    const why = seq.reason != null ? ` (${ownerReasonText(seq.reason)})` : '';
     parts.push(`Refused${why}.`);
   }
   if (seq.waived) {

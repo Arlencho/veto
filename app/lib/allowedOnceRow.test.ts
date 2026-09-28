@@ -8,6 +8,7 @@ import {
   KIND_REFUSED,
   REASON_OVER_PER_TX_MAX,
   REASON_STALE_NONCE,
+  ownerReasonText,
   reasonText,
 } from './constants';
 import { PAID_ALLOWED_ONCE_NOTICE_TITLE, PAID_NOTICE_TITLE, paidDecisionBody, planDecisionNotices } from './notify';
@@ -92,8 +93,15 @@ test('a traded amount just above the limit rounds up on screen', () => {
   assert.equal(under.title, 'Traded 0.49 USDC for 2 USDC');
 });
 
-test('the stale request reason reads in plain words', () => {
-  assert.equal(reasonText(REASON_STALE_NONCE), 'request already settled');
+test('the stale request reason reads in plain words on screen and stays canonical in exports', () => {
+  assert.equal(ownerReasonText(REASON_STALE_NONCE), 'request already settled');
+  assert.equal(reasonText(REASON_STALE_NONCE), 'nonce already settled');
+  assert.equal(ownerReasonText(REASON_OVER_PER_TX_MAX), reasonText(REASON_OVER_PER_TX_MAX));
+  const seq = nonceSequence(
+    [ledgerRow({ kind: KIND_REFUSED, kindName: 'refused', reason: REASON_STALE_NONCE }), ledgerRow()],
+    2n,
+  );
+  assert.equal(sequenceLine(seq, 6, DEVNET_USDC_MINT), 'Asked for 0.9 USDC. Refused (request already settled). Then paid.');
 });
 
 test('a paid row with no known per-payment max stays with the plain rule line', () => {

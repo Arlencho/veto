@@ -82,7 +82,7 @@ export const REASON_TEXT: Record<number, string> = {
   [REASON_OK]: 'ok',
   [REASON_NOT_ACTIVE]: 'mandate not active',
   [REASON_EXPIRED]: 'past expiry',
-  [REASON_STALE_NONCE]: 'request already settled',
+  [REASON_STALE_NONCE]: 'nonce already settled',
   [REASON_MERCHANT_NOT_ALLOWED]: 'merchant not allowed',
   [REASON_OVER_PER_TX_MAX]: 'over per-payment maximum',
   [REASON_OVER_CAP]: 'over remaining cap',
@@ -109,6 +109,17 @@ export function kindName(kind: number): string {
 
 export function reasonText(reason: number): string {
   return REASON_TEXT[reason] ?? 'unknown';
+}
+
+// REASON_TEXT is the program's own log text: exports carry it as reason_text, and the
+// verifier and the SDK check it against the chain, so it stays byte for byte. Screens
+// use this owner wording instead, which only swaps protocol jargon for plain words.
+const OWNER_REASON_TEXT: Record<number, string> = {
+  [REASON_STALE_NONCE]: 'request already settled',
+};
+
+export function ownerReasonText(reason: number): string {
+  return OWNER_REASON_TEXT[reason] ?? reasonText(reason);
 }
 
 export function statusName(status: number): string {

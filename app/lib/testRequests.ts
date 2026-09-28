@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { payeeLookup, readPayeeTokenAccount } from './agentConnect';
-import { CHARGE_IX_DISC, KIND_PAID, KIND_REFUSED, STATUS_EXHAUSTED, writeU64Le, reasonText } from './constants';
+import { CHARGE_IX_DISC, KIND_PAID, KIND_REFUSED, STATUS_EXHAUSTED, writeU64Le, ownerReasonText } from './constants';
 import { decodeEventsFromLogs } from './events';
 import { decodeMandateAccount, isActive, type MandateAccount } from './mandate';
 import { ledgerPda } from './ring';
@@ -178,7 +178,7 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
         return;
       }
       const decision = decisions[0];
-      report({ text: decision.kind === KIND_PAID ? `Paid ${shown} to the payee.` : `Refused ${shown}: ${reasonText(decision.reason)}.`, signature });
+      report({ text: decision.kind === KIND_PAID ? `Paid ${shown} to the payee.` : `Refused ${shown}: ${ownerReasonText(decision.reason)}.`, signature });
       previous = nonce;
     }
   } catch (error) {

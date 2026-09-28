@@ -21,7 +21,7 @@ import {
   STATUS_EXHAUSTED,
   STATUS_EXPIRED,
   STATUS_REVOKED,
-  reasonText,
+  ownerReasonText,
 } from './constants';
 import { decodeInstructionKind } from './events';
 import { encodeGrantOverrideData } from './instructions';
@@ -110,7 +110,7 @@ test('only a per-payment refusal with a suggested override offers a grant', () =
         } else {
           assert.equal(
             withSuggestion.why,
-            `The program records no override for this reason (${reasonText(reason)}).`,
+            `The program records no override for this reason (${ownerReasonText(reason)}).`,
           );
         }
       }

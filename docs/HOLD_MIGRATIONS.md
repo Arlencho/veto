@@ -46,4 +46,8 @@ New vaults and proposed rules reject safe addresses equal to either owner or
 guardian. Apply validates the resulting rules too, including old queued proposals.
 An existing vault with safe equal to guardian can propose an independent safe
 address and apply it after the normal delay. The old recovery destination remains
-in effect while that change waits.
+in effect while that change waits. On such a vault the guardian alone cannot
+`recover`: the program refuses it with `SafeAddressIsGuardian`, and the owner can
+still recover. The guardian can still cancel the repair; that veto stays because
+the program cannot tell an honest repair from a stolen owner key moving the safe
+address.

@@ -303,7 +303,7 @@ Every amount comes from the same chain reads as the app. If there is no signed-i
 
 Hold is a vault in the same program as a spending rule. A rule still does not escrow: the mandate is a delegate. Hold is for a balance the owner deposits and cannot move with a raw transfer. The vault PDA (`["hold", owner, vault_id]`, `vault_id` as a little-endian u64) is the authority of its token account. It holds SPL tokens. Native SOL goes in as wrapped SOL.
 
-Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md). The app screens exist, and a device check with a real vault follows.
+Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md). The app screens exist, and a device check with a real vault follows. The guardian rules below (any guardian change waits, and a guardian that is also the safe address cannot recover to itself) are in source and not yet deployed to devnet; the devnet program still applies an added guardian at once.
 
 An everyday withdrawal pays at once only when the vault is not frozen, the destination token account has already been paid by this vault, and the running 24 hour total stays inside both the daily limit and `big_share_bps` of the current balance. The app sets that share at 2500, a quarter of the vault. The delay is 1, 2, or 3 days. Anything else is held until `execute` after `unlock_at` on the chain clock. It is not refused, except when the vault cannot cover the amount, or the pending list is full (8). Those two write a refusal and pay nothing. A full known-destination list (16) still pays, and does not grow.
 
@@ -319,12 +319,12 @@ Instructions, from `programs/veto/src/hold.rs`:
 | `freeze` | owner or guardian | Nothing leaves except `recover` |
 | `unfreeze` | owner and guardian | With no guardian set, the owner waits out the current delay |
 | `skip` | owner and guardian | Pays a held withdrawal before `unlock_at`, and not while frozen |
-| `recover` | owner or guardian | Sends the whole balance to the safe address, including while frozen |
-| `propose_change` | owner | Tightening applies immediately. Loosening waits out the current delay |
+| `recover` | owner or guardian | Sends the whole balance to the safe address, including while frozen. The guardian alone is refused if the safe address is the guardian key |
+| `propose_change` | owner | Tightening applies immediately. Loosening, including any guardian change, waits out the current delay |
 | `apply_change` | anyone | Applies a pending change after `effective_at` on the chain clock |
 | `cancel_change` | owner or guardian | Drops a pending change |
 
-Tightening is a lower daily limit, a longer delay, a lower share, or adding a guardian. Loosening is a higher limit, a shorter delay, a higher share, removing or changing the guardian, or changing the safe address. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
+Tightening is a lower daily limit, a longer delay, or a lower share. Loosening is a higher limit, a shorter delay, a higher share, adding, removing or changing the guardian, or changing the safe address. Adding a guardian waits too: a guardian co-signs `skip` and `unfreeze`, so a key added at once would let the owner key alone skip the delay. Until the change applies, the new guardian has no power. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
 
 The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. With only the owner key, an attacker can move at once at most the instant allowance to destinations the vault has paid before, or the whole balance to the safe address, and nothing else. Anything else waits, and after the wait anyone can execute it unless the owner or guardian stops it or freezes the vault first. No single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
 
@@ -336,7 +336,7 @@ What the program guarantees, from `programs/veto/src/hold.rs`:
 
 - An instant withdrawal only goes to a destination this vault has paid before. A new address never gets money instantly.
 - Anything else waits 1, 2, or 3 days on the chain clock, whichever delay the vault was set to.
-- No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`) needs both the owner key and the guardian key. Loosening any rule waits out the current delay. `recover` only goes to the safe address chosen in advance.
+- No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`) needs both the owner key and the guardian key. Loosening any rule, including adding or changing the guardian, waits out the current delay. `recover` only goes to the safe address chosen in advance.
 - The guardian is alerted and can stop a held withdrawal, or freeze the whole vault, with one tap.
 
 What it does not do:

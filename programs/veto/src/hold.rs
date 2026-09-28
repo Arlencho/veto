@@ -520,6 +520,14 @@ pub fn close_hold_vault(ctx: Context<CloseHoldVault>) -> Result<()> {
             .all(|row| row.status == WITHDRAWAL_EMPTY),
         VetoError::HoldWithdrawalPending
     );
+    // The signer is always the owner. On a pre-#344 vault with safe == owner,
+    // the owner key alone must not be able to stop every row and sweep the
+    // whole balance to itself in one transaction.
+    require_keys_neq!(
+        vault.safe_address,
+        vault.owner,
+        VetoError::SafeAddressIsOwner
+    );
     transfer_out_parts(
         vault.to_account_info(),
         vault,

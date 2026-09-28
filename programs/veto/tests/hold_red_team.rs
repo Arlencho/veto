@@ -608,6 +608,42 @@ fn recover(w: &mut World, authority: &Keypair, dest: &Pubkey) -> Result<Vec<Stri
     send(&mut w.svm, authority, &[authority], &[ix])
 }
 
+fn close_ix(w: &World, dest: &Pubkey) -> Instruction {
+    Instruction::new_with_bytes(
+        veto::id(),
+        &veto::instruction::CloseHoldVault {}.data(),
+        veto::accounts::CloseHoldVault {
+            owner: w.owner.pubkey(),
+            vault: w.vault,
+            ledger: w.ledger,
+            vault_token: w.vault_token,
+            destination: *dest,
+            mint: w.mint,
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
+fn stop_ix(w: &World, id: u64, authority: &Pubkey) -> Instruction {
+    Instruction::new_with_bytes(
+        veto::id(),
+        &veto::instruction::Stop { id }.data(),
+        veto::accounts::Stop {
+            authority: *authority,
+            vault: w.vault,
+            ledger: w.ledger,
+        }
+        .to_account_metas(None),
+    )
+}
+
+fn close_vault(w: &mut World, dest: &Pubkey) -> Result<Vec<String>, String> {
+    let owner = w.owner.insecure_clone();
+    let ix = close_ix(w, dest);
+    send(&mut w.svm, &owner, &[&owner], &[ix])
+}
+
 fn current_rules(w: &World) -> HoldChange {
     let vault = read_vault(&w.svm, &w.vault);
     HoldChange {
@@ -2409,4 +2445,114 @@ fn the_owner_still_recovers_a_normal_vault_while_frozen() {
     recover(&mut w, &owner, &safe).unwrap();
     assert_eq!(token_balance(&w.svm, &safe), safe_before + balance);
     assert_eq!(token_balance(&w.svm, &w.vault_token), 0);
+}
+
+// A stolen owner key on a safe == owner vault queues a row to itself, then
+// stops it and closes the vault to its own token account in one transaction.
+// Without the close check that takes the whole balance and the rent at once.
+fn owner_stops_and_closes_to_itself(
+    w: &mut World,
+    owner_token: &Pubkey,
+) -> Result<Vec<String>, String> {
+    let owner = w.owner.insecure_clone();
+    let id = newest_pending(&read_vault(&w.svm, &w.vault)).id;
+    let stop = stop_ix(w, id, &owner.pubkey());
+    let close = close_ix(w, owner_token);
+    send(&mut w.svm, &owner, &[&owner], &[stop, close])
+}
+
+#[test]
+fn an_owner_that_is_also_the_safe_address_cannot_stop_and_close_to_itself() {
+    let (mut w, owner_token, balance) = safe_is_owner_world();
+    assert_held(&withdraw(&mut w, 200 * ONE, &owner_token).unwrap());
+    assert_err(
+        owner_stops_and_closes_to_itself(&mut w, &owner_token),
+        "SafeAddressIsOwner",
+    );
+    assert_err(close_vault(&mut w, &owner_token), "HoldWithdrawalPending");
+    assert_eq!(token_balance(&w.svm, &owner_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+    assert!(w.svm.get_account(&w.vault).is_some());
+}
+
+#[test]
+fn an_owner_that_is_also_the_safe_address_cannot_close_to_itself_while_frozen() {
+    let (mut w, owner_token, balance) = safe_is_owner_world();
+    assert_held(&withdraw(&mut w, 200 * ONE, &owner_token).unwrap());
+    let owner = w.owner.insecure_clone();
+    freeze(&mut w, &owner).unwrap();
+    assert_err(
+        owner_stops_and_closes_to_itself(&mut w, &owner_token),
+        "VaultFrozen",
+    );
+    assert_eq!(token_balance(&w.svm, &owner_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}
+
+#[test]
+fn a_guardianless_owner_that_is_also_the_safe_address_cannot_unfreeze_then_close_to_itself() {
+    let mut w = open_vault(Rules {
+        guardian: false,
+        ..Rules::default()
+    });
+    let mut legacy = read_vault(&w.svm, &w.vault);
+    legacy.safe_address = legacy.owner;
+    overwrite_vault(&mut w.svm, &w.vault, &legacy);
+    let owner = w.owner.insecure_clone();
+    let owner_token = new_dest(&mut w, &owner.pubkey());
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert_held(&withdraw(&mut w, 200 * ONE, &owner_token).unwrap());
+    freeze(&mut w, &owner).unwrap();
+    unfreeze(&mut w, &owner, None).unwrap();
+    let unfreeze_at = read_vault(&w.svm, &w.vault).unfreeze_at;
+    assert!(unfreeze_at > 0);
+    warp(&mut w.svm, unfreeze_at);
+    unfreeze(&mut w, &owner, None).unwrap();
+    assert!(!read_vault(&w.svm, &w.vault).frozen);
+    assert_err(
+        owner_stops_and_closes_to_itself(&mut w, &owner_token),
+        "SafeAddressIsOwner",
+    );
+    assert_eq!(token_balance(&w.svm, &owner_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}
+
+#[test]
+fn the_owner_closes_to_the_new_safe_address_after_repairing_safe_equal_to_owner() {
+    let (mut w, owner_token, balance) = safe_is_owner_world();
+    let owner = w.owner.insecure_clone();
+    assert_err(close_vault(&mut w, &owner_token), "SafeAddressIsOwner");
+    let mut values = current_rules(&w);
+    values.safe_address = w.safe;
+    propose(&mut w, values).unwrap();
+    let effective = read_vault(&w.svm, &w.vault).change.effective_at;
+    warp(&mut w.svm, effective);
+    apply_change(&mut w, &owner).unwrap();
+    assert_eq!(read_vault(&w.svm, &w.vault).safe_address, w.safe);
+
+    assert_err(close_vault(&mut w, &owner_token), "NotTheSafeAddress");
+    let safe = w.safe_token;
+    let safe_before = token_balance(&w.svm, &safe);
+    close_vault(&mut w, &safe).unwrap();
+    assert_eq!(token_balance(&w.svm, &safe), safe_before + balance);
+    assert_eq!(token_balance(&w.svm, &owner_token), 0);
+    assert!(w
+        .svm
+        .get_account(&w.vault)
+        .map_or(true, |account| account.lamports == 0));
+}
+
+#[test]
+fn the_owner_closes_a_normal_vault_to_its_safe_address() {
+    let mut w = open_vault(Rules::default());
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert!(balance > 0);
+    let safe = w.safe_token;
+    let safe_before = token_balance(&w.svm, &safe);
+    close_vault(&mut w, &safe).unwrap();
+    assert_eq!(token_balance(&w.svm, &safe), safe_before + balance);
+    assert!(w
+        .svm
+        .get_account(&w.vault)
+        .map_or(true, |account| account.lamports == 0));
 }

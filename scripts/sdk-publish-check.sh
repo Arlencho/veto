@@ -234,8 +234,9 @@ require_listed() {
 }
 require_listed "README.md"
 require_listed "LICENSE"
-require_listed "idl/veto.json"
-require_listed "dist/index.js"
+# The build writes the entry to dist/src and copies the runtime IDL to dist/idl.
+require_listed "dist/idl/veto.json"
+require_listed "dist/src/index.js"
 require_listed "package.json"
 
 printf 'sdk-publish-check: %s@%s is not on the registry\n' "$name" "$version" >&2

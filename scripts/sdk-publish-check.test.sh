@@ -34,7 +34,7 @@ trap cleanup EXIT
 stage() {
   CASE="$(mktemp -d "${TMPDIR:-/tmp}/sdk-publish-check-test.XXXXXX")"
   CASES+=("$CASE")
-  mkdir -p "$CASE/scripts" "$CASE/sdk/dist/fixtures" "$CASE/sdk/idl" "$CASE/bin"
+  mkdir -p "$CASE/scripts" "$CASE/sdk/dist/fixtures" "$CASE/sdk/dist/idl" "$CASE/sdk/dist/src" "$CASE/bin"
   cp "$SRC" "$CASE/scripts/sdk-publish-check.sh"
   chmod +x "$CASE/scripts/sdk-publish-check.sh"
   cat >"$CASE/sdk/package.json" <<'EOF'
@@ -46,8 +46,8 @@ stage() {
 EOF
   printf 'readme\n' >"$CASE/sdk/README.md"
   printf 'license\n' >"$CASE/sdk/LICENSE"
-  printf '{}\n' >"$CASE/sdk/idl/veto.json"
-  printf 'export {}\n' >"$CASE/sdk/dist/index.js"
+  printf '{}\n' >"$CASE/sdk/dist/idl/veto.json"
+  printf 'export {}\n' >"$CASE/sdk/dist/src/index.js"
   printf '{"ok":true}\n' >"$CASE/sdk/dist/fixtures/plain.json"
 
   cat >"$CASE/bin/git" <<'EOF'
@@ -110,9 +110,9 @@ EOF
   write_pack \
     README.md \
     LICENSE \
-    idl/veto.json \
+    dist/idl/veto.json \
     package.json \
-    dist/index.js \
+    dist/src/index.js \
     dist/fixtures/plain.json
 }
 
@@ -204,38 +204,45 @@ FAKE_NPM_VIEW=error
 assert_refuses "refuses an npm view failure that is not a 404" "not a 404"
 
 stage
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js .env
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js .env
 assert_refuses "refuses a tarball that contains an env file" ".env file"
 
 stage
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js dist/agent.test.js
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js dist/agent.test.js
 assert_refuses "refuses a tarball that contains a test file" "test file"
 
 stage
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js keys/agent.json
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js keys/agent.json
 assert_refuses "refuses a tarball that contains a key file" "key file"
 
 stage
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js dist/api_key.txt
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js dist/api_key.txt
 assert_refuses "refuses a tarball file that names an api key" "names an api key"
 
 stage
 printf 'const leaked = "api-key=abc";\n' >"$CASE/sdk/dist/note.js"
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js dist/note.js
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js dist/note.js
 assert_refuses "refuses a packed file whose text names an api key" "names an api key"
 
 stage
 printf '{"rpcUrl":"https://api.devnet.solana.com"}\n' >"$CASE/sdk/dist/fixtures/endpoint.json"
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js dist/fixtures/endpoint.json
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js dist/fixtures/endpoint.json
 assert_refuses "refuses a fixture that contains an RPC URL" "fixture with an RPC URL"
 
 stage
-write_pack README.md LICENSE idl/veto.json package.json dist/index.js src/extra.md
+write_pack README.md LICENSE dist/idl/veto.json package.json dist/src/index.js src/extra.md
 assert_refuses "refuses a file outside dist, idl, README.md, and LICENSE" "outside dist, idl, README.md, and LICENSE"
 
 stage
-write_pack README.md idl/veto.json package.json dist/index.js
+write_pack README.md dist/idl/veto.json package.json dist/src/index.js
 assert_refuses "refuses a tarball without LICENSE" "missing LICENSE"
+
+stage
+mkdir -p "$CASE/sdk/idl"
+printf '{}\n' >"$CASE/sdk/idl/veto.json"
+printf 'export {}\n' >"$CASE/sdk/dist/index.js"
+write_pack README.md LICENSE idl/veto.json package.json dist/index.js
+assert_refuses "refuses the old layout with the IDL and entry outside dist/idl and dist/src" "missing dist/idl/veto.json"
 
 stage
 run_check

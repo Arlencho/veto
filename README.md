@@ -337,7 +337,7 @@ Instructions, from `programs/veto/src/hold.rs`:
 | `freeze` | owner or guardian | Nothing leaves except `recover` |
 | `unfreeze` | owner and guardian | With no guardian set, the owner waits out the current delay |
 | `skip` | owner and guardian | Pays a held withdrawal before `unlock_at`, and not while frozen |
-| `recover` | owner or guardian | Sends the whole balance to the safe address, including while frozen. The guardian alone is refused if the safe address is the guardian key |
+| `recover` | owner or guardian | Sends the whole balance to the safe address, including while frozen. The guardian alone is refused if the safe address is the guardian key, and the owner alone is refused if the safe address is the owner key |
 | `propose_change` | owner | Tightening applies immediately. Loosening, including any guardian change, waits out the current delay |
 | `apply_change` | anyone | Applies a pending change after `effective_at` on the chain clock |
 | `cancel_change` | owner or guardian | Drops a pending change |

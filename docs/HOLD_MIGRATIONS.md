@@ -53,3 +53,14 @@ in effect while that change waits. On such a vault the guardian alone cannot
 still recover. The guardian can still cancel the repair; that veto stays because
 the program cannot tell an honest repair from a stolen owner key moving the safe
 address.
+
+An existing vault with safe equal to owner is refused the same way: the owner
+alone cannot `recover` (`SafeAddressIsOwner`), the guardian still can, and the
+owner repairs it with `propose_change` then `apply_change` after the delay.
+
+These checks compare keys only. A safe address that is a different wallet the
+guardian (or the owner) also controls cannot be detected on chain.
+
+On a vault with safe equal to guardian, repair the safe address before
+tightening any rule. `require_rules` runs on every proposal, so a tightening
+proposal that keeps the old safe address is refused with `SafeAddressIsGuardian`.

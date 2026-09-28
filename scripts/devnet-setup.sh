@@ -408,6 +408,9 @@ The pending change is in `programs/veto/src/hold.rs`:
   `freeze` or `cancel_change` until the change applies.
 - `recover` refuses the guardian alone with `SafeAddressIsGuardian` when the
   safe address is the guardian key. The owner can still recover.
+- `recover` refuses the owner alone with `SafeAddressIsOwner` when the safe
+  address is the owner key (a pre-#344 vault). The guardian can still recover,
+  and the owner repairs the safe address through `propose_change`.
 
 Until the upgrade is deployed and verified here, devnet keeps the old rules:
 adding a guardian to a vault with none applies at once, and on a vault whose

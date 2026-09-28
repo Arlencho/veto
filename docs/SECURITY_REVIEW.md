@@ -250,6 +250,8 @@ What the deployed program guarantees on a vault that had a guardian before any k
   needs both the owner key and the guardian key. Loosening any rule, including adding or changing
   the guardian, waits out the current delay.
   `recover` only goes to the safe address chosen in advance.
+  Neither key alone can `recover` to itself: on an older vault whose safe address is the owner or
+  the guardian key, that key alone is refused until the safe address is repaired.
 - The guardian is alerted and can stop a held withdrawal, or freeze the whole vault, with one tap.
 
 What it does not do:

@@ -247,7 +247,8 @@ What the program guarantees:
   gets money instantly.
 - Anything else waits 1, 2, or 3 days on the chain clock, whichever delay the vault was set to.
 - No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`)
-  needs both the owner key and the guardian key. Loosening any rule waits out the current delay.
+  needs both the owner key and the guardian key. Loosening any rule, including adding or changing
+  the guardian, waits out the current delay.
   `recover` only goes to the safe address chosen in advance.
 - The guardian is alerted and can stop a held withdrawal, or freeze the whole vault, with one tap.
 

@@ -511,22 +511,26 @@ fn freeze(w: &mut World, authority: &Keypair) -> Result<Vec<String>, String> {
     send(&mut w.svm, authority, &[authority], &[ix])
 }
 
+fn unfreeze_ix(w: &World, owner: Pubkey, guardian: Option<Pubkey>) -> Instruction {
+    Instruction::new_with_bytes(
+        veto::id(),
+        &veto::instruction::Unfreeze {}.data(),
+        veto::accounts::Unfreeze {
+            owner,
+            guardian,
+            vault: w.vault,
+            ledger: w.ledger,
+        }
+        .to_account_metas(None),
+    )
+}
+
 fn unfreeze(
     w: &mut World,
     owner: &Keypair,
     guardian: Option<&Keypair>,
 ) -> Result<Vec<String>, String> {
-    let ix = Instruction::new_with_bytes(
-        veto::id(),
-        &veto::instruction::Unfreeze {}.data(),
-        veto::accounts::Unfreeze {
-            owner: owner.pubkey(),
-            guardian: guardian.map(|key| key.pubkey()),
-            vault: w.vault,
-            ledger: w.ledger,
-        }
-        .to_account_metas(None),
-    );
+    let ix = unfreeze_ix(w, owner.pubkey(), guardian.map(|key| key.pubkey()));
     match guardian {
         Some(guardian) if guardian.pubkey() != owner.pubkey() => {
             send(&mut w.svm, owner, &[owner, guardian], &[ix])
@@ -615,18 +619,22 @@ fn current_rules(w: &World) -> HoldChange {
     }
 }
 
-fn propose(w: &mut World, values: HoldChange) -> Result<Vec<String>, String> {
-    let owner = w.owner.insecure_clone();
-    let ix = Instruction::new_with_bytes(
+fn propose_ix(w: &World, values: HoldChange) -> Instruction {
+    Instruction::new_with_bytes(
         veto::id(),
         &veto::instruction::ProposeChange { values }.data(),
         veto::accounts::ProposeChange {
-            owner: owner.pubkey(),
+            owner: w.owner.pubkey(),
             vault: w.vault,
             ledger: w.ledger,
         }
         .to_account_metas(None),
-    );
+    )
+}
+
+fn propose(w: &mut World, values: HoldChange) -> Result<Vec<String>, String> {
+    let owner = w.owner.insecure_clone();
+    let ix = propose_ix(w, values);
     send(&mut w.svm, &owner, &[&owner], &[ix])
 }
 
@@ -641,6 +649,20 @@ fn apply_change(w: &mut World, payer: &Keypair) -> Result<Vec<String>, String> {
         .to_account_metas(None),
     );
     send(&mut w.svm, payer, &[payer], &[ix])
+}
+
+fn cancel_change(w: &mut World, authority: &Keypair) -> Result<Vec<String>, String> {
+    let ix = Instruction::new_with_bytes(
+        veto::id(),
+        &veto::instruction::CancelChange {}.data(),
+        veto::accounts::CancelChange {
+            authority: authority.pubkey(),
+            vault: w.vault,
+            ledger: w.ledger,
+        }
+        .to_account_metas(None),
+    );
+    send(&mut w.svm, authority, &[authority], &[ix])
 }
 
 fn deposit_from(w: &mut World, source: &Pubkey, amount: u64) -> Result<Vec<String>, String> {
@@ -2024,9 +2046,293 @@ fn combined_guardian_addition_cannot_take_the_current_safe_during_the_delay() {
         guardian: false,
         ..Rules::default()
     });
+    let old_safe = w.safe;
+    let new_safe = Pubkey::new_unique();
     let mut values = current_rules(&w);
-    values.guardian = values.safe_address;
-    values.safe_address = Pubkey::new_unique();
-    assert_err(propose(&mut w, values), "SafeAddressIsGuardian");
+    values.guardian = old_safe;
+    values.safe_address = new_safe;
+    // Both fields now wait and apply together, and apply re-checks the rules,
+    // so the vault never holds safe == guardian at any instant.
+    propose(&mut w, values).unwrap();
+    let pending = read_vault(&w.svm, &w.vault);
+    assert_eq!(pending.guardian, Pubkey::default());
+    assert_eq!(pending.safe_address, old_safe);
+    assert!(pending.change.active);
+    assert_eq!(pending.change.fields, CHANGE_GUARDIAN | CHANGE_SAFE);
+    let owner = w.owner.insecure_clone();
+    warp(&mut w.svm, pending.change.effective_at - 1);
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    let during = read_vault(&w.svm, &w.vault);
+    assert_eq!(during.guardian, Pubkey::default());
+    assert_eq!(during.safe_address, old_safe);
+    warp(&mut w.svm, pending.change.effective_at);
+    apply_change(&mut w, &owner).unwrap();
+    let after = read_vault(&w.svm, &w.vault);
+    assert_eq!(after.guardian, old_safe);
+    assert_eq!(after.safe_address, new_safe);
+}
+
+// A vault with no guardian whose owner key is stolen. The attacker also holds a
+// fresh keypair it controls. The only protection is that a withdrawal to a new
+// address waits `delay_secs`, during which the real owner can recover to the
+// safe address. Adding a guardian must not remove that wait: a guardian
+// co-signs `skip` and `unfreeze`, so it has to wait out the delay too.
+fn stolen_guardianless_vault() -> (World, Keypair, Pubkey, u64) {
+    let mut w = open_vault(Rules {
+        guardian: false,
+        ..Rules::default()
+    });
+    let fresh = Keypair::new();
+    w.svm.airdrop(&fresh.pubkey(), 1_000_000_000).unwrap();
+    let pocket = new_dest(&mut w, &fresh.pubkey());
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert!(balance > 0);
     assert_eq!(read_vault(&w.svm, &w.vault).guardian, Pubkey::default());
+    (w, fresh, pocket, balance)
+}
+
+fn assert_no_guardian_and_nothing_moved(w: &World, pocket: &Pubkey, balance: u64) {
+    assert_eq!(read_vault(&w.svm, &w.vault).guardian, Pubkey::default());
+    assert_eq!(token_balance(&w.svm, pocket), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}
+
+#[test]
+fn owner_key_plus_a_fresh_guardian_cannot_skip_the_delay_in_one_transaction() {
+    let (mut w, fresh, pocket, balance) = stolen_guardianless_vault();
+    let owner = w.owner.insecure_clone();
+    let mut values = current_rules(&w);
+    values.guardian = fresh.pubkey();
+    let id = read_vault(&w.svm, &w.vault).next_withdrawal_id;
+    let ixs = [
+        propose_ix(&w, values),
+        withdraw_accounts(
+            owner.pubkey(),
+            w.vault,
+            w.ledger,
+            w.vault_token,
+            pocket,
+            w.mint,
+            spl_token::ID,
+            balance,
+        ),
+        skip_ix(
+            owner.pubkey(),
+            fresh.pubkey(),
+            w.vault,
+            w.ledger,
+            w.vault_token,
+            pocket,
+            w.mint,
+            id,
+        ),
+    ];
+    assert_err(
+        send(&mut w.svm, &owner, &[&owner, &fresh], &ixs),
+        "BothKeysRequired",
+    );
+    assert_no_guardian_and_nothing_moved(&w, &pocket, balance);
+    assert!(!read_vault(&w.svm, &w.vault).change.active);
+}
+
+#[test]
+fn owner_key_plus_a_fresh_guardian_cannot_skip_the_delay_step_by_step() {
+    let (mut w, fresh, pocket, balance) = stolen_guardianless_vault();
+    let owner = w.owner.insecure_clone();
+    let clock = now(&w.svm);
+    let mut values = current_rules(&w);
+    values.guardian = fresh.pubkey();
+    propose(&mut w, values).unwrap();
+    let pending = read_vault(&w.svm, &w.vault);
+    assert!(pending.change.active);
+    assert_eq!(pending.change.fields, CHANGE_GUARDIAN);
+    assert_eq!(pending.change.effective_at, clock + HOLD_DELAY_1_DAY);
+
+    assert_held(&withdraw(&mut w, balance, &pocket).unwrap());
+    let row = newest_pending(&read_vault(&w.svm, &w.vault));
+    assert_eq!(row.unlock_at, clock + HOLD_DELAY_1_DAY);
+    assert_err(
+        skip(&mut w, row.id, &pocket, &owner, &fresh),
+        "BothKeysRequired",
+    );
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    assert_no_guardian_and_nothing_moved(&w, &pocket, balance);
+
+    // The window is still there: the real owner recovers during the delay.
+    let safe_token = w.safe_token;
+    recover(&mut w, &owner, &safe_token).unwrap();
+    assert_eq!(token_balance(&w.svm, &w.safe_token), balance);
+    assert_eq!(token_balance(&w.svm, &pocket), 0);
+}
+
+#[test]
+fn owner_key_plus_a_fresh_guardian_cannot_unfreeze_and_drain_in_one_transaction() {
+    let (mut w, fresh, pocket, balance) = stolen_guardianless_vault();
+    let owner = w.owner.insecure_clone();
+    // The real owner froze the vault. With no guardian, unfreeze waits the delay.
+    freeze(&mut w, &owner).unwrap();
+    let mut values = current_rules(&w);
+    values.guardian = fresh.pubkey();
+    let id = read_vault(&w.svm, &w.vault).next_withdrawal_id;
+    let ixs = [
+        propose_ix(&w, values),
+        unfreeze_ix(&w, owner.pubkey(), Some(fresh.pubkey())),
+        withdraw_accounts(
+            owner.pubkey(),
+            w.vault,
+            w.ledger,
+            w.vault_token,
+            pocket,
+            w.mint,
+            spl_token::ID,
+            balance,
+        ),
+        skip_ix(
+            owner.pubkey(),
+            fresh.pubkey(),
+            w.vault,
+            w.ledger,
+            w.vault_token,
+            pocket,
+            w.mint,
+            id,
+        ),
+    ];
+    assert_err(
+        send(&mut w.svm, &owner, &[&owner, &fresh], &ixs),
+        "NotTheGuardian",
+    );
+    assert_no_guardian_and_nothing_moved(&w, &pocket, balance);
+    assert!(read_vault(&w.svm, &w.vault).frozen);
+}
+
+#[test]
+fn owner_key_plus_a_fresh_guardian_cannot_unfreeze_a_frozen_vault_step_by_step() {
+    let (mut w, fresh, pocket, balance) = stolen_guardianless_vault();
+    let owner = w.owner.insecure_clone();
+    freeze(&mut w, &owner).unwrap();
+    let mut values = current_rules(&w);
+    values.guardian = fresh.pubkey();
+    propose(&mut w, values).unwrap();
+    assert_err(unfreeze(&mut w, &owner, Some(&fresh)), "NotTheGuardian");
+    assert!(read_vault(&w.svm, &w.vault).frozen);
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    assert_no_guardian_and_nothing_moved(&w, &pocket, balance);
+
+    // The pending guardian can still be dropped before it applies.
+    cancel_change(&mut w, &owner).unwrap();
+    assert!(!read_vault(&w.svm, &w.vault).change.active);
+    assert_no_guardian_and_nothing_moved(&w, &pocket, balance);
+}
+
+#[test]
+fn an_added_guardian_applies_after_the_delay_and_can_then_skip_with_the_owner() {
+    let (mut w, fresh, pocket, _balance) = stolen_guardianless_vault();
+    let owner = w.owner.insecure_clone();
+    let mut values = current_rules(&w);
+    values.guardian = fresh.pubkey();
+    propose(&mut w, values).unwrap();
+    let effective = read_vault(&w.svm, &w.vault).change.effective_at;
+    warp(&mut w.svm, effective - 1);
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    assert_eq!(read_vault(&w.svm, &w.vault).guardian, Pubkey::default());
+    warp(&mut w.svm, effective);
+    apply_change(&mut w, &owner).unwrap();
+    assert_eq!(read_vault(&w.svm, &w.vault).guardian, fresh.pubkey());
+
+    assert_held(&withdraw(&mut w, ONE, &pocket).unwrap());
+    let row = newest_pending(&read_vault(&w.svm, &w.vault));
+    skip(&mut w, row.id, &pocket, &owner, &fresh).unwrap();
+    assert_eq!(token_balance(&w.svm, &pocket), ONE);
+}
+
+// A vault initialized before safe != guardian was enforced, or migrated from
+// the legacy layout, can still hold safe_address == guardian.
+fn safe_is_guardian_world() -> (World, Pubkey, u64) {
+    let mut w = open_vault(Rules::default());
+    let mut legacy = read_vault(&w.svm, &w.vault);
+    legacy.safe_address = legacy.guardian;
+    overwrite_vault(&mut w.svm, &w.vault, &legacy);
+    let guardian = w.guardian.pubkey();
+    let guardian_token = new_dest(&mut w, &guardian);
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert!(balance > 0);
+    (w, guardian_token, balance)
+}
+
+#[test]
+fn a_guardian_that_is_also_the_safe_address_cannot_recover_to_itself() {
+    let (mut w, guardian_token, balance) = safe_is_guardian_world();
+    let guardian = w.guardian.insecure_clone();
+    assert_err(
+        recover(&mut w, &guardian, &guardian_token),
+        "SafeAddressIsGuardian",
+    );
+    assert_eq!(token_balance(&w.svm, &guardian_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}
+
+// Accepted behaviour, not a hole: the guardian may cancel the owner's
+// safe-address repair. Blocking that cancel would let a stolen owner key move
+// the safe address with no veto, see
+// the_guardian_keeps_its_veto_over_a_stolen_owner_key_moving_the_safe_address.
+// The guardian still cannot pay itself, so the cancel only delays the repair.
+#[test]
+fn a_guardian_that_is_also_the_safe_address_may_cancel_the_repair_but_still_cannot_recover_to_itself(
+) {
+    let (mut w, guardian_token, balance) = safe_is_guardian_world();
+    let mut values = current_rules(&w);
+    values.safe_address = w.safe;
+    propose(&mut w, values).unwrap();
+    let guardian = w.guardian.insecure_clone();
+    cancel_change(&mut w, &guardian).unwrap();
+    assert!(!read_vault(&w.svm, &w.vault).change.active);
+    assert_err(
+        recover(&mut w, &guardian, &guardian_token),
+        "SafeAddressIsGuardian",
+    );
+    assert_eq!(token_balance(&w.svm, &guardian_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+    // The owner can propose the repair again.
+    propose(&mut w, values).unwrap();
+    assert!(read_vault(&w.svm, &w.vault).change.active);
+}
+
+#[test]
+fn the_owner_can_still_recover_when_the_safe_address_is_the_guardian() {
+    let (mut w, guardian_token, balance) = safe_is_guardian_world();
+    // While safe == guardian, a proposal must change one of them. A guardian
+    // replacement is the non-safe change, and the guardian may cancel it.
+    let mut values = current_rules(&w);
+    values.guardian = Pubkey::new_unique();
+    propose(&mut w, values).unwrap();
+    let guardian = w.guardian.insecure_clone();
+    cancel_change(&mut w, &guardian).unwrap();
+
+    let owner = w.owner.insecure_clone();
+    recover(&mut w, &owner, &guardian_token).unwrap();
+    assert_eq!(token_balance(&w.svm, &guardian_token), balance);
+}
+
+// The reason the guardian keeps its cancel. A stolen owner key queues
+// safe = thief on a safe == guardian vault. The guardian cannot recover to
+// itself, so cancel_change is its only veto, and it must keep working.
+#[test]
+fn the_guardian_keeps_its_veto_over_a_stolen_owner_key_moving_the_safe_address() {
+    let (mut w, _guardian_token, balance) = safe_is_guardian_world();
+    let thief = Keypair::new();
+    let thief_token = new_dest(&mut w, &thief.pubkey());
+    let mut values = current_rules(&w);
+    values.safe_address = thief.pubkey();
+    propose(&mut w, values).unwrap();
+    let effective = read_vault(&w.svm, &w.vault).change.effective_at;
+    let guardian = w.guardian.insecure_clone();
+    cancel_change(&mut w, &guardian).unwrap();
+
+    warp(&mut w.svm, effective);
+    let owner = w.owner.insecure_clone();
+    assert_err(apply_change(&mut w, &owner), "NoPendingChange");
+    assert_err(recover(&mut w, &owner, &thief_token), "NotTheSafeAddress");
+    assert_eq!(token_balance(&w.svm, &thief_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
 }

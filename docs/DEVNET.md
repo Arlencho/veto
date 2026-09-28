@@ -154,6 +154,25 @@ Length: 36 (0x24) bytes
 
 ## Upgrades
 
+### Pending upgrade: guardian changes wait (not deployed)
+
+Not deployed. Nothing in this section has been uploaded to devnet, and the
+program on devnet is still the build recorded in the upgrade sections below.
+The pending change is in `programs/veto/src/hold.rs`:
+
+- `propose_change` treats any guardian change, including adding one to a vault
+  with none, as a loosening change. It waits `delay_secs` and applies through
+  `apply_change`. A guardian added this way cannot `skip`, `unfreeze`, `stop`,
+  `freeze` or `cancel_change` until the change applies.
+- `recover` refuses the guardian alone with `SafeAddressIsGuardian` when the
+  safe address is the guardian key. The owner can still recover.
+
+Until the upgrade is deployed and verified here, devnet keeps the old rules:
+adding a guardian to a vault with none applies at once, and on a vault whose
+safe address is its guardian (for example the demo vault
+`7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` below) the guardian alone can
+recover the balance.
+
 ### Hold migration and safe-address upgrade, 2026-09-26
 
 The lead already upgraded the program from main commit

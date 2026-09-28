@@ -558,6 +558,15 @@ pub fn recover(ctx: Context<Recover>) -> Result<()> {
         ctx.accounts.destination.owner == ctx.accounts.vault.safe_address,
         VetoError::NotTheSafeAddress
     );
+    // A pre-#344 or migrated vault can hold safe == guardian. The guardian
+    // alone must not be able to pay itself.
+    if ctx.accounts.authority.key() == ctx.accounts.vault.guardian {
+        require_keys_neq!(
+            ctx.accounts.vault.safe_address,
+            ctx.accounts.vault.guardian,
+            VetoError::SafeAddressIsGuardian
+        );
+    }
 
     // These rows are claims on the balance that is about to leave. execute
     // needs no key, so a row left in place pays the old destination out of
@@ -626,13 +635,11 @@ pub fn propose_change(ctx: Context<ProposeChange>, values: HoldChange) -> Result
     } else if values.big_share_bps > vault.big_share_bps {
         loosen |= CHANGE_SHARE;
     }
+    // Any guardian change waits. Adding one is not a pure tightening: a new
+    // guardian co-signs skip and unfreeze, which bypass the delay, so an owner
+    // key alone must not be able to install one instantly.
     if values.guardian != vault.guardian {
-        let adding = vault.guardian == Pubkey::default() && values.guardian != Pubkey::default();
-        if adding {
-            tighten |= CHANGE_GUARDIAN;
-        } else {
-            loosen |= CHANGE_GUARDIAN;
-        }
+        loosen |= CHANGE_GUARDIAN;
     }
     if values.safe_address != vault.safe_address {
         loosen |= CHANGE_SAFE;
@@ -651,15 +658,6 @@ pub fn propose_change(ctx: Context<ProposeChange>, values: HoldChange) -> Result
     }
     if tighten & CHANGE_SHARE != 0 {
         vault.big_share_bps = values.big_share_bps;
-    }
-    if tighten & CHANGE_GUARDIAN != 0 {
-        // The safe change waits, but adding a guardian takes effect now.
-        require_keys_neq!(
-            values.guardian,
-            vault.safe_address,
-            VetoError::SafeAddressIsGuardian
-        );
-        vault.guardian = values.guardian;
     }
 
     let vault_key = vault.key();

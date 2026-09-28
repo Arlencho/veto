@@ -12,9 +12,8 @@ time to stop them.
 
 - **Hold rules are stricter on chain.** The devnet program was upgraded on
   2026-09-28. Any change to a vault's guardian now waits the vault's delay, like
-  other loosening changes. A new vault or a changed safe address must differ
-  from both the owner and the guardian. The guardian cannot recover a vault to
-  itself, and the owner cannot recover or close a vault to itself.
+  other loosening changes. The guardian cannot recover a vault to itself, and
+  the owner cannot recover or close a vault to itself.
 - **Both-keys requests are checked before you sign.** When you paste a skip or
   unfreeze request signed by the other key, the app rebuilds the request it
   expects, shows what it checked, and signs only if the pasted request matches
@@ -25,8 +24,8 @@ time to stop them.
 - **Fewer failed reads.** When the tester RPC refuses a read (401, 403 or 429),
   the app retries it on the public endpoint of the same cluster. Transactions
   are never sent through the fallback.
-- **Clearer, exact wording.** The Hold card, spent amounts (rounded up), the
-  week in review and grade labels now say exactly what the program enforces.
+- **Clearer, exact wording.** The Hold card, spent amounts (rounded up) and
+  grade labels now say exactly what the program enforces.
   The devnet line stays below the status bar, and long week amounts wrap.
 
 ## What the app does
@@ -41,8 +40,8 @@ time to stop them.
   These attempts are refused and recorded; trades within the rule can go
   through. See the recorded devnet run in [Devnet deployment](DEVNET.md).
 - **Hold with a guardian.** Fund a vault, set its limits and waiting period,
-  and choose a separate guardian key and an explicit safe address. Withdrawals
-  to new addresses wait. The guardian can stop a waiting withdrawal, freeze
+  and choose a separate guardian key and an explicit safe address that is
+  neither the owner nor the guardian. Withdrawals to new addresses wait. The guardian can stop a waiting withdrawal, freeze
   the vault or recover its balance to the chosen safe address.
 - **Owner-direct connect.** Paste or scan an existing agent's public address
   into the app, review a rule and approve it with your wallet. An agent can
@@ -77,9 +76,11 @@ Start with the [tester guide](TESTERS.md) or the Try page at
   for fees. An empty remaining cap skips the payment. Outcomes and explorer
   links appear inline, then Decisions refreshes. Other agents and trade requests
   still need a separately running agent; the hacked-agent trade demo is scripted.
-- A Hold vault created before the 2026-09-28 upgrade can have a safe address
-  equal to its guardian or owner. Recovery or close to that address is now
-  refused. Change the safe address first; the change waits the vault's delay.
+- A Hold vault created before the 2026-09-26 upgrade can have a safe address
+  equal to its guardian or its owner. The key that equals the safe address can
+  no longer recover to itself, and the owner cannot close a vault whose safe
+  address is the owner; the other key can still recover. Change the safe
+  address first; the change waits the vault's delay.
 - The trade demo uses a test pool. Its rate is not a market-price claim.
 - Records describe requests that reach the program's decision logic, not
   every possible attempt. An unsubmitted request or an account-validation

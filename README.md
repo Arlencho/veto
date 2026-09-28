@@ -321,7 +321,7 @@ Every amount comes from the same chain reads as the app. If there is no signed-i
 
 Hold is a vault in the same program as a spending rule. A rule still does not escrow: the mandate is a delegate. Hold is for a balance the owner deposits and cannot move with a raw transfer. The vault PDA (`["hold", owner, vault_id]`, `vault_id` as a little-endian u64) is the authority of its token account. It holds SPL tokens. Native SOL goes in as wrapped SOL.
 
-Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade added Hold. The live binary is the 2026-09-26 upgrade built from commit `e2a66db`, SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681` ("Hold migration and safe-address upgrade, 2026-09-26" in [docs/DEVNET.md](docs/DEVNET.md)). The app screens exist. A written device check of Hold with a real vault is not recorded in this repository yet. The guardian rules below (any guardian change waits, and a guardian that is also the safe address cannot recover to itself) are in source and not yet deployed to devnet; the devnet program still applies an added guardian at once.
+Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade added Hold. The live binary is the 2026-09-26 upgrade built from commit `e2a66db`, SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681` ("Hold migration and safe-address upgrade, 2026-09-26" in [docs/DEVNET.md](docs/DEVNET.md)). The app screens exist. A written device check of Hold with a real vault is not recorded in this repository yet. The guardian rules below (any guardian change waits, and neither key alone can recover or close to itself when it is also the safe address) are in source and not yet deployed to devnet; the devnet program still applies an added guardian at once.
 
 An everyday withdrawal pays at once only when the vault is not frozen, the destination token account has already been paid by this vault, and the running 24 hour total stays inside both the daily limit and `big_share_bps` of the current balance. The app sets that share at 2500, a quarter of the vault. The delay is 1, 2, or 3 days. Anything else is held until `execute` after `unlock_at` on the chain clock. It is not refused, except when the vault cannot cover the amount, or the pending list is full (8). Those two write a refusal and pay nothing. A full known-destination list (16) still pays, and does not grow.
 
@@ -337,12 +337,12 @@ Instructions, from `programs/veto/src/hold.rs`:
 | `freeze` | owner or guardian | Nothing leaves except `recover` |
 | `unfreeze` | owner and guardian | With no guardian set, the owner waits out the current delay |
 | `skip` | owner and guardian | Pays a held withdrawal before `unlock_at`, and not while frozen |
-| `recover` | owner or guardian | Sends the whole balance to the safe address, including while frozen. The guardian alone is refused if the safe address is the guardian key |
+| `recover` | owner or guardian | Sends the whole balance to the safe address, including while frozen. Neither key alone can recover to itself: the guardian alone is refused if the safe address is the guardian key, and the owner alone is refused if the safe address is the owner key |
 | `propose_change` | owner | Tightening applies immediately. Loosening, including any guardian change, waits out the current delay |
 | `apply_change` | anyone | Applies a pending change after `effective_at` on the chain clock |
 | `cancel_change` | owner or guardian | Drops a pending change |
 | `migrate_hold_vault` | owner | Reallocates a vault from the older layout in place, keeping its rules and history ([docs/HOLD_MIGRATIONS.md](docs/HOLD_MIGRATIONS.md)) |
-| `close_hold_vault` | owner | With nothing held and the vault not frozen, sweeps the balance to the safe address and closes the vault, its token account and its ledger |
+| `close_hold_vault` | owner | With no held withdrawal and not frozen, sends the whole balance to the safe address and closes the vault. The owner cannot close to itself: it is refused if the safe address is the owner key |
 
 Tightening is a lower daily limit, a longer delay, or a lower share. Loosening is a higher limit, a shorter delay, a higher share, adding, removing or changing the guardian, or changing the safe address. Adding a guardian waits too: a guardian co-signs `skip` and `unfreeze`, so a key added at once would let the owner key alone skip the delay. Until the change applies, the new guardian has no power. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
 

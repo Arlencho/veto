@@ -520,6 +520,14 @@ pub fn close_hold_vault(ctx: Context<CloseHoldVault>) -> Result<()> {
             .all(|row| row.status == WITHDRAWAL_EMPTY),
         VetoError::HoldWithdrawalPending
     );
+    // The signer is always the owner. On a pre-#344 vault with safe == owner,
+    // the owner key alone must not be able to stop every row and sweep the
+    // whole balance to itself in one transaction.
+    require_keys_neq!(
+        vault.safe_address,
+        vault.owner,
+        VetoError::SafeAddressIsOwner
+    );
     transfer_out_parts(
         vault.to_account_info(),
         vault,
@@ -565,6 +573,16 @@ pub fn recover(ctx: Context<Recover>) -> Result<()> {
             ctx.accounts.vault.safe_address,
             ctx.accounts.vault.guardian,
             VetoError::SafeAddressIsGuardian
+        );
+    }
+    // A pre-#344 vault can also hold safe == owner. The owner key alone must
+    // not be able to pay itself instantly, even while frozen. The guardian may
+    // still recover there, and the owner repairs it with propose_change.
+    if ctx.accounts.authority.key() == ctx.accounts.vault.owner {
+        require_keys_neq!(
+            ctx.accounts.vault.safe_address,
+            ctx.accounts.vault.owner,
+            VetoError::SafeAddressIsOwner
         );
     }
 

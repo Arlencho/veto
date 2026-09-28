@@ -2336,3 +2336,77 @@ fn the_guardian_keeps_its_veto_over_a_stolen_owner_key_moving_the_safe_address()
     assert_eq!(token_balance(&w.svm, &thief_token), 0);
     assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
 }
+
+// A vault initialized before #344 can hold safe == owner. Recover checks only
+// that the destination is owned by the safe address, so without a key check a
+// stolen owner key pays itself the whole balance with no wait, even frozen.
+fn safe_is_owner_world() -> (World, Pubkey, u64) {
+    let mut w = open_vault(Rules::default());
+    let mut legacy = read_vault(&w.svm, &w.vault);
+    legacy.safe_address = legacy.owner;
+    overwrite_vault(&mut w.svm, &w.vault, &legacy);
+    let owner = w.owner.pubkey();
+    let owner_token = new_dest(&mut w, &owner);
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert!(balance > 0);
+    (w, owner_token, balance)
+}
+
+#[test]
+fn an_owner_that_is_also_the_safe_address_cannot_recover_to_itself() {
+    let (mut w, owner_token, balance) = safe_is_owner_world();
+    let owner = w.owner.insecure_clone();
+    assert_err(recover(&mut w, &owner, &owner_token), "SafeAddressIsOwner");
+    freeze(&mut w, &owner).unwrap();
+    assert_err(recover(&mut w, &owner, &owner_token), "SafeAddressIsOwner");
+    assert_eq!(token_balance(&w.svm, &owner_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}
+
+#[test]
+fn the_guardian_can_still_recover_when_the_safe_address_is_the_owner() {
+    let (mut w, owner_token, balance) = safe_is_owner_world();
+    let guardian = w.guardian.insecure_clone();
+    freeze(&mut w, &guardian).unwrap();
+    recover(&mut w, &guardian, &owner_token).unwrap();
+    assert_eq!(token_balance(&w.svm, &owner_token), balance);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), 0);
+}
+
+#[test]
+fn the_owner_repairs_a_safe_address_equal_to_the_owner_then_recovers_normally() {
+    let (mut w, owner_token, balance) = safe_is_owner_world();
+    let mut values = current_rules(&w);
+    values.safe_address = w.safe;
+    propose(&mut w, values).unwrap();
+    let owner = w.owner.insecure_clone();
+    assert_err(apply_change(&mut w, &owner), "ChangeNotReady");
+    assert_err(recover(&mut w, &owner, &owner_token), "SafeAddressIsOwner");
+    let pending = read_vault(&w.svm, &w.vault);
+    assert_eq!(pending.safe_address, owner.pubkey());
+    warp(&mut w.svm, pending.change.effective_at);
+    apply_change(&mut w, &owner).unwrap();
+    assert_eq!(read_vault(&w.svm, &w.vault).safe_address, w.safe);
+
+    assert_err(recover(&mut w, &owner, &owner_token), "NotTheSafeAddress");
+    let safe = w.safe_token;
+    let safe_before = token_balance(&w.svm, &safe);
+    recover(&mut w, &owner, &safe).unwrap();
+    assert_eq!(token_balance(&w.svm, &safe), safe_before + balance);
+    assert_eq!(token_balance(&w.svm, &owner_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), 0);
+}
+
+#[test]
+fn the_owner_still_recovers_a_normal_vault_while_frozen() {
+    let mut w = open_vault(Rules::default());
+    let owner = w.owner.insecure_clone();
+    freeze(&mut w, &owner).unwrap();
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert!(balance > 0);
+    let safe = w.safe_token;
+    let safe_before = token_balance(&w.svm, &safe);
+    recover(&mut w, &owner, &safe).unwrap();
+    assert_eq!(token_balance(&w.svm, &safe), safe_before + balance);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), 0);
+}

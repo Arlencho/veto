@@ -567,6 +567,16 @@ pub fn recover(ctx: Context<Recover>) -> Result<()> {
             VetoError::SafeAddressIsGuardian
         );
     }
+    // A pre-#344 vault can also hold safe == owner. The owner key alone must
+    // not be able to pay itself instantly, even while frozen. The guardian may
+    // still recover there, and the owner repairs it with propose_change.
+    if ctx.accounts.authority.key() == ctx.accounts.vault.owner {
+        require_keys_neq!(
+            ctx.accounts.vault.safe_address,
+            ctx.accounts.vault.owner,
+            VetoError::SafeAddressIsOwner
+        );
+    }
 
     // These rows are claims on the balance that is about to leave. execute
     // needs no key, so a row left in place pays the old destination out of

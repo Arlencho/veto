@@ -1,4 +1,4 @@
-# Veto APK v1.0.0-devnet.2: devnet
+# Veto APK v1.0.0-devnet.3: devnet
 
 Veto is an Android app for setting rules on what an agent can spend or trade
 on Solana. You approve the rule with your wallet. The program checks requests
@@ -8,22 +8,26 @@ time to stop them.
 
 **This release is devnet only. All money used here is test money with no value.**
 
-## Changed since v1.0.0-devnet.1
+## Changed since v1.0.0-devnet.2
 
-- **Send two test requests.** On the first-run live screen or a payment rule's
-  detail, the phone's test agent sends one payment inside the rule's limit and
-  one request just above it, which the program refuses. Both are devnet
-  transactions with explorer links, and amounts are shown in the token (for
-  example 0.05 USDC). See Known limits for when it appears.
-- **Fixed: the test agent is kept after approval.** Approving a rule for a test
-  agent created on the phone no longer creates a second key: the rule is opened
-  for the agent the app showed, and the name you typed is saved with that
-  agent's address.
-- **Lighter start.** A cold start sends far fewer network requests: the home
-  screen widget reads only when a widget is placed, the start-up read runs once,
-  and only the ledger transactions the Decisions list can show are fetched. On a
-  Seeker with three payment rules and a Hold vault, three cold starts logged 40,
-  60 and 42 rate-limit retries before this change and none after.
+- **Hold rules are stricter on chain.** The devnet program was upgraded on
+  2026-09-28. Any change to a vault's guardian now waits the vault's delay, like
+  other loosening changes. A new vault or a changed safe address must differ
+  from both the owner and the guardian. The guardian cannot recover a vault to
+  itself, and the owner cannot recover or close a vault to itself.
+- **Both-keys requests are checked before you sign.** When you paste a skip or
+  unfreeze request signed by the other key, the app rebuilds the request it
+  expects, shows what it checked, and signs only if the pasted request matches
+  it exactly and carries the other key's valid signature.
+- **Renewal shows what changes.** A renewal link cannot change the rule's
+  agent, and every field that differs from the current rule shows what it
+  changed from.
+- **Fewer failed reads.** When the tester RPC refuses a read (401, 403 or 429),
+  the app retries it on the public endpoint of the same cluster. Transactions
+  are never sent through the fallback.
+- **Clearer, exact wording.** The Hold card, spent amounts (rounded up), the
+  week in review and grade labels now say exactly what the program enforces.
+  The devnet line stays below the status bar, and long week amounts wrap.
 
 ## What the app does
 
@@ -73,6 +77,9 @@ Start with the [tester guide](TESTERS.md) or the Try page at
   for fees. An empty remaining cap skips the payment. Outcomes and explorer
   links appear inline, then Decisions refreshes. Other agents and trade requests
   still need a separately running agent; the hacked-agent trade demo is scripted.
+- A Hold vault created before the 2026-09-28 upgrade can have a safe address
+  equal to its guardian or owner. Recovery or close to that address is now
+  refused. Change the safe address first; the change waits the vault's delay.
 - The trade demo uses a test pool. Its rate is not a market-price claim.
 - Records describe requests that reach the program's decision logic, not
   every possible attempt. An unsubmitted request or an account-validation

@@ -149,6 +149,9 @@ async function connect(args: Args, runtime: Runtime): Promise<void> {
   const connection = runtime.connect(rpc);
   await assertGenesis(connection, cluster);
   await maybeAirdrop(connection, loaded.keypair.publicKey, cluster, runtime);
+  if (args.rule !== undefined && args.owner !== undefined) {
+    throw new CliError("Use --rule or --owner, not both.");
+  }
   const address =
     args.rule !== undefined
       ? await namedRule(connection, args.rule, loaded.keypair, runtime)

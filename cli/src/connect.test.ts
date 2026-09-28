@@ -560,3 +560,20 @@ test("connect --owner refuses a value that is not a wallet address", async () =>
     removeHome(home);
   }
 });
+
+test("connect refuses --rule together with --owner", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(
+      ["connect", ...(await agentKey(home, w.agent.secretKey)), "--rule", w.mandate.toBase58(), "--owner", w.owner.publicKey.toBase58()],
+      runtime,
+    );
+    assert.equal(code, 1);
+    assert.equal(runtime.errs.join("\n"), "Use --rule or --owner, not both.");
+    assert.equal(existsSync(configFile(home)), false);
+  } finally {
+    removeHome(home);
+  }
+});

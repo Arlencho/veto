@@ -179,6 +179,7 @@ test('a changed draft says the owner changed it, and a bad payee cannot be signe
   assert.equal(params.per, '6');
   assert.equal(params.cap, '80');
   assert.equal(params.payee, MERCHANT);
+  assert.equal('agent' in params, false);
 });
 
 test('letting the rule end remembers the choice and signs nothing', async () => {

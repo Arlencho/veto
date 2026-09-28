@@ -857,6 +857,112 @@ test('a new rule shows loading, an empty payee, a failed open, and arms the hold
 });
 
 
+test('a renewal link cannot swap the agent and shows a changed payee before signing', async () => {
+  const Screen = (await import('../app/rule/new')).default;
+  const source = mandate({ expiresAt: BigInt(Math.floor(Date.now() / 1000) + 84 * 86400 + 3600) });
+  const attacker = key();
+  const saved = chain.mandates;
+  chain.mandates = [source];
+  try {
+    const inputs = (root: ReactTestRenderer, label: string) =>
+      root.root
+        .findAll((node) => (node.type as unknown) === 'TextInput')
+        .find((node) => node.props.accessibilityLabel === label);
+
+    route.current = { from: source.address, renew: '1', payee: attacker, agent: key(), cap: '500', per: '500' };
+    let root = await mount(createElement(Screen));
+    assert.equal(inputs(root, 'Agent address')?.props.value, source.agent);
+    assert.equal(inputs(root, 'Payee')?.props.value, attacker);
+    assert.match(textOf(root), new RegExp(`Changed from ${source.merchant} to ${attacker}`));
+    await act(async () => root.unmount());
+
+    route.current = { from: source.address, renew: '1', payee: source.merchant, cap: '300', per: '10', days: '84' };
+    root = await mount(createElement(Screen));
+    assert.equal(inputs(root, 'Agent address')?.props.value, source.agent);
+    assert.doesNotMatch(textOf(root), /Changed from/);
+    await act(async () => root.unmount());
+  } finally {
+    chain.mandates = saved;
+  }
+});
+
+
+test('a renewal link raising cap, per-payment maximum and days shows each change before signing', async () => {
+  const Screen = (await import('../app/rule/new')).default;
+  // 84 days and one hour left, so the rule reads as 84 days left for the whole test.
+  const source = mandate({ expiresAt: BigInt(Math.floor(Date.now() / 1000) + 84 * 86400 + 3600) });
+  const saved = chain.mandates;
+  chain.mandates = [source];
+  try {
+    const input = (root: ReactTestRenderer, label: string) =>
+      root.root
+        .findAll((node) => (node.type as unknown) === 'TextInput')
+        .find((node) => node.props.accessibilityLabel === label || String(node.props.accessibilityLabel).startsWith(`${label},`));
+
+    route.current = { from: source.address, renew: '1', payee: source.merchant, cap: '5000', per: '500', days: '365', purpose: 'garage charger' };
+    const root = await mount(createElement(Screen));
+    let shown = textOf(root);
+    assert.match(shown, /Changed from 300 to 5000/);
+    assert.match(shown, /Changed from 10 to 500/);
+    assert.match(shown, /Changed from 84 days left to 365 days/);
+    assert.doesNotMatch(shown, new RegExp(`Changed from ${source.merchant}`));
+    assert.doesNotMatch(shown, /Changed from "/);
+
+    // The owner putting a field back removes its line; editing another field adds one.
+    await act(async () => {
+      input(root, 'Cap')!.props.onChangeText('300');
+    });
+    await act(async () => {
+      input(root, 'Expiry (days from now)')!.props.onChangeText('84');
+    });
+    shown = textOf(root);
+    assert.doesNotMatch(shown, /Changed from 300 to/);
+    assert.doesNotMatch(shown, /days left to/);
+    assert.match(shown, /Changed from 10 to 500/);
+    await act(async () => {
+      input(root, 'Per-payment maximum')!.props.onChangeText('10');
+    });
+    assert.doesNotMatch(textOf(root), /Changed from/);
+    await act(async () => {
+      input(root, 'Cap')!.props.onChangeText('301');
+    });
+    assert.match(textOf(root), /Changed from 300 to 301/);
+    await act(async () => root.unmount());
+  } finally {
+    chain.mandates = saved;
+  }
+});
+
+test('a renewal link or an edit that changes the purpose shows the change before signing', async () => {
+  const Screen = (await import('../app/rule/new')).default;
+  const source = mandate({ expiresAt: BigInt(Math.floor(Date.now() / 1000) + 84 * 86400 + 3600) });
+  const saved = chain.mandates;
+  chain.mandates = [source];
+  try {
+    const input = (root: ReactTestRenderer, label: string) =>
+      root.root
+        .findAll((node) => (node.type as unknown) === 'TextInput')
+        .find((node) => node.props.accessibilityLabel === label);
+    const same = { from: source.address, renew: '1', payee: source.merchant, cap: '300', per: '10', days: '84' };
+
+    route.current = { ...same, purpose: 'pay any invoice' };
+    let root = await mount(createElement(Screen));
+    assert.match(textOf(root), /Changed from "garage charger" to "pay any invoice"/);
+    await act(async () => root.unmount());
+
+    route.current = { ...same, purpose: 'garage charger' };
+    root = await mount(createElement(Screen));
+    assert.doesNotMatch(textOf(root), /Changed from/);
+    await act(async () => {
+      input(root, 'Purpose')!.props.onChangeText('garage charger and parking');
+    });
+    assert.match(textOf(root), /Changed from "garage charger" to "garage charger and parking"/);
+    await act(async () => root.unmount());
+  } finally {
+    chain.mandates = saved;
+  }
+});
+
 test('Overview and Rules never display the wallet error from another screen', async () => {
   sharedWalletError = 'You cancelled the wallet request.';
   try {

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 
 import { SkipScreen } from '../../components/hold/SkipScreen';
@@ -13,7 +13,8 @@ import {
   routeParam,
   shortKey,
 } from '../../lib/hold';
-import { holdRequestFromPayload, signHoldPartialWithSession } from '../../lib/holdSign';
+import { signHoldPartialWithSession } from '../../lib/holdSign';
+import { readHoldRequest, type PastedHoldRequest } from '../../lib/holdVerify';
 import { useHoldBundle } from '../../lib/holdSession';
 
 export default function HoldSkip() {
@@ -27,6 +28,9 @@ export default function HoldSkip() {
   const row = bundle?.account.pending.find((item) => item.id.toString() === idText) ?? bundle?.account.pending[0] ?? null;
   const [payload, setPayload] = useState('');
   const [signedHere, setSignedHere] = useState(false);
+  // The partial this phone produced. It carries only this phone's signature, so it is not checked as a pasted request.
+  const [ownPartial, setOwnPartial] = useState<string | null>(null);
+  const showingOwnPartial = ownPartial != null && payload.trim() === ownPartial.trim();
   const [waitingLine, setWaitingLine] = useState('1 of 2 signed. Waiting for the other key.');
   const guardian = bundle?.account.guardian.toBase58() ?? '';
   const hasGuardian = guardian.length > 0 && !isDefaultKey(guardian);
@@ -40,13 +44,49 @@ export default function HoldSkip() {
         ? 'empty'
         : loaded.status;
 
+  const pasted = useMemo<PastedHoldRequest | null>(() => {
+    if (payload.trim().length === 0 || showingOwnPartial) return null;
+    if (!loaded.client || !loaded.owner || !bundle) {
+      return { ok: false, reason: 'The vault is not ready to check this request. Nothing was signed.' };
+    }
+    return readHoldRequest(payload, {
+      purpose,
+      programId: loaded.client.programId,
+      owner: bundle.account.owner,
+      guardian: bundle.account.guardian,
+      vaultId: bundle.account.vaultId,
+      mint: bundle.account.mint,
+      tokenProgram: bundle.tokenProgram,
+      withdrawal: row ? { id: row.id, destination: row.destination } : null,
+      connected: loaded.owner,
+    });
+  }, [payload, showingOwnPartial, loaded.client, loaded.owner, bundle, purpose, row]);
+
+  const request = !pasted
+    ? null
+    : !pasted.ok
+      ? { ok: false as const, reason: pasted.reason }
+      : {
+          ok: true as const,
+          lines:
+            pasted.facts.action === 'skip'
+              ? [
+                  'Action: skip the wait and pay now.',
+                  `Vault: ${pasted.facts.vault.toBase58()}`,
+                  `Withdrawal: #${pasted.facts.withdrawalId?.toString() ?? ''}, ${amountLabel} ${loaded.tokenName}`,
+                  `Destination: ${pasted.facts.destination?.toBase58() ?? ''}`,
+                ]
+              : ['Action: unfreeze the vault.', `Vault: ${pasted.facts.vault.toBase58()}`],
+        };
+
   async function onSign() {
     if (!loaded.client || !loaded.owner || !bundle) {
       throw new Error('The vault is not ready to sign.');
     }
-    if (payload.trim().length > 0) {
-      const tx = holdRequestFromPayload(payload);
-      await loaded.wallet.signAndSend([tx]);
+    if (pasted) {
+      // Sign only a request that is exactly the one this screen shows, already signed by the other key.
+      if (!pasted.ok) throw new Error(pasted.reason);
+      await loaded.wallet.signAndSend([pasted.tx]);
       router.replace(purpose === 'unfreeze' ? `/hold/frozen?vault=${address}` : '/hold');
       return;
     }
@@ -89,6 +129,7 @@ export default function HoldSkip() {
             feePayer: loaded.owner,
           });
     const partial = await signHoldPartialWithSession(tx);
+    setOwnPartial(partial);
     setPayload(partial);
     setSignedHere(true);
     setWaitingLine('1 of 2 signed. Waiting for the other key.');
@@ -127,6 +168,8 @@ export default function HoldSkip() {
           }
           payload={payload}
           onPayload={setPayload}
+          request={request}
+          ownPartial={showingOwnPartial}
           onBack={() => router.back()}
           onCancel={() => router.back()}
           signLabel="Press and hold to sign with your key on this phone"

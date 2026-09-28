@@ -1,4 +1,5 @@
 import { redactRpc } from './rpcPrivacy';
+import { openRpcConnection } from './rpcFallback';
 import { Buffer } from 'buffer';
 import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 
@@ -466,7 +467,8 @@ async function readSignatureOnConfiguredRpc(
 
 async function openConfiguredConnection(): Promise<SignatureStatusConnection> {
   const { loadConfig } = await import('./config');
-  return new Connection(loadConfig().rpcUrl, 'confirmed');
+  const config = loadConfig();
+  return openRpcConnection(config.rpcUrl, config.explorerCluster);
 }
 
 const defaultSignatureLookup: SignatureLookup = async (signature) =>

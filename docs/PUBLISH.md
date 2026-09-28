@@ -6,7 +6,7 @@ Version 0.1.1 of both packages is prepared for release: the manifests, lockfiles
 version and changelogs say 0.1.1, and it is not on npm until the founder runs the commands below.
 The READMEs keep stating 0.1.0 as the published version until then. After both 0.1.1 registry
 checks pass, change those README lines (root `README.md`, `sdk/README.md`, `cli/README.md`) and
-the other docs that name 0.1.0 as the npm version.
+the other docs that name 0.1.0 as the npm version. In the same change, update the expected sentence in `sdk/src/critic-r2-pr195.test.ts` (it pins "Version 0.1.0 was published to npm on 2026-09-27."), or the sdk suite and the next `prepublishOnly` fail.
 
 Only the founder runs the publish commands below, from an approved checkout,
 using an npm account authorized for the `@veto-hq` scope and its two-factor code.

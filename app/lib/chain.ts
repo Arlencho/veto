@@ -54,6 +54,7 @@ import {
 } from './ruleAccount';
 import { displayPurpose } from './ruleView';
 import { isRateLimitError } from './rpcError';
+import { openRpcConnection } from './rpcFallback';
 import { signatureNotYetVisibleMessage, signatureSeenUnconfirmedMessage } from './wallet';
 import { assessOverride, type OverrideAssessment } from './override';
 import { decodeMandateAccount, isActive, type MandateAccount } from './mandate';
@@ -203,15 +204,15 @@ export type ChainClient = {
 };
 
 export const chainConnection = {
-  open(rpcUrl: string): Connection {
-    return new Connection(rpcUrl, 'confirmed');
+  open(rpcUrl: string, cluster: string): Connection {
+    return openRpcConnection(rpcUrl, cluster);
   },
 };
 
 export function createClient(config: AppConfig = loadConfig()): ChainClient {
   return {
     config,
-    connection: chainConnection.open(config.rpcUrl),
+    connection: chainConnection.open(config.rpcUrl, config.explorerCluster),
     programId: new PublicKey(config.programId),
   };
 }

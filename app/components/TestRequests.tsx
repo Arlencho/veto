@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import type { MandateAccount } from '../lib/mandate';
@@ -9,6 +9,7 @@ import { useChain } from '../lib/useChain';
 import { useWallet } from '../lib/useWallet';
 import { Button } from './Button';
 import { colors } from './theme';
+import { openRpcConnection } from '../lib/rpcFallback';
 
 export function TestRequests({ mandate }: { mandate: MandateAccount | null }) {
   const chain = useChain();
@@ -30,7 +31,7 @@ export function TestRequests({ mandate }: { mandate: MandateAccount | null }) {
     setBusy(true);
     setUpdates([]);
     const options = {
-      connection: new Connection(chain.config.rpcUrl, 'confirmed'),
+      connection: openRpcConnection(chain.config.rpcUrl, chain.config.explorerCluster),
       programId: new PublicKey(chain.config.programId), cluster: chain.config.explorerCluster,
       address: mandate.address, owner: wallet.ownerPublicKey,
       getAgentPublicKey: wallet.getAgentPublicKey, signWithAgent: wallet.signWithAgent, signAndSend: wallet.signAndSend, report,

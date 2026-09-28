@@ -66,13 +66,13 @@ The guardian keeps its cancel on that repair too. On a vault with safe equal to
 owner and a guardian, a hostile guardian can freeze the vault and cancel every
 repair, leaving only the guardian able to release funds, through `recover` to
 the owner wallet. No theft is possible: the owner key alone cannot recover or
-close to itself, and the guardian can only pay the owner. Repair any vault with
-safe equal to owner before this upgrade is deployed, while the current devnet
-program still lets the owner recover to itself. No vault documented in
-[DEVNET.md](DEVNET.md) has safe equal to owner: the demo vault
+close to itself, and the guardian can only pay the owner. These rules are
+deployed on devnet as of the 2026-09-28 upgrade recorded in [DEVNET.md](DEVNET.md).
+No vault documented in [DEVNET.md](DEVNET.md) has safe equal to owner: the demo vault
 `7BNXEuccpJVHuDgCSRZ3TsBovkHe9tJSC5qcHytWbwy8` and the legacy vault
-`8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` (issue #368) have safe equal to
-guardian, and the Hold journey vaults use a freshly generated safe address.
+`8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` (issue #368) still have safe equal
+to guardian and still need their owner's repair, and the Hold journey vaults use
+a freshly generated safe address.
 
 These checks compare keys only. A safe address that is a different wallet the
 guardian (or the owner) also controls cannot be detected on chain.

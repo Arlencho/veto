@@ -321,7 +321,7 @@ Every amount comes from the same chain reads as the app. If there is no signed-i
 
 Hold is a vault in the same program as a spending rule. A rule still does not escrow: the mandate is a delegate. Hold is for a balance the owner deposits and cannot move with a raw transfer. The vault PDA (`["hold", owner, vault_id]`, `vault_id` as a little-endian u64) is the authority of its token account. It holds SPL tokens. Native SOL goes in as wrapped SOL.
 
-Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade added Hold. The live binary is the 2026-09-26 upgrade built from commit `e2a66db`, SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681` ("Hold migration and safe-address upgrade, 2026-09-26" in [docs/DEVNET.md](docs/DEVNET.md)). The app screens exist. A written device check of Hold with a real vault is not recorded in this repository yet. The guardian rules below (any guardian change waits, and neither key alone can recover or close to itself when it is also the safe address) are in source and not yet deployed to devnet; the devnet program still applies an added guardian at once.
+Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade added Hold. The live binary is the 2026-09-28 upgrade built from commit `74c9e99`, SHA-256 `31dd22337359e3c31951e312b130b6de71b244d884e2530140182d5ee9529bd2` ("Hold guardian and safe-address upgrade, 2026-09-28" in [docs/DEVNET.md](docs/DEVNET.md)). The app screens exist. A written device check of Hold with a real vault is not recorded in this repository yet. The guardian rules below (any guardian change waits, and neither key alone can recover or close to itself when it is also the safe address) are deployed on devnet in that upgrade.
 
 An everyday withdrawal pays at once only when the vault is not frozen, the destination token account has already been paid by this vault, and the running 24 hour total stays inside both the daily limit and `big_share_bps` of the current balance. The app sets that share at 2500, a quarter of the vault. The delay is 1, 2, or 3 days. Anything else is held until `execute` after `unlock_at` on the chain clock. It is not refused, except when the vault cannot cover the amount, or the pending list is full (8). Those two write a refusal and pay nothing. A full known-destination list (16) still pays, and does not grow.
 
@@ -346,7 +346,7 @@ Instructions, from `programs/veto/src/hold.rs`:
 
 Tightening is a lower daily limit, a longer delay, or a lower share. Loosening is a higher limit, a shorter delay, a higher share, adding, removing or changing the guardian, or changing the safe address. Adding a guardian waits too: a guardian co-signs `skip` and `unfreeze`, so a key added at once would let the owner key alone skip the delay. Until the change applies, the new guardian has no power. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
 
-The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. On a vault that already has a guardian, an attacker with only the owner key can move at once at most the instant allowance to destinations the vault has paid before, or the whole balance to the safe address, and nothing else. Anything else waits, and after the wait anyone can execute it unless the owner or guardian stops it or freezes the vault first. On such a vault no single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. A vault without a guardian is weaker; see the known issue below. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
+The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. On a vault that already has a guardian, an attacker with only the owner key can move at once at most the instant allowance to destinations the vault has paid before, or the whole balance to the safe address, and nothing else. Anything else waits, and after the wait anyone can execute it unless the owner or guardian stops it or freezes the vault first. On such a vault no single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. A vault without a guardian is weaker; see the note below. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
 
 `@veto-hq/agent-sdk` exports `HoldVault`. The package is published from this checkout by the maintainer. The watcher raises hold alerts when `VETO_HOLD_VAULTS` is set. The app has the Hold screens, and the phone raises the same alerts. Overview and Rules each open Hold. Details are in [app/README.md](app/README.md), [sdk/README.md](sdk/README.md), and [watcher/README.md](watcher/README.md).
 
@@ -366,13 +366,13 @@ What it does not do:
 - A guardian on the same phone as the owner key is not a second factor. Keep the guardian on a second device kept somewhere else.
 - The vault's settings, including the safe address, are public on chain. Anyone can read them.
 
-**Known issue, fix pending.** A vault can be created without a guardian. On such a vault the
-deployed program treats adding a guardian as a tightening and applies it at once, so whoever holds
-the owner key could add a guardian key and then use `skip` with both keys to pay a held withdrawal
-without waiting out the delay. The guarantees above do not hold for that vault. The fix makes any
-guardian change wait out the vault's delay. It needs a program upgrade: the source fix is merged (PR #374) and not yet deployed; until
-that upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md), the deployed program behaves as
-described here.
+**Fixed on devnet, 2026-09-28.** A vault can be created without a guardian. Before the
+2026-09-28 upgrade, the deployed program treated adding a guardian to such a vault as a tightening
+and applied it at once, so whoever held the owner key could add a guardian key and then use `skip`
+with both keys to pay a held withdrawal without waiting out the delay. That upgrade, recorded in
+[docs/DEVNET.md](docs/DEVNET.md), makes any guardian change wait out the vault's delay. Vaults
+created before the 2026-09-26 safe-address upgrade may have a safe address equal to the guardian
+and should be repaired ([docs/HOLD_MIGRATIONS.md](docs/HOLD_MIGRATIONS.md)).
 
 ## The demo
 
@@ -424,7 +424,7 @@ docs/PROBLEM.md           the problem, who has it, what they do today, what Veto
 docs/PLAN.md              build plan, milestones, and prior art
 docs/PITCH.md             the pitch: position and the sixty seconds
 docs/DECK.md              the deck, slide by slide
-docs/DEVNET.md            public devnet addresses, and every recorded upgrade (live: 2026-09-26, e2a66db)
+docs/DEVNET.md            public devnet addresses, and every recorded upgrade (live: 2026-09-28, 74c9e99)
 docs/VIDEO.md             the three-minute shot list
 docs/TESTERS.md           how a Seeker owner installs and tries the devnet APK
 docs/RELEASE_NOTES.md     release notes for the tester APK
@@ -512,8 +512,8 @@ What a key can do under a mandate.
 - **A forged mandate account cannot be substituted.** `charge` re-derives the mandate address from
   the fields stored inside it and rejects a mismatch, and the CPI signs as that PDA.
 - **Hold is live on devnet.** The vault instructions are in this repository and tested. The
-  2026-09-25 upgrade added Hold. The live binary is the 2026-09-26 upgrade built from commit
-  `e2a66db`, SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`,
+  2026-09-25 upgrade added Hold. The live binary is the 2026-09-28 upgrade built from commit
+  `74c9e99`, SHA-256 `31dd22337359e3c31951e312b130b6de71b244d884e2530140182d5ee9529bd2`,
   recorded in [docs/DEVNET.md](docs/DEVNET.md). The bounds in the bullets above are bounds on
   that binary.
 - **Devnet upgrade authority.** The devnet program is owned by the upgradeable loader. Its

@@ -262,7 +262,9 @@ What it does not do:
   device kept somewhere else.
 - The vault's settings, including the safe address, are public on chain. Anyone can read them.
 
-Known issue, fix pending: on a vault created without a guardian, the deployed program applies
-adding a guardian at once, so whoever holds the owner key could add a guardian key and then `skip`
-a held withdrawal with both keys. The guarantees above do not hold for that vault. The fix makes
-any guardian change wait out the vault's delay and needs a program upgrade: the source fix is merged (PR #374) and not yet deployed.
+Fixed on devnet, 2026-09-28: on a vault created without a guardian, the program deployed before
+that upgrade applied adding a guardian at once, so whoever held the owner key could add a guardian
+key and then `skip` a held withdrawal with both keys. The 2026-09-28 upgrade from `74c9e99`
+(PR #374 and PR #376, recorded in [DEVNET.md](DEVNET.md)) makes any guardian change wait out the
+vault's delay. Vaults created before the 2026-09-26 safe-address upgrade may have a safe address
+equal to the guardian and should be repaired ([HOLD_MIGRATIONS.md](HOLD_MIGRATIONS.md)).

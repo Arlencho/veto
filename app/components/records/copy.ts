@@ -2,7 +2,7 @@ import { KIND_ADVISORY_DECLINE } from '../../lib/advisory';
 import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, REASON_OVER_PER_TX_MAX } from '../../lib/constants';
 import { formatClock, formatDayHeading, formatUnix, roundShownAmounts } from '../../lib/format';
 import { formatTokenAmount } from '../../lib/tokens';
-import { overrideRowView } from '../../lib/override';
+import { overrideRowView, paidAboveLimit } from '../../lib/override';
 import { refusalWhyLine } from '../../lib/reasons';
 import type { LedgerRow } from '../../lib/ring';
 import { tradeDecisionTitle } from '../../lib/tradeCopy';
@@ -121,6 +121,23 @@ function chainCopy(lead: string, signature: string | null | undefined): { detail
   return { detail, chainLink: null };
 }
 
+export function paidLimitLine(
+  amount: bigint,
+  perTxMax: bigint | undefined,
+  decimals: number,
+  mint: string | null | undefined,
+  unit: 'payment' | 'trade',
+): string {
+  if (perTxMax == null) {
+    return 'Inside the rule.';
+  }
+  const limit = formatTokenAmount(perTxMax, decimals, mint);
+  if (paidAboveLimit(amount, perTxMax)) {
+    return `Allowed once by you: above your ${limit} per-${unit} limit.`;
+  }
+  return `Inside your limit of ${limit} per ${unit}.`;
+}
+
 export function decisionFace(
   row: LedgerRow,
   decimals: number,
@@ -220,9 +237,7 @@ export function decisionFace(
       counterparty: row.counterparty,
       perTradeMax: perTxMax,
     });
-    const limit = perTxMax != null ? formatTokenAmount(perTxMax, decimals, mint) : null;
-    const inside = limit != null ? `Inside your limit of ${limit} per trade.` : 'Inside the rule.';
-    const chain = chainCopy(inside, row.signature);
+    const chain = chainCopy(paidLimitLine(row.amount, perTxMax, decimals, mint, 'trade'), row.signature);
     face = {
       tone: 'paid',
       badge: null,
@@ -235,9 +250,7 @@ export function decisionFace(
   } else if (row.kind === KIND_PAID) {
     const amount = formatTokenAmount(row.amount, decimals, mint);
     const payee = payeeLabel(options?.payee);
-    const limit = perTxMax != null ? formatTokenAmount(perTxMax, decimals, mint) : null;
-    const inside = limit != null ? `Inside your limit of ${limit} per payment.` : 'Inside the rule.';
-    const chain = chainCopy(inside, row.signature);
+    const chain = chainCopy(paidLimitLine(row.amount, perTxMax, decimals, mint, 'payment'), row.signature);
     face = {
       tone: 'paid',
       badge: null,

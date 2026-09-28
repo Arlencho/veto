@@ -7,7 +7,7 @@ import { KIND_OVERRIDE, KIND_REFUSED } from '../lib/constants';
 import { encodeDecisionId } from '../lib/exportRecord';
 import { explorerTxUrl } from '../lib/format';
 import { formatTokenDisplay } from '../lib/tokens';
-import { overrideRowView } from '../lib/override';
+import { overrideRowView, paidAboveLimit } from '../lib/override';
 import type { LedgerRow } from '../lib/ring';
 import { decisionFace, type RowTone } from './records/copy';
 import { colors, fonts, radii } from './theme';
@@ -65,7 +65,9 @@ export function DecisionRow({
     void RN.Linking.openURL(explorerTxUrl(row.signature, cluster, rpcUrl));
   };
 
-  let accessibilityLabel = `Paid within rule ${amount}`;
+  let accessibilityLabel = paidAboveLimit(row.amount, perTxMax)
+    ? `Paid, allowed once by you ${amount}`
+    : `Paid within rule ${amount}`;
   if (row.kind === KIND_ADVISORY_DECLINE) {
     accessibilityLabel = `${ADVISORY_DECLINE_LABEL} ${amount}`;
   } else if (row.kind === KIND_REFUSED) {

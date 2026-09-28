@@ -207,7 +207,7 @@ export default function DecisionDetailScreen() {
 
             {seqText ? (
               <View style={styles.sequence}>
-                <Text style={styles.kicker}>The record of this nonce</Text>
+                <Text style={styles.kicker}>The record of this request</Text>
                 <Text style={styles.body}>{seqText}</Text>
               </View>
             ) : null}

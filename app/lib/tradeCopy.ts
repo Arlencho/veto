@@ -7,6 +7,7 @@ import {
   reasonText,
 } from './constants';
 import { formatTokenAmount, formatTokenDisplay } from './tokens';
+import { paidAboveLimit } from './override';
 import { truncateAddress } from './wallet';
 
 export function tradeWorstCase(dailyLimitLabel: string): string {
@@ -24,11 +25,14 @@ export function tradeDecisionDetail(args: {
 }): string {
   const sold = formatTokenAmount(args.amountIn, args.inDecimals, args.inMint);
   const limit = formatTokenAmount(args.perTradeMax, args.inDecimals, args.inMint);
+  const within = paidAboveLimit(args.amountIn, args.perTradeMax)
+    ? `allowed once by you above your ${limit} per-trade limit`
+    : `under ${limit} per trade`;
   if (args.amountOut != null && args.outMint) {
     const bought = formatTokenAmount(args.amountOut, args.outDecimals, args.outMint);
-    return `Traded ${sold} for ${bought}, under ${limit} per trade.`;
+    return `Traded ${sold} for ${bought}, ${within}.`;
   }
-  return `${sold}, under ${limit} per trade.`;
+  return `${sold}, ${within}.`;
 }
 
 export function tradeDecisionTitle(args: {

@@ -41,8 +41,8 @@ export function AllowOnce({
       <View style={styles.block}>
         <Text style={styles.kicker}>Read back from chain</Text>
         <Text style={styles.body}>
-          Override of {formatTokenAmount(confirmed.amount, decimals, mint)} for nonce {confirmed.nonce.toString()} is
-          on the ledger as a recorded decision. The agent can retry this nonce.
+          Override of {formatTokenAmount(confirmed.amount, decimals, mint)} for this request is on the ledger as a
+          recorded decision. The agent can retry this request.
         </Text>
       </View>
     );
@@ -52,7 +52,7 @@ export function AllowOnce({
   }
   if (assessment.status === 'checking') {
     return (
-      <EmptyState>Checking this rule and nonce on chain before offering an override.</EmptyState>
+      <EmptyState>Checking this rule and request on chain before offering an override.</EmptyState>
     );
   }
   if (assessment.status === 'none' || assessment.status === 'blocked' || assessment.status === 'already') {

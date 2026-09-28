@@ -857,6 +857,36 @@ test('a new rule shows loading, an empty payee, a failed open, and arms the hold
 });
 
 
+test('a renewal link cannot swap the agent and shows a changed payee before signing', async () => {
+  const Screen = (await import('../app/rule/new')).default;
+  const source = mandate();
+  const attacker = key();
+  const saved = chain.mandates;
+  chain.mandates = [source];
+  try {
+    const inputs = (root: ReactTestRenderer, label: string) =>
+      root.root
+        .findAll((node) => (node.type as unknown) === 'TextInput')
+        .find((node) => node.props.accessibilityLabel === label);
+
+    route.current = { from: source.address, renew: '1', payee: attacker, agent: key(), cap: '500', per: '500' };
+    let root = await mount(createElement(Screen));
+    assert.equal(inputs(root, 'Agent address')?.props.value, source.agent);
+    assert.equal(inputs(root, 'Payee')?.props.value, attacker);
+    assert.match(textOf(root), new RegExp(`Changed from ${source.merchant} to ${attacker}`));
+    await act(async () => root.unmount());
+
+    route.current = { from: source.address, renew: '1', payee: source.merchant, cap: '80', per: '6' };
+    root = await mount(createElement(Screen));
+    assert.equal(inputs(root, 'Agent address')?.props.value, source.agent);
+    assert.doesNotMatch(textOf(root), /Changed from/);
+    await act(async () => root.unmount());
+  } finally {
+    chain.mandates = saved;
+  }
+});
+
+
 test('Overview and Rules never display the wallet error from another screen', async () => {
   sharedWalletError = 'You cancelled the wallet request.';
   try {

@@ -384,8 +384,8 @@ export function renewalSearchParams(
   per: string;
   payee: string;
   purpose: string;
-  agent: string;
 } {
+  // No agent: a renewal always keeps the rule's own agent, so a link cannot swap it.
   return {
     from: address,
     renew: '1',
@@ -394,7 +394,6 @@ export function renewalSearchParams(
     per: draft.perTxMax.trim(),
     payee: draft.merchant.trim(),
     purpose: draft.purpose.trim(),
-    agent: draft.agent.trim(),
   };
 }
 

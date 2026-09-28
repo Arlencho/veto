@@ -65,7 +65,6 @@ export default function NewRuleScreen() {
     per?: string;
     payee?: string;
     purpose?: string;
-    agent?: string;
   }>();
   const chain = useChain();
   const stored = useRulesets();
@@ -155,7 +154,6 @@ export default function NewRuleScreen() {
     renewing ? (params.per ?? '') : '',
     renewing ? (params.payee ?? '') : '',
     renewing ? (params.purpose ?? '') : '',
-    renewing ? (params.agent ?? '') : '',
   ].join(':');
 
   return (
@@ -167,7 +165,7 @@ export default function NewRuleScreen() {
       authoring={(params.ruleset === 'new' || Boolean(sourceMandate)) && !renewing}
       applying={selectedRuleset != null}
       renewing={renewing}
-      initialAgent={renewing ? params.agent?.trim() || sourceMandate.agent : ''}
+      initialAgent={renewing ? sourceMandate.agent : ''}
     />
   );
 }
@@ -221,6 +219,8 @@ function RuleCompose({
   const [openedAddress, setOpenedAddress] = useState<string | null>(null);
   const [holdReset, setHoldReset] = useState(0);
   const openingRef = useRef(false);
+  const payeeChangedFrom =
+    renewing && sourceMandate && fields.merchant.trim() !== sourceMandate.merchant ? sourceMandate.merchant : null;
   const formMint = chain.config?.mint ?? null;
   const formSymbol = tokenSymbol(formMint);
   const formCluster = chain.config?.explorerCluster ?? null;
@@ -548,6 +548,11 @@ function RuleCompose({
           }
           hint={PAYEE_GUIDANCE}
         />
+        {payeeChangedFrom ? (
+          <Text style={styles.changed} accessibilityRole="text" selectable>
+            Changed from {payeeChangedFrom} to {fields.merchant.trim()}
+          </Text>
+        ) : null}
         <AddressActions
           target="payee"
           onAddress={(address) => setField('merchant', address)}
@@ -612,6 +617,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 14,
     lineHeight: 20,
+  },
+  changed: {
+    color: colors.tilt,
+    fontFamily: fonts.sansBold,
+    fontSize: 13,
+    lineHeight: 18,
   },
   meta: {
     color: colors.muted,

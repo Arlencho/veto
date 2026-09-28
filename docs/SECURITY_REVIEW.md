@@ -241,10 +241,10 @@ anchor-spl 1.2.0 are the pinned versions. The devnet deployment was not probed l
 Hold landed after this review and the verdicts above do not cover it. This section states, in plain
 words, what `programs/veto/src/hold.rs` guarantees when an owner is coerced, and what it does not.
 
-What the program guarantees:
+What the deployed program guarantees on a vault that had a guardian before any key was lost:
 
-- An instant withdrawal only goes to a destination this vault has paid before. A new address never
-  gets money instantly.
+- An instant withdrawal only goes to a destination this vault has paid before. A new address gets
+  money before the wait ends only through `skip`, which needs both keys.
 - Anything else waits 1, 2, or 3 days on the chain clock, whichever delay the vault was set to.
 - No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`)
   needs both the owner key and the guardian key. Loosening any rule, including adding or changing
@@ -259,3 +259,8 @@ What it does not do:
 - A guardian on the same phone as the owner key is not a second factor. Keep the guardian on a second
   device kept somewhere else.
 - The vault's settings, including the safe address, are public on chain. Anyone can read them.
+
+Known issue, fix pending: on a vault created without a guardian, the deployed program applies
+adding a guardian at once, so whoever holds the owner key could add a guardian key and then `skip`
+a held withdrawal with both keys. The guarantees above do not hold for that vault. The fix makes
+any guardian change wait out the vault's delay and needs a program upgrade, which is pending.

@@ -333,15 +333,15 @@ Instructions, from `programs/veto/src/hold.rs`:
 
 Tightening is a lower daily limit, a longer delay, or a lower share. Loosening is a higher limit, a shorter delay, a higher share, adding, removing or changing the guardian, or changing the safe address. Adding a guardian waits too: a guardian co-signs `skip` and `unfreeze`, so a key added at once would let the owner key alone skip the delay. Until the change applies, the new guardian has no power. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
 
-The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. With only the owner key, an attacker can move at once at most the instant allowance to destinations the vault has paid before, or the whole balance to the safe address, and nothing else. Anything else waits, and after the wait anyone can execute it unless the owner or guardian stops it or freezes the vault first. No single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
+The wait uses the chain clock only. A stolen guardian key can move money only to the safe address. On a vault that already has a guardian, an attacker with only the owner key can move at once at most the instant allowance to destinations the vault has paid before, or the whole balance to the safe address, and nothing else. Anything else waits, and after the wait anyone can execute it unless the owner or guardian stops it or freezes the vault first. On such a vault no single key shortens a wait or loosens a rule before the delay. `unfreeze` and `skip` are the exception, and they need both keys. A vault without a guardian is weaker; see the known issue below. Every action writes a hold ledger entry and an event. Mandate accounts are unchanged.
 
 `@veto-hq/agent-sdk` exports `HoldVault`. The package is published from this checkout by the maintainer. The watcher raises hold alerts when `VETO_HOLD_VAULTS` is set. The app has the Hold screens, and the phone raises the same alerts. Overview and Rules each open Hold. Details are in [app/README.md](app/README.md), [sdk/README.md](sdk/README.md), and [watcher/README.md](watcher/README.md).
 
 ### If someone forces you
 
-What the program guarantees, from `programs/veto/src/hold.rs`:
+What the deployed program guarantees on a vault that had a guardian before any key was lost, from `programs/veto/src/hold.rs`:
 
-- An instant withdrawal only goes to a destination this vault has paid before. A new address never gets money instantly.
+- An instant withdrawal only goes to a destination this vault has paid before. A new address gets money before the wait ends only through `skip`, which needs both keys.
 - Anything else waits 1, 2, or 3 days on the chain clock, whichever delay the vault was set to.
 - No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`) needs both the owner key and the guardian key. Loosening any rule, including adding or changing the guardian, waits out the current delay. `recover` only goes to the safe address chosen in advance.
 - The guardian is alerted and can stop a held withdrawal, or freeze the whole vault, with one tap.
@@ -352,6 +352,14 @@ What it does not do:
 - Someone who holds the owner for longer than the delay, or who gets both keys, can still get the money.
 - A guardian on the same phone as the owner key is not a second factor. Keep the guardian on a second device kept somewhere else.
 - The vault's settings, including the safe address, are public on chain. Anyone can read them.
+
+**Known issue, fix pending.** A vault can be created without a guardian. On such a vault the
+deployed program treats adding a guardian as a tightening and applies it at once, so whoever holds
+the owner key could add a guardian key and then use `skip` with both keys to pay a held withdrawal
+without waiting out the delay. The guarantees above do not hold for that vault. The fix makes any
+guardian change wait out the vault's delay. It needs a program upgrade, which is pending; until
+that upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md), the deployed program behaves as
+described here.
 
 ## The demo
 

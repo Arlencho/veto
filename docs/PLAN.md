@@ -14,7 +14,7 @@ leaves only a failed transaction's logs, nothing in program state. Veto makes th
 recorded no, a one-line why, and the override that would have cleared it. On a phone, with the
 key in Seed Vault.
 
-AP2 standardised the record of a yes. This is the missing half.
+AP2 specified the record of a yes. This is the missing half.
 
 The mandate is the prior claim, the ledger is the evidence, and neither is worth anything alone.
 Who has the problem, and how a burner wallet compares, is in [PROBLEM.md](PROBLEM.md).
@@ -25,13 +25,14 @@ Capped agent spending is not new. The table names the limits that already exist.
 
 | Who | What they do | Relation to this entry |
 |---|---|---|
-| Squads v4 spending limits | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec, Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
+| Squads v4 spending limits | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec, Trail of Bits, two formal verifications underway (per the Squads blog, read 2026-09-28) | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
 | SPL `approve` / delegate | Caps what a delegate can pull | Cap only. No purpose, no expiry, no reason, no record |
 | LazorKit | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
-| SolAgent Pay | An overspend "is not a policy violation logged after the fact, it is an impossible transaction". Funds are escrowed into a vault | Veto records the decline and leaves the funds in an account the owner controls |
 | Oculus | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves |
-| x402 / AP2 | HTTP 402 settlement; signed Intent, Cart and Payment mandates as verifiable credentials | The record of a yes, held off chain as evidence for the merchant |
+| x402 / AP2 | HTTP 402 settlement; signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | The record of a yes, held off chain as evidence for the merchant |
 | Seed Vault | Hardware-held keys, human approves every signature | The default on this platform. Unattended agent spend needs a bound beside that key |
+
+SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28, and no archived copy was found, so its row and quote were removed.
 
 By the time this plan was written, capped on-chain agent budgets were already commodity, including
 tutorials from infrastructure vendors. The entry is the mobile build, the recorded refusal, and
@@ -101,7 +102,7 @@ writes a hold ledger entry and an event. Mandate accounts are unchanged.
 
 `@veto-hq/agent-sdk` exports `HoldVault` for those instructions. Install it with `npm install @veto-hq/agent-sdk`. Version 0.1.0 was published to npm on 2026-09-27. The package is published from this checkout by the maintainer. The watcher reads `VETO_HOLD_VAULTS` and writes hold alerts. The app has the Hold screens and raises the same alerts on the phone. Overview and Rules each open Hold.
 
-Hold is merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows. [DEVNET.md](DEVNET.md) records the 2026-09-20 addresses and the 2026-09-25 program upgrade.
+Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. [DEVNET.md](DEVNET.md) records the 2026-09-20 addresses and the 2026-09-25 program upgrade.
 
 ### The feed
 
@@ -139,7 +140,7 @@ One APK, in `app/`. The look is Backglass. A fresh install walks five stages: Le
 
 Agents grades each agent with the four rules in `app/lib/grade.ts` (fewer than 1 request in 20 outside the rule, 1 to 4 in 20, more than 4 in 20, or too new: fewer than 10 requests or fewer than 3 days). Plaques, a seven-day week in review, a track record card, renewal in the last seven days, and a quiet note that is off until turned on are in the app. Two Android home screen widgets show what an agent can still spend. They need a prebuild. Expo Go cannot install them.
 
-On an active rule, Connect your agent (Copy all and a QR). Revoke in one tap. Close rule returns the remaining budget on a per-rule token account. A local notification on every decision, raised by an on-device background read (`app/lib/decisionNotifyTask.ts`), because the agent acts while the owner is not looking. Hold screens are in the app. Hold is live on devnet, and a device check with a real vault follows.
+On an active rule, Connect your agent (Copy all and a QR). Revoke in one tap. Close rule returns the remaining budget on a per-rule token account. A local notification on every decision, raised by an on-device background read (`app/lib/decisionNotifyTask.ts`), because the agent acts while the owner is not looking. Hold screens are in the app. Hold is live on devnet. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 The agent key is generated in the app and held in `expo-secure-store`. It signs `charge` and
 nothing else. It owns no funds and cannot widen any limit.
@@ -166,7 +167,7 @@ Dates below are the hackathon calendar. The cut lines and the old self-score liv
 | **Oct 6** | Three-minute video shot on device. Deck done. |
 | **Oct 8** | Submitted. The deadline is October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)). |
 
-On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiGKYDk4zaVmFxdJ2RPj4MTujgR39g` has three paid charges and six refusals from 2026-09-20 20:57:50 UTC through 2026-09-21 22:00:11 UTC. That span is not a week, and it cannot be backfilled. Mobile Wallet Adapter `authorize` and the Seed Vault signatures have not been checked on a Seeker. Hold is live on devnet as of the 2026-09-25 upgrade recorded in [DEVNET.md](DEVNET.md). The app screens exist, and a device check with a real vault follows.
+On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiGKYDk4zaVmFxdJ2RPj4MTujgR39g` has three paid charges and six refusals from 2026-09-20 20:57:50 UTC through 2026-09-21 22:00:11 UTC. That span is not a week, and it cannot be backfilled. Mobile Wallet Adapter `authorize` and the Seed Vault signatures have not been checked on a Seeker. Hold is live on devnet as of the 2026-09-25 upgrade recorded in [DEVNET.md](DEVNET.md). The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 ## Risks
 
@@ -174,7 +175,6 @@ On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiG
 2. **The quoted rule's history is the span above.** A later charge on that mandate does not turn the existing rows into a week.
 3. **A refusal has to confirm.** The balance is unchanged and the ledger entry exists in the same confirmed transaction. That is what the refusal test asserts.
 4. **A charge the agent never submits has no record.** Nothing on chain can provide one. The record is every decision the agent submits. [PROBLEM.md](PROBLEM.md) states that limit.
-5. **SolAgent Pay describes an overspend as an impossible transaction and escrows into a vault.** The record here is the refusal, on a phone.
 
 ## House rules
 

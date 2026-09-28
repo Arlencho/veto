@@ -55,7 +55,9 @@ test("R5: the reason tables in README.md and DECISION_RECORD.md are the program'
   const program = programReasons();
   const readme = docTable("README.md", /### Refusal reasons/);
   const record = docTable("docs/DECISION_RECORD.md", /### Reason codes/);
-  assert.deepEqual([...readme.keys()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "README lists the ten refusal codes");
+  const readmeCodes = [...readme.keys()];
+  assert.deepEqual(readmeCodes.filter((code) => code <= 10), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "README lists the ten refusal codes");
+  assert.ok(readmeCodes.every((code) => code >= 1 && code <= 14), "README adds only the trade codes 11 to 14");
   assert.deepEqual([...record.keys()], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "DECISION_RECORD lists ok plus the ten");
   for (const [code, text] of program) {
     if (code !== 0) assert.equal(readme.get(code), text, `README code ${code}`);

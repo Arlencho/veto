@@ -41,13 +41,16 @@ Reversed by: the delegate path proving unworkable, per the entry above.
 
 A competitive check found that capped on-chain agent budgets are commodity: Squads v4 ships
 audited spending limits, with two formal verifications underway, LazorKit ships session keys with
-on-chain roles and limits, AP2 standardised signed mandates carrying limits and validity windows,
+on-chain roles and limits, AP2 specified signed mandates carrying limits and validity windows,
 and an infrastructure vendor publishes a tutorial on capped on-chain agent budgets. The named
 designs are the table in the README.
 
 The closest of them, SolAgent Pay, states outright that an overspend "is not a policy violation
 logged after the fact, it is an impossible transaction". That is the opposite thesis and it is what
 we differentiate against. An impossible transaction leaves no artifact, no reason and no trail.
+
+Update 2026-09-28: the SolAgent Pay repository returned HTTP 404 and no archived copy was found, so
+the quote above can no longer be checked. It was removed from the README, PLAN, PITCH and DECK.
 
 So the claim is narrowed and sharpened: the refusal is legible. A recorded no, a reason, and the
 override that would clear it, on a phone, with the key in Seed Vault.
@@ -184,7 +187,7 @@ The phone is the Backglass app. A fresh install walks five stages: Learn, Connec
 
 The agent package is `@veto-hq/agent-sdk`. Install it with `npm install @veto-hq/agent-sdk`. Published to npm at 0.1.0 on 2026-09-27. The package is published from this checkout by the maintainer.
 
-Hold is a vault in the same program (`programs/veto/src/hold.rs`). It does not replace the spending rule. A rule is still a delegate, not an escrow. The SDK exports `HoldVault`. The watcher alerts on `VETO_HOLD_VAULTS`. The app has the Hold screens. Hold is merged and tested, and live on devnet as of the 2026-09-25 upgrade recorded in [DEVNET.md](../DEVNET.md). A device check with a real vault follows.
+Hold is a vault in the same program (`programs/veto/src/hold.rs`). It does not replace the spending rule. A rule is still a delegate, not an escrow. The SDK exports `HoldVault`. The watcher alerts on `VETO_HOLD_VAULTS`. The app has the Hold screens. Hold is merged and tested, and live on devnet as of the 2026-09-25 upgrade recorded in [DEVNET.md](../DEVNET.md). A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 The 2026-09-24 introduction entry described four cards before Connect. Those steps are now the Learn stage. The 2026-09-24 custody entry still describes a spending rule.
 

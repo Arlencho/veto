@@ -56,7 +56,6 @@ These are the limits that already exist.
 | Squads v4 | Audited spending limits, formal verification underway |
 | SPL delegate | A cap on what a delegate may pull |
 | LazorKit | Session keys with on-chain roles and limits |
-| SolAgent Pay | Session PDA, ceilings, allowlist, TTL |
 | AP2 | Signed mandates carrying limits and validity |
 
 > Capped agent spending on Solana is not new. An infrastructure vendor publishes a tutorial on it.
@@ -68,9 +67,6 @@ These are the limits that already exist.
 > The difference is what is left behind. Elsewhere a blocked overspend is a failed
 > transaction: logs and an error code, but nothing in program state. Here the decline is a
 > successful transaction that records a structured reason and moves no payment tokens.
-
-Quote SolAgent Pay's own README on screen, verbatim, in their words: an overspend "is not a policy
-violation logged after the fact, it is an impossible transaction."
 
 Here the transfer is not executed. The decline is recorded.
 
@@ -90,7 +86,7 @@ per-payment maximum 10, remaining 292 of a 300 cap, override 16.659625. The 12.5
 1.33277 SEK/kWh is that amount. Same decision as slide 1.
 
 > The transaction succeeded at deciding no. The payment did not happen. The balance is unchanged,
-> and neither party can edit the record.
+> and neither party can edit the confirmed transaction.
 >
 > The last field is the override that would have cleared the charge.
 
@@ -131,7 +127,7 @@ mints further supply of that same mint. Addresses are in [DEVNET.md](DEVNET.md).
 > A worst case fixed in advance by the rule. A complete record of every payment made against it.
 > Every refusal the agent surfaced.
 >
-> AP2 standardised the record of a yes. This is the missing half.
+> AP2 specified the record of a yes. This is the missing half.
 
 **Thirty seconds.**
 
@@ -146,7 +142,7 @@ mints further supply of that same mint. Addresses are in [DEVNET.md](DEVNET.md).
 >
 > Submissions close October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 
-The phone now also has the Backglass first run (Learn, Connect wallet, Add your agent, Approve the rule, Live), four tabs (Overview, Rules, Agents, Decisions), grades, plaques, a week in review, a track record card, renewal, a quiet note, and two home screen widgets. The agent package is `@veto-hq/agent-sdk`, version 0.1.0 on npm. Authorize identifies the app as `https://veto-hq.github.io`. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows. The slides above are still the refusal on the quoted rule.
+The phone now also has the Backglass first run (Learn, Connect wallet, Add your agent, Approve the rule, Live), four tabs (Overview, Rules, Agents, Decisions), grades, plaques, a week in review, a track record card, renewal, a quiet note, and two home screen widgets. The agent package is `@veto-hq/agent-sdk`, version 0.1.0 on npm. Authorize identifies the app as `https://veto-hq.github.io`. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. The slides above are still the refusal on the quoted rule.
 
 ---
 

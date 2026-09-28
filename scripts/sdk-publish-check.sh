@@ -120,7 +120,7 @@ set -e
 [[ -n "$files" ]] || die "refusing: dry-run tarball has no files"
 
 # A listed path is allowed only as package.json (npm adds it), README.md,
-# idl/, or dist/. A fixture is refused when its text contains an http(s) URL.
+# LICENSE, idl/, or dist/. A fixture is refused when its text contains an http(s) URL.
 classify() {
   local rel="$1"
   local base
@@ -183,9 +183,9 @@ classify() {
   fi
 
   case "$rel" in
-    package.json|README.md|idl/*|dist/*) ;;
+    package.json|README.md|LICENSE|idl/*|dist/*) ;;
     *)
-      printf 'file outside dist, idl, and README.md: %s' "$rel"
+      printf 'file outside dist, idl, README.md, and LICENSE: %s' "$rel"
       return 1
       ;;
   esac
@@ -233,6 +233,7 @@ require_listed() {
   fi
 }
 require_listed "README.md"
+require_listed "LICENSE"
 require_listed "idl/veto.json"
 require_listed "dist/index.js"
 require_listed "package.json"

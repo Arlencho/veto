@@ -7,7 +7,7 @@ have moved. The program was not changed in this review. Every verdict below was 
 against the compiled program, not by reading it; the attacks live in `programs/veto/tests/red_team.rs`
 and run under `make test`.
 
-Hold (`programs/veto/src/hold.rs`) landed after this review. The verdicts below do not cover it. Hold is merged and tested in `programs/veto/tests/hold.rs`, and live on devnet. The app screens exist, and a device check with a real vault follows.
+Hold (`programs/veto/src/hold.rs`) landed after this review. The verdicts below do not cover it. Hold is merged and tested in `programs/veto/tests/hold.rs`, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 Toolchain used: anchor-cli 1.2.0, solana-cli 4.1.2, rustc 1.89.0, LiteSVM 0.10.0, SBPF v0 build.
 
@@ -241,10 +241,10 @@ anchor-spl 1.2.0 are the pinned versions. The devnet deployment was not probed l
 Hold landed after this review and the verdicts above do not cover it. This section states, in plain
 words, what `programs/veto/src/hold.rs` guarantees when an owner is coerced, and what it does not.
 
-What the program guarantees:
+What the deployed program guarantees on a vault that had a guardian before any key was lost:
 
-- An instant withdrawal only goes to a destination this vault has paid before. A new address never
-  gets money instantly.
+- An instant withdrawal only goes to a destination this vault has paid before. A new address gets
+  money before the wait ends only through `skip`, which needs both keys.
 - Anything else waits 1, 2, or 3 days on the chain clock, whichever delay the vault was set to.
 - No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`)
   needs both the owner key and the guardian key. Loosening any rule, including adding or changing
@@ -259,3 +259,8 @@ What it does not do:
 - A guardian on the same phone as the owner key is not a second factor. Keep the guardian on a second
   device kept somewhere else.
 - The vault's settings, including the safe address, are public on chain. Anyone can read them.
+
+Known issue, fix pending: on a vault created without a guardian, the deployed program applies
+adding a guardian at once, so whoever holds the owner key could add a guardian key and then `skip`
+a held withdrawal with both keys. The guarantees above do not hold for that vault. The fix makes
+any guardian change wait out the vault's delay and needs a program upgrade: the source fix is merged (PR #374) and not yet deployed.

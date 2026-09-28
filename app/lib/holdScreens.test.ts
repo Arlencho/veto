@@ -1114,3 +1114,79 @@ test('an old vault offers an owner update and no send action', async () => {
   assert.doesNotMatch(textOf(root), /Send from this vault/);
   assert.equal(pressable(root, 'Update this vault').props.accessibilityRole, 'button');
 });
+
+test('skip with both keys shows what a pasted request does, or why it was refused', async () => {
+  const { SkipScreen } = await import('../components/hold/SkipScreen');
+  const base = {
+    network: 'Test tokens',
+    purpose: 'skip' as const,
+    status: 'ready' as const,
+    error: null,
+    headline: 'To pay 1,000 test tokens, both keys must sign.',
+    yourKey: 'Key 6Ywq...GSV5.',
+    guardianKey: 'Key 4mKp...R2vd.',
+    signedHere: false,
+    waitingLine: '',
+    whenBoth: [],
+    payload: 'request',
+    onPayload() {},
+    onBack() {},
+    onSign: async () => undefined,
+    signLabel: 'Press and hold to sign with your key on this phone',
+    signHint: 'Each signature uses Seed Vault.',
+    onCancel() {},
+  };
+  const accepted = textOf(
+    await mount(
+      createElement(SkipScreen, {
+        ...base,
+        request: { ok: true, lines: ['Action: skip the wait and pay now.', 'Withdrawal: #5, 1,000 test tokens'] },
+      }),
+    ),
+  );
+  assert.match(accepted, /checked against this vault/);
+  assert.match(accepted, /Withdrawal: #5, 1,000 test tokens/);
+  const refused = textOf(
+    await mount(
+      createElement(SkipScreen, {
+        ...base,
+        request: { ok: false, reason: 'This request is not the one on this screen. Nothing was signed.' },
+      }),
+    ),
+  );
+  assert.match(refused, /This request was refused/);
+  assert.match(refused, /Nothing was signed/);
+});
+
+test('skip with both keys shows neutral status, not a refusal, for the partial this phone signed', async () => {
+  const { SkipScreen } = await import('../components/hold/SkipScreen');
+  const shown = textOf(
+    await mount(
+      createElement(SkipScreen, {
+        network: 'Test tokens',
+        purpose: 'skip',
+        status: 'ready',
+        error: null,
+        headline: 'To pay 1,000 test tokens, both keys must sign.',
+        yourKey: 'Key 6Ywq...GSV5.',
+        guardianKey: 'Key 4mKp...R2vd.',
+        signedHere: true,
+        waitingLine: '1 of 2 signed. Waiting for the other key.',
+        whenBoth: [],
+        payload: 'partial',
+        onPayload() {},
+        request: null,
+        ownPartial: true,
+        onBack() {},
+        onSign: async () => undefined,
+        signLabel: 'Press and hold to sign with your key on this phone',
+        signHint: 'Each signature uses Seed Vault.',
+        onCancel() {},
+      }),
+    ),
+  );
+  assert.match(shown, /This phone signed its half\. Paste the request on the phone with the other key\./);
+  assert.doesNotMatch(shown, /This request was refused/);
+  assert.doesNotMatch(shown, /Nothing was signed/);
+  assert.doesNotMatch(shown, /This finishes the request the other phone started/);
+});

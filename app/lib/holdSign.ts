@@ -25,14 +25,6 @@ export function holdRequestPayload(transaction: Transaction): string {
   return transaction.serialize({ requireAllSignatures: false, verifySignatures: false }).toString('base64');
 }
 
-export function holdRequestFromPayload(payload: string): Transaction {
-  try {
-    return Transaction.from(Buffer.from(payload.trim(), 'base64'));
-  } catch {
-    throw new Error('That request could not be read. Paste the whole request from the other phone.');
-  }
-}
-
 function asTransaction(value: unknown, fallback: Transaction): Transaction {
   if (value instanceof Transaction) return value;
   if (typeof value === 'string') return Transaction.from(Buffer.from(value, 'base64'));

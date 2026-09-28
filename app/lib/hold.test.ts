@@ -389,7 +389,7 @@ test('opening a vault and stopping a withdrawal use the vault client instruction
 });
 
 test('a partial signature can be read again on the other phone', async () => {
-  const { holdRequestFromPayload, signHoldPartial } = await import('./holdSign');
+  const { signHoldPartial } = await import('./holdSign');
   const owner = Keypair.generate();
   const tx = new Transaction();
   tx.feePayer = owner.publicKey;
@@ -412,7 +412,7 @@ test('a partial signature can be read again on the other phone', async () => {
     store,
     tx,
   );
-  const again = holdRequestFromPayload(payload);
+  const again = Transaction.from(Buffer.from(payload, 'base64'));
   assert.equal(again.feePayer?.toBase58(), owner.publicKey.toBase58());
 
   await assert.rejects(

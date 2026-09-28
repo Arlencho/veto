@@ -12,7 +12,7 @@ The claim is the recorded refusal. When a rule fails, the transfer is never exec
 >
 > The demo pays a bill repriced by a public index, on Solana devnet, in our token, to our counterparty. It buys no electricity. On the rule the video quotes (cap 300, at most 10 per payment, 90 days, purpose "Charging top-ups at the SE3 spot rate", payee 6i99...PdCG, mandate `3hgrSbPX2VTrfnVekoL2qi2qDWNGBhWP3QgADAWz6X6N`) the 12:00 Swedish slot on 2026-09-25 asked 16.659625, over that ceiling. Nothing moved. An override of 16.659625 would have cleared it. That refusal is taken off the phone and verified against the chain from somewhere else.
 >
-> That record is the point. A worst case fixed in advance, every payment made against it, and every refusal the agent submitted. AP2 standardised the record of a yes. This is the missing half.
+> That record is the point. A worst case fixed in advance, every payment made against it, and every refusal the agent submitted. AP2 specified the record of a yes. This is the missing half.
 
 ## Position
 
@@ -20,7 +20,7 @@ A rule opened in the app keeps the cap in a token account derived from the owner
 
 The names are the table in [PLAN.md](PLAN.md): Squads v4 spending limits, SPL `approve` / delegate, LazorKit, Oculus, x402, AP2, and Seed Vault.
 
-On a Veto spending rule the funds stay in an account the owner controls, under a delegate, and the decline is recorded. Hold is a separate vault in the same program, for money the owner deposits and cannot move with a raw transfer. Hold is merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows.
+On a Veto spending rule the funds stay in an account the owner controls, under a delegate, and the decline is recorded. Hold is a separate vault in the same program, for money the owner deposits and cannot move with a raw transfer. Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 AP2 mandates are the record of a yes, held off chain as the merchant's evidence. The word mandate, in this repository, is the on-chain rule. Oculus reimburses a breach from a USDC reserve after the fact. This declines before money moves, and the decline is recorded.
 
@@ -61,7 +61,7 @@ During the last seven days before an active rule ends, renewal offers the next r
 
 Two Android home screen widgets show what an agent can still spend. They need a build that runs Expo prebuild. Expo Go cannot install them. Numbers come from the chain. A missing owner, a missing rule, or a failed read does not invent a balance.
 
-Hold on the phone is the vault above: a wait of 1, 2, or 3 days, a second key that can stop a big withdrawal, and alerts that cannot be muted. The app screens exist. Hold is live on devnet, and a device check with a real vault follows.
+Hold on the phone is the vault above: a wait of 1, 2, or 3 days, a second key that can stop a big withdrawal, and alerts that cannot be muted inside Veto (delivery depends on Android background scheduling). The app screens exist. Hold is live on devnet. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 ## Limits
 
@@ -89,7 +89,7 @@ People built trust with a payment history. Agents will build it with a history o
 
 Submissions close October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 
-One spending-rule type. A delegate on a token account the owner controls. Several rules, one agent each. A ruleset written once and applied to the next agent. One pay path. One refusal path with a reason and an override hint. Four tabs: Overview, Rules, Agents, and Decisions. Connect your agent on an active rule. Grades, plaques, a week in review, a track record card, renewal, and a quiet note. An export anyone can re-read from the chain, including after the mandate account is closed. The quoted rule's history is the span above. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows. No DeFi zoo, no marketplace, no W3C verifiable credential, no signing ceremony, no verifier service.
+One spending-rule type. A delegate on a token account the owner controls. Several rules, one agent each. A ruleset written once and applied to the next agent. One pay path. One refusal path with a reason and an override hint. Four tabs: Overview, Rules, Agents, and Decisions. Connect your agent on an active rule. Grades, plaques, a week in review, a track record card, renewal, and a quiet note. An export anyone can re-read from the chain, including after the mandate account is closed. The quoted rule's history is the span above. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. No DeFi zoo, no marketplace, no W3C verifiable credential, no signing ceremony, no verifier service.
 
 ## Words
 

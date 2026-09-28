@@ -440,8 +440,11 @@ A read-only `getAccountInfo` at confirmed slot 504528805 found legacy vault
 `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj` still 1291 bytes, owned by
 the Veto program. Its HoldVault owner field is the founder device key
 `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`. The vault was not changed.
-It will be migrated and closed by its owner later, with his Seed Vault
-signature, following [Hold migrations](HOLD_MIGRATIONS.md).
+Its owner later migrated it in place with that key, following
+[Hold migrations](HOLD_MIGRATIONS.md): `migrate_hold_vault` confirmed at block time
+2026-09-26 23:39:59 UTC, signature
+`2SUSRUvHKBdUsEWAPqwxxopGV1nTQAcwmQeVqZWvCcBBmTzf2pz3YJxXX5oR8a795a58xH3TXDKy6Jk5YS9ecYrC`.
+A `getAccountInfo` read on 2026-09-28 found it 1691 bytes and not closed.
 
 #### Verification resumed, 2026-09-26
 
@@ -863,7 +866,7 @@ On 2026-09-25T12:18:23Z the program `{program_id}` was upgraded on devnet in slo
 - `make hold-e2e-devnet` then passed on devnet. Vault `2Tk8Qfd23udSkHZAQvx8x1TXU166n26HtjzCjaSeoqaU`: everyday withdrawal paid at once, big withdrawal held and refused before unlock, guardian stop, freeze, recover while frozen, unfreeze with both keys, loosening waits, tightening applies at once.
 - Vault: https://explorer.solana.com/address/2Tk8Qfd23udSkHZAQvx8x1TXU166n26HtjzCjaSeoqaU?cluster={cluster}
 
-The app screens for Hold exist. A device check with a real vault follows.
+The app screens for Hold exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 ## USDC
 
@@ -877,7 +880,7 @@ Circle devnet USDC uses the classic Token program (`TokenkegQfeZyiNwAJbNbGKPFXCW
 
 Devnet USDC is Circle's test token. It has no value.
 
-The founder gets it from https://faucet.circle.com by pasting the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` and the deployer `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`. Nobody can mint this token. `scripts/devnet-usdc.sh` creates the merchant and deployer accounts when they are absent, and re-running it is a no-op.
+The founder gets it from https://faucet.circle.com by pasting the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` and the deployer `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`. We cannot mint it; Circle's faucet does. Its mint authority is `GrNg1XM2ctzeE2mXxXCfhcTUbejM8Z4z4wNVTy2FjMEz`, not a key in this repository. `scripts/devnet-usdc.sh` creates the merchant and deployer accounts when they are absent, and re-running it is a no-op.
 
 ## Indexed USDC demo calibration (issue 105)
 
@@ -1002,7 +1005,7 @@ Export and verify of one refused and one traded row (`tools/export.ts --signatur
 ## Notes
 
 - This script never deploys to mainnet and never prints private keys.
-- `declare_id!` in `programs/veto/src/lib.rs` is left as committed. The live program address is the Program row above. A later program-side change can sync `declare_id!` in its own PR.
+- `declare_id!` in `programs/veto/src/lib.rs` and the program ids in `Anchor.toml` equal the live program address, the Program row above.
 - The agent must keep holding zero tokens apart from the trade-demo amount recorded under Trade rule on devnet. The setup does not mint to it and does not create an agent token account.
 
 ## Hold rolling daily limit upgrade (issue 322)
@@ -1017,10 +1020,11 @@ on those doors.
 
 The original demo replacement left 5 USDC in the legacy vault. The repository
 now supports `migrate_hold_vault` to reallocate it in place, preserving its
-rules, queued changes and release accounting. After the upgraded binary is
-deployed, the owner can migrate, resolve any holds and freeze, then call
-`close_hold_vault` to sweep tokens to the configured safe address and reclaim
-rent. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
+rules, queued changes and release accounting. The upgraded binary was deployed
+on 2026-09-26, and the owner migrated the legacy vault the same day (signature
+under "Hold migration and safe-address upgrade, 2026-09-26" above). The owner can
+still resolve any holds and freeze, then call `close_hold_vault` to sweep tokens
+to the configured safe address and reclaim rent. See [Hold migrations](HOLD_MIGRATIONS.md) for requirements and client calls.
 These instructions do not authorize or record a deployment or recovery transaction.
 """
 Path("docs/DEVNET.md").write_text(md)

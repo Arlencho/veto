@@ -29,8 +29,10 @@ migrate or close alone, and closure cannot redirect funds or apply a queued safe
 address change early. Existing Recover semantics are unchanged.
 
 The old devnet demo vault `8n9EcgXwSWVbQgnunw6oin8hYcpRDr1CkkvozhpiAyVj`
-requires the upgraded program and its owner's signature. This code change does
-not deploy a program or submit transactions for that vault.
+needed the upgraded program and its owner's signature. Its owner migrated it on
+2026-09-26, signature
+`2SUSRUvHKBdUsEWAPqwxxopGV1nTQAcwmQeVqZWvCcBBmTzf2pz3YJxXX5oR8a795a58xH3TXDKy6Jk5YS9ecYrC`
+(recorded in [DEVNET.md](DEVNET.md)). It has not been closed.
 
 Migration now requires the writable `hold-ledger` PDA in addition to owner,
 vault and system program. Use the synchronized client and IDL. It appends kind

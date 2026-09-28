@@ -4,7 +4,7 @@ The command you run next to your agent. Pairing does not need a developer, and i
 
 ## Install
 
-Requires Node 22 or newer. After version 0.1.0 is published:
+Requires Node 22 or newer. Version 0.1.0 was published to npm on 2026-09-27:
 
 ```bash
 npm install --global @veto-hq/veto

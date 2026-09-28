@@ -303,7 +303,7 @@ before using this client against the upgraded program.
 
 The vault PDA is `["hold", owner, vault_id]` with `vault_id` as a little-endian u64. The known-destination list holds 16 addresses. The hold ledger is a 32-entry ring. The instructions and the account fields are in `programs/veto/src/hold.rs`.
 
-Hold is merged and tested, and live on devnet. These methods target the program recorded in [docs/DEVNET.md](../docs/DEVNET.md). The app screens exist, and a device check with a real vault follows. The package that exports `HoldVault` is published from this checkout by the maintainer.
+Hold is merged and tested, and live on devnet. These methods target the program recorded in [docs/DEVNET.md](../docs/DEVNET.md). The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. The package that exports `HoldVault` is published from this checkout by the maintainer.
 
 ## Trade demo
 

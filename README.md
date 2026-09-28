@@ -5,7 +5,8 @@ Seeker owner? [Try Veto on devnet before October 8](docs/TESTERS.md).
 **Everyone stops the overspend. Veto also records why it stopped.**
 
 Veto enforces a spending rule on chain: when a charge breaks it, the transfer is never executed
-and no tokens move. That much is table stakes, and every serious design does it.
+and no tokens move. That much is table stakes: most of the prior art below already caps agent
+spending on chain.
 
 The difference is what the stop leaves behind. Elsewhere a blocked overspend is usually a failed
 transaction: Solana keeps its logs and error code, but no program state changes. Here a refusal is a
@@ -16,7 +17,7 @@ Every decision is a confirmed transaction that anyone can look up by its signatu
 program state is the rule's on-chain ledger. It keeps the latest 32 decisions, and it is deleted
 when the owner closes the rule.
 
-AP2 standardised the record of a yes. This is the missing half.
+AP2 specified the record of a yes. This is the missing half.
 
 > Status: in development for the Solana Mobile "Clock In" hackathon. Submissions close
 > October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
@@ -30,11 +31,11 @@ Capped agent spending on Solana is not new, and this project does not claim it.
 
 | Prior art | What it does | What Veto adds |
 |---|---|---|
-| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
+| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway (per the Squads blog, read 2026-09-28) | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
 | SPL `approve` / delegate | Caps what a delegate may pull | Cap only. No purpose, no expiry, no reason, no record |
 | [LazorKit](https://github.com/lazor-kit/lazor-kit) | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
 | [Oculus](https://github.com/useoculusagent/useoculusagent) | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves, and the decline is a record |
-| [x402](https://metamask.io/news/what-is-x402) / [AP2](https://www.cobo.com/post/ap2-protocol-complete-guide-to-agent-payments-for-web3-developers-2026) | HTTP 402 settlement; signed Intent, Cart and Payment mandates as verifiable credentials | The record of a yes, held off chain as the merchant's evidence |
+| [x402](https://metamask.io/news/what-is-x402) / [AP2](https://ap2-protocol.org/) | HTTP 402 settlement; signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | The record of a yes, held off chain as the merchant's evidence |
 
 SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28, and no archived copy was found, so its row and quote were removed.
 
@@ -141,14 +142,14 @@ it rather than a copy of the key.
 
 | | Owner key | Agent key |
 |---|---|---|
-| Lives in | Seed Vault, reached through Mobile Wallet Adapter | app secure storage on the phone |
+| Lives in | Seed Vault, reached through Mobile Wallet Adapter | on the agent's machine (for example `keys/agent.json` or the CLI's `~/.veto/agent.json`), or app secure storage for the phone's test agent |
 | Can | open a mandate, override one payment, revoke, close | submit a charge |
 | Cannot | be impersonated by the agent | change any limit, change the merchant, extend the expiry, or move funds outside the mandate |
 
 The program does not escrow a spending rule into a vault. `open_mandate` approves the mandate PDA as an SPL
 delegate on the source token account for the cap. `charge` moves tokens only within that
 delegation. Hold, below, is a separate vault in the same program. Hold is live on devnet.
-The app screens exist, and a device check with a real vault follows.
+The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 A rule opened in the app gets its own token account. The address is `createAccountWithSeed`
 from the owner, seed `veto-rule-<mandate id>`. One owner signature creates that account, moves
@@ -226,6 +227,15 @@ bound to a merchant the chain does enforce.
 | 8 | insufficient funds |
 | 9 | zero amount |
 | 10 | account frozen |
+
+Trade rules add four reasons, from `programs/veto/src/trade_state.rs`:
+
+| Code | Meaning |
+|---|---|
+| 11 | destination not allowed |
+| 12 | pool not allowed |
+| 13 | over rolling daily limit |
+| 14 | below price floor |
 
 ## Advisory purpose check
 
@@ -331,6 +341,8 @@ Instructions, from `programs/veto/src/hold.rs`:
 | `propose_change` | owner | Tightening applies immediately. Loosening, including any guardian change, waits out the current delay |
 | `apply_change` | anyone | Applies a pending change after `effective_at` on the chain clock |
 | `cancel_change` | owner or guardian | Drops a pending change |
+| `migrate_hold_vault` | owner | Reallocates a vault from the older layout in place, keeping its rules and history ([docs/HOLD_MIGRATIONS.md](docs/HOLD_MIGRATIONS.md)) |
+| `close_hold_vault` | owner | With nothing held and the vault not frozen, sweeps the balance to the safe address and closes the vault, its token account and its ledger |
 
 Tightening is a lower daily limit, a longer delay, or a lower share. Loosening is a higher limit, a shorter delay, a higher share, adding, removing or changing the guardian, or changing the safe address. Adding a guardian waits too: a guardian co-signs `skip` and `unfreeze`, so a key added at once would let the owner key alone skip the delay. Until the change applies, the new guardian has no power. A mixed change applies the tightening fields now and holds the loosening fields for the current delay.
 
@@ -345,7 +357,7 @@ What the deployed program guarantees on a vault that had a guardian before any k
 - An instant withdrawal only goes to a destination this vault has paid before. A new address gets money before the wait ends only through `skip`, which needs both keys.
 - Anything else waits 1, 2, or 3 days on the chain clock, whichever delay the vault was set to.
 - No single key, including the owner's, can shorten a wait. Paying a held withdrawal early (`skip`) needs both the owner key and the guardian key. Loosening any rule, including adding or changing the guardian, waits out the current delay. `recover` only goes to the safe address chosen in advance.
-- The guardian is alerted and can stop a held withdrawal, or freeze the whole vault, with one tap.
+- The guardian is alerted and can stop a held withdrawal, or freeze the whole vault, with one tap. The alert comes from a background check about every 15 minutes, which Android can delay, and it cannot be muted inside Veto.
 
 What it does not do:
 
@@ -397,9 +409,14 @@ not the demo mint `2dV6DLAUF63ugfD1sgNF8fUmQKr9pMDzeLxJGSwkMcCU`.
 programs/veto/            the Anchor program: mandates, the refusal ledger, and Hold
 app/                      the Android app: Backglass, four tabs, grades, Hold, widgets
 sdk/                      @veto-hq/agent-sdk: charge, decisions, and HoldVault
+cli/                      @veto-hq/veto: the companion CLI for pairing agents, payments, and MCP tools
 watcher/                  unattended agent, and Hold alerts when VETO_HOLD_VAULTS is set
 indexer/                  rebuild Paid and Refused history from transaction logs
 tools/                    export one decision as JSON and verify it against the chain
+service/                  veto-index: the Postgres decision index
+terminal/                 the demo merchant terminal (the counterparty screen)
+loadtest/                 on-chain and off-chain load tests and their reports
+e2e/                      Maestro device flows
 scripts/devnet-setup.sh   recreate the chain deploy and demo fixtures from nothing
 docs/DECISION_RECORD.md   stable schema for that JSON
 docs/DECISIONS.md         pointer to the decision log under docs/internal/
@@ -409,7 +426,10 @@ docs/PITCH.md             the pitch: position and the sixty seconds
 docs/DECK.md              the deck, slide by slide
 docs/DEVNET.md            public devnet addresses, and every recorded upgrade (live: 2026-09-26, e2a66db)
 docs/VIDEO.md             the three-minute shot list
-docs/SECURITY_REVIEW.md   review of the mandate program at an earlier commit; Hold is out of scope
+docs/TESTERS.md           how a Seeker owner installs and tries the devnet APK
+docs/RELEASE_NOTES.md     release notes for the tester APK
+docs/SCALE.md             compute unit and throughput measurements
+docs/SECURITY_REVIEW.md   internal review of the mandate program at 4b50a63; Hold and trade are out of scope
 docs/GCP_SETUP.md         the watcher GCP project, checked by scripts/gcp-verify.sh
 docs/design/backglass/    approved Backglass screens and the screen map
 docs/internal/            working notes: decisions, self-review, design brief, design decision

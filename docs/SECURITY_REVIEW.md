@@ -7,7 +7,7 @@ have moved. The program was not changed in this review. Every verdict below was 
 against the compiled program, not by reading it; the attacks live in `programs/veto/tests/red_team.rs`
 and run under `make test`.
 
-Hold (`programs/veto/src/hold.rs`) landed after this review. The verdicts below do not cover it. Hold is merged and tested in `programs/veto/tests/hold.rs`, and live on devnet. The app screens exist, and a device check with a real vault follows.
+Hold (`programs/veto/src/hold.rs`) landed after this review. The verdicts below do not cover it. Hold is merged and tested in `programs/veto/tests/hold.rs`, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 Toolchain used: anchor-cli 1.2.0, solana-cli 4.1.2, rustc 1.89.0, LiteSVM 0.10.0, SBPF v0 build.
 

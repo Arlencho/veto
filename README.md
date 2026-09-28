@@ -12,6 +12,10 @@ transaction: Solana keeps its logs and error code, but no program state changes.
 successful transaction that moves no payment tokens and writes a structured reason to program
 state, with the override that would have cleared it. On a phone, with the key in Seed Vault.
 
+Every decision is a confirmed transaction that anyone can look up by its signature. The copy in
+program state is the rule's on-chain ledger. It keeps the latest 32 decisions, and it is deleted
+when the owner closes the rule.
+
 AP2 standardised the record of a yes. This is the missing half.
 
 > Status: in development for the Solana Mobile "Clock In" hackathon. Submissions close
@@ -55,8 +59,11 @@ VETO REFUSED reason=5 (over per-payment maximum) amount=6232500 per_tx_max=50000
 ```
 
 The **transaction** succeeded: it succeeded at deciding no. The **payment** did not happen: the
-balance is unchanged. A refusal is a transaction that worked and a payment that did not, and
-neither party can edit the record of it.
+balance is unchanged. A refusal is a transaction that worked and a payment that did not.
+Neither party can edit that confirmed transaction or its logs. The ledger entry in program state
+is not permanent: the ledger is a 32-entry ring, so every later decision the agent submits, paid or
+refused, can overwrite the oldest entry, and the owner can delete the ledger with
+`close_mandate` once the rule is no longer active.
 
 The last field is the override that would have cleared the charge.
 

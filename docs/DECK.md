@@ -90,7 +90,7 @@ per-payment maximum 10, remaining 292 of a 300 cap, override 16.659625. The 12.5
 1.33277 SEK/kWh is that amount. Same decision as slide 1.
 
 > The transaction succeeded at deciding no. The payment did not happen. The balance is unchanged,
-> and neither party can edit the record.
+> and neither party can edit the confirmed transaction.
 >
 > The last field is the override that would have cleared the charge.
 

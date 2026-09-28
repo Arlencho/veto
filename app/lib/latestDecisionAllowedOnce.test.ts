@@ -97,3 +97,10 @@ test('the latest decision on Today keeps the within-the-limit line at or under t
   assert.match(text, /Within the limit of 0\.5 USDC\. 4\.10 USDC left\./);
   assert.doesNotMatch(text, /Allowed once/);
 });
+
+test('the latest decision on Today never shows an above-limit payment equal to the limit', async () => {
+  const text = await latestText(504_000n);
+  assert.match(text, /Paid 0\.51 USDC to 6i99\.\.\.PdCG/);
+  assert.match(text, /Allowed once by you: above your limit of 0\.5 USDC\./);
+  assert.match(text, /0\.51 USDC paid/);
+});

@@ -5,7 +5,7 @@ import { Circle, Path, Svg } from 'react-native-svg';
 import { ADVISORY_DECLINE_LABEL, KIND_ADVISORY_DECLINE } from '../../lib/advisory';
 import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, REASON_OVER_PER_TX_MAX } from '../../lib/constants';
 import { encodeDecisionId } from '../../lib/exportRecord';
-import { formatTokenDisplay, tokenSymbol } from '../../lib/tokens';
+import { formatTokenAmount, formatTokenDisplay, tokenSymbol } from '../../lib/tokens';
 import { overrideRowView, paidAboveLimit } from '../../lib/override';
 import { reasonText } from '../../lib/reasons';
 import type { LedgerRow } from '../../lib/ring';
@@ -34,12 +34,19 @@ export function LatestDecision({
   last: boolean;
 }) {
   const router = useRouter();
-  const amount = formatTokenDisplay(row.amount, decimals, mint);
-  const limit = perTxMax != null ? formatTokenDisplay(perTxMax, decimals, mint) : null;
+  const paid = row.kind === KIND_PAID;
+  // Above the limit, round the paid amount up and show the limit exactly, so the two never read equal.
+  const above = paid && paidAboveLimit(row.amount, perTxMax);
+  const amount = formatTokenDisplay(row.amount, decimals, mint, above ? 'ceil' : 'nearest');
+  const limit =
+    perTxMax != null
+      ? above
+        ? formatTokenAmount(perTxMax, decimals, mint)
+        : formatTokenDisplay(perTxMax, decimals, mint)
+      : null;
   const zeroPaid = mint ? `0 ${tokenSymbol(mint)} paid` : '0 paid';
   const who = payeeLabel(payee);
   const refused = row.kind === KIND_REFUSED;
-  const paid = row.kind === KIND_PAID;
   const waived = row.kind === KIND_OVERRIDE;
   const advisory = row.kind === KIND_ADVISORY_DECLINE;
   const tone = refused || advisory ? colors.refused : colors.paid;
@@ -58,7 +65,7 @@ export function LatestDecision({
   } else if (paid) {
     title = `Paid ${amount} to ${who}`;
     detail = limit
-      ? paidAboveLimit(row.amount, perTxMax)
+      ? above
         ? `Allowed once by you: above your limit of ${limit}. ${remainingText} left.`
         : `Within the limit of ${limit}. ${remainingText} left.`
       : `${remainingText} left.`;

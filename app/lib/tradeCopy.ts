@@ -6,6 +6,7 @@ import {
   REASON_POOL_NOT_ALLOWED,
   reasonText,
 } from './constants';
+import type { DisplayRounding } from './format';
 import { formatTokenAmount, formatTokenDisplay } from './tokens';
 import { paidAboveLimit } from './override';
 import { truncateAddress } from './wallet';
@@ -47,9 +48,14 @@ export function tradeDecisionTitle(args: {
   counterparty: string;
   perTradeMax?: bigint;
   amounts?: 'exact' | 'display';
+  /** Display rounding for the sold amount only. The bought amount always rounds to nearest. */
+  inRounding?: DisplayRounding;
 }): string {
   const format = args.amounts === 'display' ? formatTokenDisplay : formatTokenAmount;
-  const sold = format(args.amountIn, args.inDecimals, args.inMint);
+  const sold =
+    args.amounts === 'display'
+      ? formatTokenDisplay(args.amountIn, args.inDecimals, args.inMint, args.inRounding ?? 'nearest')
+      : formatTokenAmount(args.amountIn, args.inDecimals, args.inMint);
   const bought = format(args.amountOut, args.outDecimals, args.outMint);
   if (args.kind === KIND_PAID) {
     return `Traded ${sold} for ${bought}`;

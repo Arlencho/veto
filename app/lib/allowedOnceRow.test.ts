@@ -68,6 +68,30 @@ test('a paid amount just above the limit never rounds down to the limit on scree
   assert.equal(under.title, 'Paid 0.49 USDC to 6i99...PdCG');
 });
 
+test('above the limit, the limit shows exactly and is never rounded down', () => {
+  const face = decisionFace(ledgerRow({ amount: 508_000n }), 6, 505_000n, undefined, {
+    payee: PAYEE,
+    mint: DEVNET_USDC_MINT,
+  });
+  assert.equal(face.title, 'Paid 0.51 USDC to 6i99...PdCG');
+  assert.equal(face.detail, 'Allowed once by you: above your 0.505 USDC per-payment limit.');
+});
+
+test('a traded amount just above the limit rounds up on screen', () => {
+  const trade = ledgerRow({
+    family: 'trade',
+    amount: 504_000n,
+    amountOut: 2_000_000n,
+    outMint: DEVNET_USDC_MINT,
+    outDecimals: 6,
+  });
+  const face = decisionFace(trade, 6, PER_TX_MAX, undefined, { mint: DEVNET_USDC_MINT });
+  assert.equal(face.title, 'Traded 0.51 USDC for 2 USDC');
+  assert.equal(face.detail, 'Allowed once by you: above your 0.5 USDC per-trade limit.');
+  const under = decisionFace({ ...trade, amount: 494_000n }, 6, PER_TX_MAX, undefined, { mint: DEVNET_USDC_MINT });
+  assert.equal(under.title, 'Traded 0.49 USDC for 2 USDC');
+});
+
 test('the stale request reason reads in plain words', () => {
   assert.equal(reasonText(REASON_STALE_NONCE), 'request already settled');
 });

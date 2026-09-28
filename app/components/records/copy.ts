@@ -236,6 +236,7 @@ export function decisionFace(
       reason: row.reason,
       counterparty: row.counterparty,
       perTradeMax: perTxMax,
+      inRounding: paidAboveLimit(row.amount, perTxMax) ? 'ceil' : 'nearest',
     });
     const chain = chainCopy(paidLimitLine(row.amount, perTxMax, decimals, mint, 'trade'), row.signature);
     face = {
@@ -274,13 +275,13 @@ export function decisionFace(
   if (!screen) {
     return face;
   }
-  // Above the limit, round the paid amount away from the limit and the limit toward zero,
+  // Above the limit, round the paid amount up and show the limit exactly,
   // so a shown "Paid 0.50" never sits next to "above your 0.50 limit".
   const above = row.kind === KIND_PAID && paidAboveLimit(row.amount, perTxMax);
   return {
     ...face,
     title: roundShownAmounts(face.title, above && row.family !== 'trade' ? 'ceil' : 'nearest'),
-    detail: roundShownAmounts(face.detail, above ? 'floor' : 'nearest'),
+    detail: above ? face.detail : roundShownAmounts(face.detail),
     figure: roundShownAmounts(face.figure, above ? 'floor' : 'nearest'),
   };
 }

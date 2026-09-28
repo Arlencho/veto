@@ -2245,3 +2245,94 @@ fn an_added_guardian_applies_after_the_delay_and_can_then_skip_with_the_owner() 
     skip(&mut w, row.id, &pocket, &owner, &fresh).unwrap();
     assert_eq!(token_balance(&w.svm, &pocket), ONE);
 }
+
+// A vault initialized before safe != guardian was enforced, or migrated from
+// the legacy layout, can still hold safe_address == guardian.
+fn safe_is_guardian_world() -> (World, Pubkey, u64) {
+    let mut w = open_vault(Rules::default());
+    let mut legacy = read_vault(&w.svm, &w.vault);
+    legacy.safe_address = legacy.guardian;
+    overwrite_vault(&mut w.svm, &w.vault, &legacy);
+    let guardian = w.guardian.pubkey();
+    let guardian_token = new_dest(&mut w, &guardian);
+    let balance = token_balance(&w.svm, &w.vault_token);
+    assert!(balance > 0);
+    (w, guardian_token, balance)
+}
+
+#[test]
+fn a_guardian_that_is_also_the_safe_address_cannot_recover_to_itself() {
+    let (mut w, guardian_token, balance) = safe_is_guardian_world();
+    let guardian = w.guardian.insecure_clone();
+    assert_err(
+        recover(&mut w, &guardian, &guardian_token),
+        "SafeAddressIsGuardian",
+    );
+    assert_eq!(token_balance(&w.svm, &guardian_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}
+
+// Accepted behaviour, not a hole: the guardian may cancel the owner's
+// safe-address repair. Blocking that cancel would let a stolen owner key move
+// the safe address with no veto, see
+// the_guardian_keeps_its_veto_over_a_stolen_owner_key_moving_the_safe_address.
+// The guardian still cannot pay itself, so the cancel only delays the repair.
+#[test]
+fn a_guardian_that_is_also_the_safe_address_may_cancel_the_repair_but_still_cannot_recover_to_itself(
+) {
+    let (mut w, guardian_token, balance) = safe_is_guardian_world();
+    let mut values = current_rules(&w);
+    values.safe_address = w.safe;
+    propose(&mut w, values).unwrap();
+    let guardian = w.guardian.insecure_clone();
+    cancel_change(&mut w, &guardian).unwrap();
+    assert!(!read_vault(&w.svm, &w.vault).change.active);
+    assert_err(
+        recover(&mut w, &guardian, &guardian_token),
+        "SafeAddressIsGuardian",
+    );
+    assert_eq!(token_balance(&w.svm, &guardian_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+    // The owner can propose the repair again.
+    propose(&mut w, values).unwrap();
+    assert!(read_vault(&w.svm, &w.vault).change.active);
+}
+
+#[test]
+fn the_owner_can_still_recover_when_the_safe_address_is_the_guardian() {
+    let (mut w, guardian_token, balance) = safe_is_guardian_world();
+    // While safe == guardian, a proposal must change one of them. A guardian
+    // replacement is the non-safe change, and the guardian may cancel it.
+    let mut values = current_rules(&w);
+    values.guardian = Pubkey::new_unique();
+    propose(&mut w, values).unwrap();
+    let guardian = w.guardian.insecure_clone();
+    cancel_change(&mut w, &guardian).unwrap();
+
+    let owner = w.owner.insecure_clone();
+    recover(&mut w, &owner, &guardian_token).unwrap();
+    assert_eq!(token_balance(&w.svm, &guardian_token), balance);
+}
+
+// The reason the guardian keeps its cancel. A stolen owner key queues
+// safe = thief on a safe == guardian vault. The guardian cannot recover to
+// itself, so cancel_change is its only veto, and it must keep working.
+#[test]
+fn the_guardian_keeps_its_veto_over_a_stolen_owner_key_moving_the_safe_address() {
+    let (mut w, _guardian_token, balance) = safe_is_guardian_world();
+    let thief = Keypair::new();
+    let thief_token = new_dest(&mut w, &thief.pubkey());
+    let mut values = current_rules(&w);
+    values.safe_address = thief.pubkey();
+    propose(&mut w, values).unwrap();
+    let effective = read_vault(&w.svm, &w.vault).change.effective_at;
+    let guardian = w.guardian.insecure_clone();
+    cancel_change(&mut w, &guardian).unwrap();
+
+    warp(&mut w.svm, effective);
+    let owner = w.owner.insecure_clone();
+    assert_err(apply_change(&mut w, &owner), "NoPendingChange");
+    assert_err(recover(&mut w, &owner, &thief_token), "NotTheSafeAddress");
+    assert_eq!(token_balance(&w.svm, &thief_token), 0);
+    assert_eq!(token_balance(&w.svm, &w.vault_token), balance);
+}

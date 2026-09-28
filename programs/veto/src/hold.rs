@@ -558,6 +558,15 @@ pub fn recover(ctx: Context<Recover>) -> Result<()> {
         ctx.accounts.destination.owner == ctx.accounts.vault.safe_address,
         VetoError::NotTheSafeAddress
     );
+    // A pre-#344 or migrated vault can hold safe == guardian. The guardian
+    // alone must not be able to pay itself.
+    if ctx.accounts.authority.key() == ctx.accounts.vault.guardian {
+        require_keys_neq!(
+            ctx.accounts.vault.safe_address,
+            ctx.accounts.vault.guardian,
+            VetoError::SafeAddressIsGuardian
+        );
+    }
 
     // These rows are claims on the balance that is about to leave. execute
     // needs no key, so a row left in place pays the old destination out of

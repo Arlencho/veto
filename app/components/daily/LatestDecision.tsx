@@ -6,7 +6,7 @@ import { ADVISORY_DECLINE_LABEL, KIND_ADVISORY_DECLINE } from '../../lib/advisor
 import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, REASON_OVER_PER_TX_MAX } from '../../lib/constants';
 import { encodeDecisionId } from '../../lib/exportRecord';
 import { formatTokenDisplay, tokenSymbol } from '../../lib/tokens';
-import { overrideRowView } from '../../lib/override';
+import { overrideRowView, paidAboveLimit } from '../../lib/override';
 import { reasonText } from '../../lib/reasons';
 import type { LedgerRow } from '../../lib/ring';
 import { payeeLabel } from '../../lib/wallet';
@@ -57,7 +57,11 @@ export function LatestDecision({
     side = zeroPaid;
   } else if (paid) {
     title = `Paid ${amount} to ${who}`;
-    detail = limit ? `Within the limit of ${limit}. ${remainingText} left.` : `${remainingText} left.`;
+    detail = limit
+      ? paidAboveLimit(row.amount, perTxMax)
+        ? `Allowed once by you: above your limit of ${limit}. ${remainingText} left.`
+        : `Within the limit of ${limit}. ${remainingText} left.`
+      : `${remainingText} left.`;
     side = `${amount} paid`;
   } else if (waived) {
     const view = overrideRowView(row, decimals, mint);

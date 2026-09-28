@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { decisionFace } from '../components/records/copy';
-import { KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, REASON_OVER_PER_TX_MAX } from './constants';
+import {
+  KIND_OVERRIDE,
+  KIND_PAID,
+  KIND_REFUSED,
+  REASON_OVER_PER_TX_MAX,
+  REASON_STALE_NONCE,
+  reasonText,
+} from './constants';
 import { PAID_ALLOWED_ONCE_NOTICE_TITLE, PAID_NOTICE_TITLE, paidDecisionBody, planDecisionNotices } from './notify';
 import { nonceSequence, overrideRowView, sequenceLine } from './override';
 import type { LedgerRow } from './ring';
@@ -44,6 +51,25 @@ test('a paid row at or under the per-payment max keeps the inside-the-limit line
     });
     assert.equal(face.detail, 'Inside your limit of 0.5 USDC per payment.');
   }
+});
+
+test('a paid amount just above the limit never rounds down to the limit on screen', () => {
+  const options = { payee: PAYEE, mint: DEVNET_USDC_MINT };
+  const face = decisionFace(ledgerRow({ amount: 504_000n }), 6, PER_TX_MAX, undefined, options);
+  assert.equal(face.title, 'Paid 0.51 USDC to 6i99...PdCG');
+  assert.equal(face.figure, '-0.51 USDC');
+  assert.equal(face.detail, 'Allowed once by you: above your 0.5 USDC per-payment limit.');
+  const exact = decisionFace(ledgerRow({ amount: 504_000n }), 6, PER_TX_MAX, undefined, {
+    ...options,
+    amounts: 'exact',
+  });
+  assert.equal(exact.title, 'Paid 0.504 USDC to 6i99...PdCG');
+  const under = decisionFace(ledgerRow({ amount: 494_000n }), 6, PER_TX_MAX, undefined, options);
+  assert.equal(under.title, 'Paid 0.49 USDC to 6i99...PdCG');
+});
+
+test('the stale request reason reads in plain words', () => {
+  assert.equal(reasonText(REASON_STALE_NONCE), 'request already settled');
 });
 
 test('a paid row with no known per-payment max stays with the plain rule line', () => {

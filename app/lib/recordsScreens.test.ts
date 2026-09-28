@@ -476,7 +476,7 @@ test('the decision list shows the payee and two decimals, and the detail keeps t
   const row = paidRow();
   row.amount = 15_152_750n;
   row.counterparty = '2bt9bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbay7F';
-  const rule = mandate({ perTxMax: 10_000_000n, cap: 300_000_000n, spent: 0n });
+  const rule = mandate({ perTxMax: 20_000_000n, cap: 300_000_000n, spent: 0n });
   chainState = baseChain({ decimals: 6, rows: [row], mandate: rule, mandates: [rule] });
   const { default: Decisions } = await import('../app/(tabs)/decisions');
   const list = visibleText(await mount(createElement(Decisions)));

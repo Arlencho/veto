@@ -82,7 +82,7 @@ export const REASON_TEXT: Record<number, string> = {
   [REASON_OK]: 'ok',
   [REASON_NOT_ACTIVE]: 'mandate not active',
   [REASON_EXPIRED]: 'past expiry',
-  [REASON_STALE_NONCE]: 'nonce already settled',
+  [REASON_STALE_NONCE]: 'request already settled',
   [REASON_MERCHANT_NOT_ALLOWED]: 'merchant not allowed',
   [REASON_OVER_PER_TX_MAX]: 'over per-payment maximum',
   [REASON_OVER_CAP]: 'over remaining cap',

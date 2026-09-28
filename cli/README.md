@@ -32,7 +32,7 @@ The command then asks for anything it does not already have: who is paid, the mo
 
 It prints a `veto://rule-request` link and a QR of that link. Scan the QR with the Veto app and hold to approve.
 
-The terminal waits until the rule for this key is on chain, then prints the terms in the token's name. Half a USDC, which is 500000 base units, reads as 0.50 USDC. It also prints one MCP config line. Your agent can pay with `veto pay <amount>`, or you paste that line into the agent's MCP config. The veto server in that line is:
+The terminal waits until a rule that answers this request is on chain: it must name this key, the payee, mint and purpose you asked for, and stay within the total, the most per payment and the days you asked for. The owner may lower those on the phone, never raise them. Anyone who sees the agent address can open a rule for it, so the newest rule for the key is not trusted. The terminal prints the rule address and its owner; check that they match what your phone shows, because someone who copies the request from the QR could open a matching rule first. When more than one rule matches, it picks none and tells you to pass `--rule` with the address your phone shows. It then prints the terms in the token's name. Half a USDC, which is 500000 base units, reads as 0.50 USDC. It also prints one MCP config line. Your agent can pay with `veto pay <amount>`, or you paste that line into the agent's MCP config. The veto server in that line is:
 
 ```json
 "veto": { "command": "npx", "args": ["-y", "@veto-hq/veto", "mcp"] }
@@ -48,7 +48,7 @@ The rule and the RPC are saved in `~/.veto/config.json`. If the RPC refuses `get
 veto pay 500000
 ```
 
-That is one charge, in base units, on the newest active rule for this key. A pending override is the nonce the SDK would use, and a different amount is not sent, so the override is not cleared by accident.
+That is one charge, in base units, on the rule `veto connect` saved in `~/.veto/config.json`. `--rule <address>` charges that rule instead. A newer rule for the same key is never picked up on its own, because anyone can open one. A pending override is the nonce the SDK would use, and a different amount is not sent, so the override is not cleared by accident.
 
 A refusal is a successful decision. The command exits 0 and prints the kind, the reason code and text, the override that would have cleared it, the signature, and the explorer link. Amounts in that printout are named in the token. An RPC or key problem exits 1.
 

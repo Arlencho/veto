@@ -21,7 +21,7 @@ const SCAN_INSTRUCTION = "Scan this on your phone and hold to approve.";
 const payInput = z
   .object({
     amount: z.string().describe("Amount in base units."),
-    rule: z.string().optional().describe("Rule address. Omit to use the active rule for this key."),
+    rule: z.string().optional().describe("Rule address. Omit to use the rule saved by veto connect."),
   })
   .strict();
 

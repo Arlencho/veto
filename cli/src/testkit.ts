@@ -2,16 +2,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PROGRAM_ID } from "@veto-hq/agent-sdk";
-import { ledgerPda } from "../../sdk/src/layout.js";
+import { decodeMandate, ledgerPda } from "../../sdk/src/layout.js";
 import {
   TOKEN_PROGRAM,
   asConnection,
   framed,
   legacyChargeTx,
+  mandateBytes,
   paidLog,
   refusedLog,
   world,
   type FakeConnection,
+  type MandateFields,
   type World,
 } from "../../sdk/src/testkit.js";
 import { DEFAULT_RPC, type Cluster } from "./cluster.js";
@@ -135,6 +137,28 @@ export function plantNewerRule(w: World): string {
   data.writeBigUInt64LE(9n, MANDATE_ID_OFFSET);
   const address = Keypair.generate().publicKey.toBase58();
   w.fake.accounts.set(address, { data, owner: PROGRAM_ID, lamports: 1 });
+  return address;
+}
+
+export const U64_MAX = 18446744073709551615n;
+
+/**
+ * A rule for this agent opened by someone else: foreign owner, foreign payee, and mandate id
+ * u64::MAX so it sorts first for the agent. Other fields copy the world's rule unless patched.
+ */
+export function plantDecoy(w: World, patch: Partial<MandateFields> = {}): string {
+  const current = w.fake.accounts.get(w.mandate.toBase58());
+  if (!current) throw new Error("mandate missing");
+  const fields: MandateFields = {
+    ...decodeMandate(Buffer.from(current.data)),
+    owner: Keypair.generate().publicKey,
+    merchant: Keypair.generate().publicKey,
+    source: Keypair.generate().publicKey,
+    mandateId: U64_MAX,
+    ...patch,
+  };
+  const address = Keypair.generate().publicKey.toBase58();
+  w.fake.accounts.set(address, { data: mandateBytes(fields), owner: PROGRAM_ID, lamports: 1 });
   return address;
 }
 

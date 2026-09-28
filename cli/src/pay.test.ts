@@ -10,6 +10,7 @@ import {
   openedWorld,
   output,
   plantCharge,
+  plantDecoy,
   plantNewerRule,
   removeHome,
   retargetMint,
@@ -88,20 +89,24 @@ test("pay prints a refusal and exits 0", async () => {
   }
 });
 
-test("pay charges the most recent active rule for this key", async () => {
+test("pay charges the saved rule, not a newer rule for this key from another owner", async () => {
   const home = tempHome();
   try {
     const w = openedWorld();
+    const decoy = plantDecoy(w);
     const newer = plantNewerRule(w);
     await saveSetup(home, w);
-    plantCharge(w, new PublicKey(newer), 1000n, 1n, "paid");
+    plantCharge(w, w.mandate, 1000n, 1n, "paid");
     const runtime = harness(home, chainOf(w.fake));
     const code = await run(["pay", "1000"], runtime);
     assert.equal(code, 0);
     const raw = w.fake.sent[0];
     assert.ok(raw);
     const ix = Transaction.from(raw).instructions[0];
-    assert.equal(ix?.keys[1]?.pubkey.toBase58(), newer);
+    const charged = ix?.keys[1]?.pubkey.toBase58();
+    assert.equal(charged, w.mandate.toBase58());
+    assert.notEqual(charged, decoy);
+    assert.notEqual(charged, newer);
   } finally {
     removeHome(home);
   }

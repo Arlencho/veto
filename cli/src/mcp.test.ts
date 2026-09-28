@@ -18,6 +18,7 @@ import {
   openedWorld,
   plantCharge,
   plantDecision,
+  plantDecoy,
   plantNewerRule,
   removeHome,
   retargetMint,
@@ -184,6 +185,28 @@ test("veto_pay charges the rule you name", async () => {
       assert.ok(raw);
       const ix = Transaction.from(raw).instructions[0];
       assert.equal(ix?.keys[1]?.pubkey.toBase58(), w.mandate.toBase58());
+    });
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("veto_pay without a rule charges the saved rule, not a u64::MAX decoy from another owner", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const decoy = plantDecoy(w);
+    await saveSetup(home, w);
+    plantCharge(w, w.mandate, 1000n, 1n, "paid");
+    const runtime = harness(home, chainOf(w.fake));
+    await withClient(runtime, async (client) => {
+      const result = asResult(await client.callTool({ name: "veto_pay", arguments: { amount: "1000" } }));
+      assert.equal(result.isError, undefined);
+      const raw = w.fake.sent[0];
+      assert.ok(raw);
+      const ix = Transaction.from(raw).instructions[0];
+      assert.equal(ix?.keys[1]?.pubkey.toBase58(), w.mandate.toBase58());
+      assert.notEqual(ix?.keys[1]?.pubkey.toBase58(), decoy);
     });
   } finally {
     removeHome(home);

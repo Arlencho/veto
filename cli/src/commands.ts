@@ -5,8 +5,9 @@ import {
   createRuleRequest,
   decisionsForMandate,
   mandatesForAgent,
+  parseRuleRequest,
 } from "@veto-hq/agent-sdk";
-import type { Decision } from "@veto-hq/agent-sdk";
+import type { AgentMandate, Decision, RuleRequest } from "@veto-hq/agent-sdk";
 import { USAGE, parseArgs, rejectPositionals, rejectUnused, type Args } from "./args.js";
 import { DEFAULT_RPC, assertGenesis, explorerTx, parseCluster, type Cluster } from "./cluster.js";
 import { CliError, FILTERS_REFUSED, isForeignAgent, rpcRefusesFilters } from "./errors.js";
@@ -30,6 +31,9 @@ import type { Runtime } from "./runtime.js";
 import { PublicKey, canonicalAddress, type Connection, type Keypair as AgentKey, type PublicKey as Address } from "./web3.js";
 
 const POLL_MS = 5_000;
+/** Clock skew allowed between this machine and the phone when checking the approved expiry. */
+const EXPIRY_SLACK_SECONDS = 3_600n;
+const SECONDS_PER_DAY = 86_400n;
 const AIRDROP_LAMPORTS = 1_000_000_000;
 const CONNECT_FLAGS = ["key", "rule", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster"] as const;
 
@@ -174,7 +178,7 @@ export async function executePay(runtime: Runtime, amountText: string, rule?: st
   const stored = await readConfig(runtime.home);
   const keypair = await readKeyFile(stored.key);
   const connection = runtime.connect(stored.rpc);
-  const address = await selectRule(connection, keypair, runtime, rule);
+  const address = rule !== undefined ? canonicalAddress(rule, "Rule address") : stored.rule;
   const veto = await openMandate(connection, address, keypair);
   const view = await veto.status();
   if (!isActive(view.status, view.expiresAt, unixSeconds(runtime.now()))) {
@@ -343,6 +347,9 @@ async function requestAndWait(
 ): Promise<string> {
   const fields = await askRule(args, cluster, runtime);
   const url = ruleRequestUrl(keypair.publicKey.toBase58(), fields);
+  const parsed = parseRuleRequest(url);
+  if (!parsed.ok) throw new CliError("The rule request could not be read back.");
+  const request = parsed.request;
   runtime.stdout(url);
   runtime.stdout(runtime.qr(url));
   runtime.stdout("Waiting for you to approve on the phone.");
@@ -355,13 +362,42 @@ async function requestAndWait(
       throw err;
     }
     const now = unixSeconds(runtime.now());
-    const match = rules.find(
-      (rule) => rule.agent.equals(keypair.publicKey) && isActive(rule.status, rule.expiresAt, now),
-    );
-    if (match) return match.address.toBase58();
+    const matches = rules.filter((rule) => matchesRequest(rule, keypair.publicKey, request, now));
+    if (matches.length > 1) {
+      for (const rule of matches) {
+        runtime.stdout(`Matching rule ${rule.address.toBase58()} from owner ${rule.owner.toBase58()}`);
+      }
+      throw new CliError(
+        "Several rules match this request, so none was chosen. Run veto connect --rule <address> with the rule your phone shows.",
+      );
+    }
+    const match = matches[0];
+    if (match) {
+      runtime.stdout(`Rule ${match.address.toBase58()}`);
+      runtime.stdout(`Owner ${match.owner.toBase58()}`);
+      runtime.stdout("Check that this owner and rule match what your phone shows.");
+      return match.address.toBase58();
+    }
     await runtime.sleep(POLL_MS);
   }
   throw new CliError("Still waiting for you to approve on the phone.");
+}
+
+/**
+ * A rule answers the request only when it names this agent, the requested payee, mint and
+ * purpose, and stays within the requested total, per-payment maximum and days. The owner may
+ * lower the limits on the phone but never raise them. Anyone can open a rule for this agent, so
+ * the newest rule for the key proves nothing.
+ */
+function matchesRequest(rule: AgentMandate, agent: Address, request: RuleRequest, now: bigint): boolean {
+  if (!rule.agent.equals(agent) || !isActive(rule.status, rule.expiresAt, now)) return false;
+  if (rule.merchant.toBase58() !== request.payee) return false;
+  if (rule.mint.toBase58() !== request.mint) return false;
+  if (rule.purpose !== request.purpose) return false;
+  if (rule.cap <= 0n || rule.cap > request.cap) return false;
+  if (rule.perTxMax <= 0n || rule.perTxMax > request.max) return false;
+  const latest = now + BigInt(request.days) * SECONDS_PER_DAY + EXPIRY_SLACK_SECONDS;
+  return rule.expiresAt <= latest;
 }
 
 async function askRule(args: Args, cluster: Cluster, runtime: Runtime): Promise<RuleFields> {
@@ -404,28 +440,6 @@ async function showRule(
     }),
   );
   runtime.stdout(MCP_CONFIG_LINE);
-}
-
-async function selectRule(
-  connection: Connection,
-  keypair: AgentKey,
-  runtime: Runtime,
-  named: string | undefined,
-): Promise<string> {
-  if (named !== undefined) return canonicalAddress(named, "Rule address");
-  let rules;
-  try {
-    rules = await mandatesForAgent(connection, keypair.publicKey);
-  } catch (err) {
-    if (rpcRefusesFilters(err)) throw new CliError(FILTERS_REFUSED);
-    throw err;
-  }
-  const now = unixSeconds(runtime.now());
-  const match = rules.find(
-    (rule) => rule.agent.equals(keypair.publicKey) && isActive(rule.status, rule.expiresAt, now),
-  );
-  if (!match) throw new CliError("No active rule.");
-  return match.address.toBase58();
 }
 
 async function openSaved(runtime: Runtime): Promise<{ connection: Connection; veto: VetoAgent }> {

@@ -10,11 +10,12 @@ time to stop them.
 
 ## Changed since v1.0.0-devnet.3
 
-- **Allowed-once payments say so.** A payment above the rule's per-payment
-  limit can only go through after you allow it once. Decisions, the decision
-  screen, notifications, trade rows and the Today card now say "Allowed once by
-  you: above your limit" for such a payment, instead of "Inside your limit".
-  Amounts are rounded so the shown payment never equals the shown limit.
+- **Allowed-once payments say so.** A payment or trade above the rule's
+  per-payment or per-trade limit can only go through after you allow it once.
+  Decisions, the decision screen, notifications, trade rows and the Today card
+  now say the payment was allowed once by you, above your limit, instead of
+  describing it as within the limit. Amounts are rounded so the shown payment
+  never equals the shown limit.
 - **Plain words.** Screens say "request" where they said "nonce". Exported
   records keep the program's exact reason text, so they still verify.
 

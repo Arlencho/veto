@@ -35,7 +35,7 @@ function pasted(instructions: TransactionInstruction[], signers: Keypair[] = [ow
   tx.recentBlockhash = blockhash;
   tx.add(...instructions);
   if (signers.length > 0) tx.partialSign(...signers);
-  // The same bytes the paste field carries (holdSign.holdRequestPayload / holdRequestFromPayload).
+  // The same bytes the paste field carries (holdSign.holdRequestPayload / holdVerify.readHoldRequest).
   return Transaction.from(tx.serialize({ requireAllSignatures: false, verifySignatures: false }));
 }
 

@@ -6,7 +6,7 @@ The chosen look for the Veto app: a 1930s brass and forest-lacquer pinball cabin
 - `html/`: the source mockup for each screen. Read it for exact colors, spacing, copy and motion. Open in a browser; motion is CSS only.
 - `app/assets/brand/`: the logo kit (SVG masters, app icon, adaptive icon, splash, favicons) and `usage.md`.
 
-The app on main follows this map. The bottom tabs are labeled Overview, Rules, Agents, and Decisions. Overview is the home screen (FD3). First run uses the five stages Learn, Connect wallet, Add your agent, Approve the rule, and Live. Grades, plaques, the week in review, the track record card, renewal, the quiet note, the widget, and the Hold screens are in the app. The agent package is `@veto-hq/agent-sdk`, published to npm at 0.1.0 on 2026-09-27. Authorize identifies the app as `https://veto-hq.github.io`. Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
+The app on main follows this map. The bottom tabs are labeled Overview, Rules, Agents, and Decisions. Overview is the home screen (FD3). First run uses the five stages Learn, Connect wallet, Add your agent, Approve the rule, and Live. Grades, plaques, the week in review, the track record card, renewal, the quiet note, the widget, and the Hold screens are in the app. The agent package is `@veto-hq/agent-sdk`, published to npm at 0.1.1 on 2026-09-28 (0.1.0 on 2026-09-27). Authorize identifies the app as `https://veto-hq.github.io`. Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
 Build rules:
 

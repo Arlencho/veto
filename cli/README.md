@@ -4,7 +4,7 @@ The command you run next to your agent. Pairing does not need a developer, and i
 
 ## Install
 
-Requires Node 22 or newer. Version 0.1.0 was published to npm on 2026-09-27:
+Requires Node 22 or newer. Version 0.1.1 was published to npm on 2026-09-28 (0.1.0 on 2026-09-27):
 
 ```bash
 npm install --global @veto-hq/veto
@@ -16,7 +16,7 @@ Or run without a global install:
 npx @veto-hq/veto connect
 ```
 
-Version 0.1.0 was published to npm on 2026-09-27. See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for maintainer release steps.
+Version 0.1.1 was published to npm on 2026-09-28 (0.1.0 on 2026-09-27). See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for maintainer release steps.
 
 `veto connect --owner <your wallet address>` accepts only a rule opened by that wallet. Use it when anyone else could have seen the rule request or its QR code: a copied request from another owner is then ignored.
 

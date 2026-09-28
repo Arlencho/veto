@@ -139,7 +139,7 @@ test("R11 the README install line is the published package and the example usage
   const sectionEnd = readme.indexOf("\n## ", sectionStart + 1);
   const section = readme.slice(sectionStart, sectionEnd === -1 ? undefined : sectionEnd);
   assert.match(section, /npm install @veto-hq\/agent-sdk/);
-  assert.match(section, /Version 0\.1\.0 was published to npm on 2026-09-27\./);
+  assert.match(section, /Version 0\.1\.1 was published to npm on 2026-09-28 \(0\.1\.0 on 2026-09-27\)\./);
   assert.doesNotMatch(section, /<date>/);
   assert.match(section, /The package is published from this checkout by the maintainer\./);
   assert.doesNotMatch(section, /not yet published/);

@@ -100,7 +100,7 @@ the current delay, and either key can cancel it. Eight holds can sit at once. A 
 recorded as refused and is not paid. Sixteen destination accounts are remembered. Each action
 writes a hold ledger entry and an event. Mandate accounts are unchanged.
 
-`@veto-hq/agent-sdk` exports `HoldVault` for those instructions. Install it with `npm install @veto-hq/agent-sdk`. Version 0.1.0 was published to npm on 2026-09-27. The package is published from this checkout by the maintainer. The watcher reads `VETO_HOLD_VAULTS` and writes hold alerts. The app has the Hold screens and raises the same alerts on the phone. Overview and Rules each open Hold.
+`@veto-hq/agent-sdk` exports `HoldVault` for those instructions. Install it with `npm install @veto-hq/agent-sdk`. Version 0.1.1 was published to npm on 2026-09-28 (0.1.0 on 2026-09-27). The package is published from this checkout by the maintainer. The watcher reads `VETO_HOLD_VAULTS` and writes hold alerts. The app has the Hold screens and raises the same alerts on the phone. Overview and Rules each open Hold.
 
 Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. [DEVNET.md](DEVNET.md) records the 2026-09-20 addresses and the 2026-09-25 program upgrade.
 

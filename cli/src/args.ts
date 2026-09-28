@@ -1,7 +1,7 @@
 import { CliError } from "./errors.js";
 import { TRADE_RULE_DISABLED } from "./features.js";
 
-const FLAGS = ["key", "rule", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster", "limit"] as const;
+const FLAGS = ["key", "rule", "owner", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster", "limit"] as const;
 
 type Flag = (typeof FLAGS)[number];
 
@@ -11,6 +11,7 @@ export type Args = {
   positionals: string[];
   key?: string;
   rule?: string;
+  owner?: string;
   payee?: string;
   mint?: string;
   max?: string;
@@ -22,7 +23,7 @@ export type Args = {
   limit?: string;
 };
 
-export const USAGE = `veto connect [--key <file>] [--rule <address>] [--payee <address>] [--mint <address>] [--max <base units>] [--cap <base units>] [--days <n>] [--purpose <text>] [--rpc <url>] [--cluster devnet|mainnet-beta]
+export const USAGE = `veto connect [--key <file>] [--rule <address>] [--owner <your wallet address>] [--payee <address>] [--mint <address>] [--max <base units>] [--cap <base units>] [--days <n>] [--purpose <text>] [--rpc <url>] [--cluster devnet|mainnet-beta]
 veto pay <amount in base units> [--rule <address>]
 veto status
 veto decisions [--limit <n>]

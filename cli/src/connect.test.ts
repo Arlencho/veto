@@ -14,15 +14,33 @@ import {
   harness,
   openedWorld,
   output,
+  plantDecoy,
   plantForeignAgent,
   removeHome,
   retargetMint,
   tempHome,
 } from "./testkit.js";
 import { Keypair } from "./web3.js";
+import type { World } from "../../sdk/src/testkit.js";
 
 const EXPIRES = 1793750400n;
 const MAINNET_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+const WORLD_PURPOSE = "Charging top-ups at the SE3 spot rate";
+
+/** Request flags that match the world's rule: its payee, mint, limits and purpose, 90 days. */
+function matchingFlags(w: World, over: Partial<Record<"payee" | "mint" | "max" | "cap" | "days" | "purpose", string>> = {}): string[] {
+  const fields = {
+    payee: w.merchant.publicKey.toBase58(),
+    mint: w.mint.publicKey.toBase58(),
+    max: "10000000",
+    cap: "300000000",
+    days: "90",
+    purpose: WORLD_PURPOSE,
+    ...over,
+  };
+  return Object.entries(fields).flatMap(([name, value]) => [`--${name}`, value]);
+}
 
 async function agentKey(home: string, secret: Uint8Array): Promise<string[]> {
   const keyFile = resolve(home, "agent.json");
@@ -168,9 +186,10 @@ test("connect refuses an RPC whose genesis does not match the cluster", async ()
 test("connect asks for missing rule fields and defaults the mint to devnet USDC", async () => {
   const home = tempHome();
   try {
-    const w = openedWorld();
-    const payee = Keypair.generate().publicKey.toBase58();
-    const runtime = harness(home, chainOf(w.fake), [payee, "500000", "20000000", "30", "API fees"]);
+    const w = openedWorld({ cap: 20_000_000n, perTxMax: 500_000n, purpose: "API fees" });
+    retargetMint(w, DEVNET_USDC_MINT);
+    const payee = w.merchant.publicKey.toBase58();
+    const runtime = harness(home, chainOf(w.fake), [payee, "500000", "20000000", "90", "API fees"]);
     const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey))], runtime);
     assert.equal(code, 0);
     assert.deepEqual(runtime.prompts, [
@@ -189,7 +208,7 @@ test("connect asks for missing rule fields and defaults the mint to devnet USDC"
     assert.equal(parsed.request.payee, payee);
     assert.equal(parsed.request.cap, 20_000_000n);
     assert.equal(parsed.request.max, 500_000n);
-    assert.equal(parsed.request.days, 30);
+    assert.equal(parsed.request.days, 90);
     assert.equal(parsed.request.purpose, "API fees");
     assert.equal(parsed.request.agent, w.agent.publicKey.toBase58());
   } finally {
@@ -200,9 +219,10 @@ test("connect asks for missing rule fields and defaults the mint to devnet USDC"
 test("connect asks for the mint on mainnet", async () => {
   const home = tempHome();
   try {
-    const w = openedWorld({ balance: 0 });
+    const w = openedWorld({ balance: 0, cap: 20_000_000n, perTxMax: 500_000n, purpose: "API fees" });
+    retargetMint(w, MAINNET_USDC);
     w.fake.genesisHash = GENESIS["mainnet-beta"];
-    const payee = Keypair.generate().publicKey.toBase58();
+    const payee = w.merchant.publicKey.toBase58();
     const runtime = harness(home, chainOf(w.fake), [MAINNET_USDC]);
     const code = await run(
       [
@@ -217,7 +237,7 @@ test("connect asks for the mint on mainnet", async () => {
         "--cap",
         "20000000",
         "--days",
-        "30",
+        "90",
         "--purpose",
         "API fees",
       ],
@@ -240,9 +260,9 @@ test("connect asks for the mint on mainnet", async () => {
 test("connect prints the rule request, its QR, and the approved terms", async () => {
   const home = tempHome();
   try {
-    const w = openedWorld({ cap: 20_000_000n, perTxMax: 500_000n, expiresAt: EXPIRES, balance: 1_000_000 });
+    const w = openedWorld({ cap: 20_000_000n, perTxMax: 500_000n, expiresAt: EXPIRES, balance: 1_000_000, purpose: "API fees" });
     retargetMint(w, DEVNET_USDC_MINT);
-    const payee = Keypair.generate().publicKey.toBase58();
+    const payee = w.merchant.publicKey.toBase58();
     const runtime = harness(home, chainOf(w.fake));
     runtime.qr = renderQr;
     const code = await run(
@@ -291,12 +311,8 @@ test("connect finds only this agent's rule and saves that rule and the rpc", asy
   try {
     const w = openedWorld();
     const foreign = plantForeignAgent(w);
-    const payee = Keypair.generate().publicKey.toBase58();
     const runtime = harness(home, chainOf(w.fake));
-    const code = await run(
-      ["connect", ...(await agentKey(home, w.agent.secretKey)), "--payee", payee, "--max", "1", "--cap", "2", "--days", "1", "--purpose", "fees"],
-      runtime,
-    );
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w)], runtime);
     assert.equal(code, 0);
     const saved = JSON.parse(readFileSync(configFile(home), "utf8")) as { rule: string; rpc: string };
     assert.equal(saved.rule, w.mandate.toBase58());
@@ -321,11 +337,7 @@ test("connect waits five seconds and says it is waiting for approval", async () 
       waits += 1;
       w.fake.accounts.set(w.mandate.toBase58(), saved);
     };
-    const payee = Keypair.generate().publicKey.toBase58();
-    const code = await run(
-      ["connect", ...(await agentKey(home, w.agent.secretKey)), "--payee", payee, "--max", "1", "--cap", "2", "--days", "1", "--purpose", "fees"],
-      runtime,
-    );
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w)], runtime);
     assert.equal(code, 0);
     assert.equal(waits, 1);
     assert.ok(output(runtime).includes("Waiting for you to approve on the phone."));
@@ -415,6 +427,152 @@ test("connect --rule checks that rule when filters are refused", async () => {
     assert.equal(code, 0);
     const saved = JSON.parse(readFileSync(configFile(home), "utf8")) as { rule: string };
     assert.equal(saved.rule, w.mandate.toBase58());
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect ignores a newer rule for this agent from another owner and keeps waiting", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const decoy = plantDecoy(w, { cap: 900_000_000n });
+    w.fake.accounts.delete(w.mandate.toBase58());
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w)], runtime);
+    assert.equal(code, 1);
+    assert.equal(runtime.errs.join("\n"), "Still waiting for you to approve on the phone.");
+    assert.equal(output(runtime).includes("Rule approved"), false);
+    assert.equal(output(runtime).includes(decoy), false);
+    assert.equal(existsSync(configFile(home)), false);
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect accepts the rule that matches the request over a u64::MAX decoy and names its owner", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const decoy = plantDecoy(w);
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w)], runtime);
+    assert.equal(code, 0);
+    const saved = JSON.parse(readFileSync(configFile(home), "utf8")) as { rule: string };
+    assert.equal(saved.rule, w.mandate.toBase58());
+    assert.notEqual(saved.rule, decoy);
+    assert.ok(runtime.lines.includes(`Rule ${w.mandate.toBase58()}`));
+    assert.ok(runtime.lines.includes(`Owner ${w.owner.publicKey.toBase58()}`));
+    assert.ok(runtime.lines.includes("Check that this owner is your wallet. If it is not, stop and run veto connect --owner <your wallet address>."));
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect picks no rule when several match the request", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const decoy = plantDecoy(w, { merchant: w.merchant.publicKey });
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w)], runtime);
+    assert.equal(code, 1);
+    assert.equal(
+      runtime.errs.join("\n"),
+      "Several rules match this request, so none was chosen. Run veto connect --owner <your wallet address> to pick the rule you approved.",
+    );
+    const text = output(runtime);
+    assert.ok(text.includes(`Matching rule ${decoy} from owner `));
+    assert.ok(text.includes(`Matching rule ${w.mandate.toBase58()} from owner ${w.owner.publicKey.toBase58()}`));
+    assert.equal(text.includes("Rule approved"), false);
+    assert.equal(existsSync(configFile(home)), false);
+  } finally {
+    removeHome(home);
+  }
+});
+
+for (const [name, patch] of [
+  ["a different payee", { payee: Keypair.generate().publicKey.toBase58() }],
+  ["a different mint", { mint: Keypair.generate().publicKey.toBase58() }],
+  ["a different purpose", { purpose: "Something else" }],
+  ["a lower total than the rule", { cap: "299999999" }],
+  ["a lower per-payment maximum than the rule", { max: "9999999" }],
+  ["fewer days than the rule lasts", { days: "80" }],
+] as const) {
+  test(`connect does not accept a rule when the request asked for ${name}`, async () => {
+    const home = tempHome();
+    try {
+      const w = openedWorld();
+      const runtime = harness(home, chainOf(w.fake));
+      const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w, patch)], runtime);
+      assert.equal(code, 1);
+      assert.equal(runtime.errs.join("\n"), "Still waiting for you to approve on the phone.");
+      assert.equal(existsSync(configFile(home)), false);
+    } finally {
+      removeHome(home);
+    }
+  });
+}
+
+test("connect accepts a rule the owner lowered on the phone", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld({ cap: 100_000_000n, perTxMax: 1_000_000n });
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w)], runtime);
+    assert.equal(code, 0);
+    const saved = JSON.parse(readFileSync(configFile(home), "utf8")) as { rule: string };
+    assert.equal(saved.rule, w.mandate.toBase58());
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect --owner picks the owner's rule when a copied decoy also matches", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    plantDecoy(w, { merchant: w.merchant.publicKey });
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(
+      ["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w), "--owner", w.owner.publicKey.toBase58()],
+      runtime,
+    );
+    assert.equal(code, 0);
+    const text = output(runtime);
+    assert.ok(text.includes(`Rule ${w.mandate.toBase58()}`));
+    assert.equal(text.includes("If it is not, stop"), false);
+    assert.equal(existsSync(configFile(home)), true);
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect --owner refuses a value that is not a wallet address", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w), "--owner", "not-a-key"], runtime);
+    assert.equal(code, 1);
+    assert.equal(runtime.errs.join("\n"), "--owner must be a wallet address.");
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect refuses --rule together with --owner", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(
+      ["connect", ...(await agentKey(home, w.agent.secretKey)), "--rule", w.mandate.toBase58(), "--owner", w.owner.publicKey.toBase58()],
+      runtime,
+    );
+    assert.equal(code, 1);
+    assert.equal(runtime.errs.join("\n"), "Use --rule or --owner, not both.");
+    assert.equal(existsSync(configFile(home)), false);
   } finally {
     removeHome(home);
   }

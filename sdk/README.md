@@ -129,13 +129,17 @@ The checks, in order:
 
 `mandatesForAgent(connection, agent)` reads the mandate accounts whose agent field is that key. `agent` is a public key or a base58 string. The call is `getProgramAccounts` on the Veto program with two filters: the mandate discriminator, and a memcmp at `MANDATE_AGENT_OFFSET` from `sdk/src/layout.ts` (the agent pubkey, after the 8-byte discriminator and the owner pubkey). The decoded mandates come back newest first. Newest is the largest `mandateId`, and a revoked rule is included.
 
+The list spans every owner. The agent does not sign when a mandate is opened, so anyone who knows the agent address can open one that names it, with any payee and any `mandateId`, including `u64::MAX`. Never take the first row on trust: keep the rule address you were given, or select by the owner and the terms you expect.
+
 ```ts
 import { mandatesForAgent, VetoAgent } from "@veto-hq/agent-sdk";
 
 const rules = await mandatesForAgent(connection, agentKeypair.publicKey);
-const newest = rules[0];
-if (newest) {
-  const veto = await VetoAgent.fromMandate(connection, newest.address, agentKeypair);
+const mine = rules.filter(
+  (rule) => rule.owner.equals(expectedOwner) && rule.merchant.equals(expectedPayee) && rule.status === 0,
+);
+if (mine.length === 1) {
+  const veto = await VetoAgent.fromMandate(connection, mine[0].address, agentKeypair);
 }
 ```
 

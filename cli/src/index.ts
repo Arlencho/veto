@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 import { run } from "./commands.js";
+import { errorText } from "./errors.js";
 import { productionRuntime } from "./runtime.js";
 
 export async function main(): Promise<void> {
@@ -8,8 +9,7 @@ export async function main(): Promise<void> {
   try {
     process.exitCode = await run(process.argv.slice(2), runtime);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`${message}\n`);
+    process.stderr.write(`${errorText(err)}\n`);
     process.exitCode = 1;
   } finally {
     runtime.close();

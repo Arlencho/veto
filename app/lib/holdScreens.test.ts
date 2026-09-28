@@ -1157,3 +1157,36 @@ test('skip with both keys shows what a pasted request does, or why it was refuse
   assert.match(refused, /This request was refused/);
   assert.match(refused, /Nothing was signed/);
 });
+
+test('skip with both keys shows neutral status, not a refusal, for the partial this phone signed', async () => {
+  const { SkipScreen } = await import('../components/hold/SkipScreen');
+  const shown = textOf(
+    await mount(
+      createElement(SkipScreen, {
+        network: 'Test tokens',
+        purpose: 'skip',
+        status: 'ready',
+        error: null,
+        headline: 'To pay 1,000 test tokens, both keys must sign.',
+        yourKey: 'Key 6Ywq...GSV5.',
+        guardianKey: 'Key 4mKp...R2vd.',
+        signedHere: true,
+        waitingLine: '1 of 2 signed. Waiting for the other key.',
+        whenBoth: [],
+        payload: 'partial',
+        onPayload() {},
+        request: null,
+        ownPartial: true,
+        onBack() {},
+        onSign: async () => undefined,
+        signLabel: 'Press and hold to sign with your key on this phone',
+        signHint: 'Each signature uses Seed Vault.',
+        onCancel() {},
+      }),
+    ),
+  );
+  assert.match(shown, /This phone signed its half\. Paste the request on the phone with the other key\./);
+  assert.doesNotMatch(shown, /This request was refused/);
+  assert.doesNotMatch(shown, /Nothing was signed/);
+  assert.doesNotMatch(shown, /This finishes the request the other phone started/);
+});

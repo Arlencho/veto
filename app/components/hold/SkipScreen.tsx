@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts, radii, space } from '../theme';
 import { HoldInput, HoldSign, HoldTop, StatusBlock } from './chrome';
 
+export const OWN_PARTIAL_LINE = 'This phone signed its half. Paste the request on the phone with the other key.';
+
 export function SkipScreen({
   network,
   purpose,
@@ -18,6 +20,7 @@ export function SkipScreen({
   payload,
   onPayload,
   request = null,
+  ownPartial = false,
   onBack,
   onSign,
   signLabel,
@@ -40,6 +43,8 @@ export function SkipScreen({
   onPayload: (text: string) => void;
   /** What the pasted request does, checked against this vault, or why it was refused. */
   request?: { ok: true; lines: readonly string[] } | { ok: false; reason: string } | null;
+  /** The request field holds the partial this phone just signed, not one pasted from the other phone. */
+  ownPartial?: boolean;
   onBack: () => void;
   onSign: () => Promise<void>;
   signLabel: string;
@@ -86,7 +91,11 @@ export function SkipScreen({
           onChangeText={onPayload}
           hint="Paste this only on the phone that still has to sign."
         />
-        {request ? (
+        {ownPartial ? (
+          <View accessibilityRole="text" accessibilityLiveRegion="polite" style={styles.when}>
+            <Text style={styles.body}>{OWN_PARTIAL_LINE}</Text>
+          </View>
+        ) : request ? (
           <View accessibilityRole="text" accessibilityLiveRegion="polite" style={request.ok ? styles.when : styles.refused}>
             <Text style={styles.kicker}>{request.ok ? 'This request, checked against this vault' : 'This request was refused'}</Text>
             {request.ok ? (
@@ -113,7 +122,7 @@ export function SkipScreen({
             onSign={onSign}
           />
         )}
-        {signedHere && payload.length > 0 ? (
+        {signedHere && payload.length > 0 && !ownPartial ? (
           <HoldSign
             name="finish-both"
             label="Press and hold to sign with the key on this phone"

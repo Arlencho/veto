@@ -23,7 +23,11 @@ type SkipProps = {
   onPayload: (text: string) => void;
   onSign: () => Promise<void>;
   request: { ok: true; lines: readonly string[] } | { ok: false; reason: string } | null;
+  ownPartial?: boolean;
+  signedHere: boolean;
 };
+// What this phone's own signature returns, when a test lets it sign first.
+let ownSign: { tx: Transaction; partial: string } | null = null;
 let latest: SkipProps | null = null;
 
 const bundle = {
@@ -63,17 +67,17 @@ mock.module('../components/hold/SkipScreen', {
 });
 mock.module('./holdSign', {
   namedExports: {
-    // The real decoder, without the wallet session imports behind it.
-    holdRequestFromPayload: (payload: string) => Transaction.from(Buffer.from(payload.trim(), 'base64')),
     signHoldPartialWithSession: async () => {
-      throw new Error('not used');
+      if (!ownSign) throw new Error('not used');
+      return ownSign.partial;
     },
   },
 });
 mock.module('./holdActions', {
   namedExports: {
     compileSkip: async () => {
-      throw new Error('not used');
+      if (!ownSign) throw new Error('not used');
+      return ownSign.tx;
     },
     compileUnfreeze: async () => {
       throw new Error('not used');
@@ -166,4 +170,39 @@ test('the legitimate pasted request is shown with its facts and signed', async (
   assert.match(lines, /skip the wait/);
   assert.match(lines, /Withdrawal: #5, 1,000 test tokens/);
   assert.match(lines, new RegExp(`Destination: ${destination.toBase58()}`));
+});
+
+test('after this phone signs its half, its own partial is not shown as a refused request', async () => {
+  sent.length = 0;
+  const tx = new Transaction();
+  tx.feePayer = owner.publicKey;
+  tx.recentBlockhash = Keypair.generate().publicKey.toBase58();
+  tx.add(legitSkip());
+  tx.partialSign(guardian);
+  ownSign = { tx, partial: tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString('base64') };
+  try {
+    const Screen = (await import('../app/hold/skip')).default;
+    await act(async () => {
+      create(createElement(Screen));
+    });
+    await act(async () => {
+      await latest!.onSign();
+    });
+    const signed = latest as SkipProps | null;
+    assert.equal(sent.length, 0);
+    assert.equal(signed?.signedHere, true);
+    assert.equal(signed?.payload, ownSign.partial);
+    assert.equal(signed?.ownPartial, true);
+    assert.equal(signed?.request, null);
+
+    // A different paste in the same field is checked again, as a request from the other phone.
+    await act(async () => {
+      latest!.onPayload(payloadOf([legitSkip()], [owner]));
+    });
+    const pasted = latest as SkipProps | null;
+    assert.equal(pasted?.ownPartial, false);
+    assert.equal(pasted?.request?.ok, true);
+  } finally {
+    ownSign = null;
+  }
 });

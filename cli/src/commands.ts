@@ -12,7 +12,7 @@ import { USAGE, parseArgs, rejectPositionals, rejectUnused, type Args } from "./
 import { DEFAULT_RPC, assertGenesis, explorerTx, parseCluster, type Cluster } from "./cluster.js";
 import { CliError, FILTERS_REFUSED, errorText, isForeignAgent, rpcRefusesFilters } from "./errors.js";
 import { TRADE_RULE_DISABLED, tradeRuleEnabled } from "./features.js";
-import { loadOrCreateKey, readConfig, readKeyFile, writeConfig } from "./files.js";
+import { loadOrCreateKey, readConfig, readKeyFile, writeConfig, type VetoConfig } from "./files.js";
 import {
   DEVNET_USDC_MINT,
   MCP_CONFIG_LINE,
@@ -277,13 +277,15 @@ export async function executeDecisions(runtime: Runtime, limit?: string | number
 }
 
 export async function executeRequestRule(runtime: Runtime, fields: RuleRequestInput): Promise<string> {
-  const cluster = await savedCluster(runtime.home);
+  const stored = await savedConfig(runtime.home);
+  const cluster = stored?.cluster ?? "devnet";
   const mint = fields.mint !== undefined ? fields.mint : cluster === "devnet" ? DEVNET_USDC_MINT : undefined;
   if (mint === undefined || mint.trim() === "") {
     throw new CliError("Mint address is required.");
   }
-  const loaded = await loadOrCreateKey(runtime.home, undefined);
-  return ruleRequestUrl(loaded.keypair.publicKey.toBase58(), {
+  // After veto connect, the request names the key that config saved, never a new one.
+  const keypair = stored ? await savedKey(stored.key) : (await loadOrCreateKey(runtime.home, undefined)).keypair;
+  return ruleRequestUrl(keypair.publicKey.toBase58(), {
     payee: fields.payee,
     max: fields.max,
     cap: fields.cap,
@@ -473,11 +475,22 @@ async function openMandate(connection: Connection, address: string, keypair: Age
   }
 }
 
-async function savedCluster(home: string): Promise<Cluster> {
+async function savedConfig(home: string): Promise<VetoConfig | null> {
   try {
-    return (await readConfig(home)).cluster;
+    return await readConfig(home);
   } catch (err) {
-    if (err instanceof CliError && err.code === "config-missing") return "devnet";
+    if (err instanceof CliError && err.code === "config-missing") return null;
+    throw err;
+  }
+}
+
+async function savedKey(path: string): Promise<AgentKey> {
+  try {
+    return await readKeyFile(path);
+  } catch (err) {
+    if (err instanceof CliError && err.code === "key-missing") {
+      throw new CliError("The agent key file saved by veto connect was not found. Run veto connect again.");
+    }
     throw err;
   }
 }

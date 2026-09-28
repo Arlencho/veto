@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { inflateSync } from "node:zlib";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -454,6 +455,59 @@ test("veto_request_rule returns the link, a PNG, and the hold instruction", asyn
       assert.ok(dark > 0);
       assert.equal(w.fake.sent.length, 0);
     });
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("veto_request_rule uses the key saved in config and does not create another", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const secure = join(home, "secure", "agent.json");
+    await writeKeyFile(secure, w.agent.secretKey);
+    await writeConfig(home, { rule: w.mandate.toBase58(), rpc: DEFAULT_RPC.devnet, cluster: "devnet", key: secure });
+    const payee = Keypair.generate().publicKey.toBase58();
+    const runtime = harness(home, chainOf(w.fake));
+    await withClient(runtime, async (client) => {
+      const result = asResult(
+        await client.callTool({
+          name: "veto_request_rule",
+          arguments: { payee, max: "500000", cap: "20000000", days: "30", purpose: "API fees" },
+        }),
+      );
+      assert.equal(result.isError, undefined);
+      const parsed = parseRuleRequest(textOf(result).split("\n")[0] ?? "");
+      assert.equal(parsed.ok, true);
+      if (!parsed.ok) return;
+      assert.equal(parsed.request.agent, w.agent.publicKey.toBase58());
+    });
+    assert.equal(existsSync(agentFile(home)), false);
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("veto_request_rule refuses when the saved key is missing and does not create one", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const secure = join(home, "secure", "agent.json");
+    await writeConfig(home, { rule: w.mandate.toBase58(), rpc: DEFAULT_RPC.devnet, cluster: "devnet", key: secure });
+    const payee = Keypair.generate().publicKey.toBase58();
+    const runtime = harness(home, chainOf(w.fake));
+    await withClient(runtime, async (client) => {
+      const result = asResult(
+        await client.callTool({
+          name: "veto_request_rule",
+          arguments: { payee, max: "500000", cap: "20000000", days: "30", purpose: "API fees" },
+        }),
+      );
+      assert.equal(result.isError, true);
+      assert.equal(textOf(result), "The agent key file saved by veto connect was not found. Run veto connect again.");
+    });
+    assert.equal(existsSync(agentFile(home)), false);
+    assert.equal(existsSync(secure), false);
   } finally {
     removeHome(home);
   }

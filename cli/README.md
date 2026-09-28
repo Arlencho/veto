@@ -38,7 +38,7 @@ The terminal waits until a rule that answers this request is on chain: it must n
 "veto": { "command": "npx", "args": ["-y", "@veto-hq/veto", "mcp"] }
 ```
 
-The owner should remove any other tool that holds a funded key, because the companion cannot stop a second key. The server does not take a key. It refuses to start when `~/.veto/agent.json` is more open than mode 0600. Its `veto_pay` tool is marked as spending and not idempotent, so MCP clients that honour tool annotations can ask before each payment.
+The owner should remove any other tool that holds a funded key, because the companion cannot stop a second key. The server does not take a key. It refuses to start when `~/.veto/agent.json` is more open than mode 0600. Its `veto_pay` tool is marked as spending and not idempotent, so MCP clients that honour tool annotations can ask before each payment. Its `veto_request_rule` tool uses the key saved by `veto connect` and never creates a second key.
 
 The rule and the RPC are saved in `~/.veto/config.json`. If the RPC refuses `getProgramAccounts` filters, pass `--rule` with the rule address. That checks the rule you name and skips the request.
 

@@ -310,7 +310,7 @@ Every amount comes from the same chain reads as the app. If there is no signed-i
 
 Hold is a vault in the same program as a spending rule. A rule still does not escrow: the mandate is a delegate. Hold is for a balance the owner deposits and cannot move with a raw transfer. The vault PDA (`["hold", owner, vault_id]`, `vault_id` as a little-endian u64) is the authority of its token account. It holds SPL tokens. Native SOL goes in as wrapped SOL.
 
-Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md). The app screens exist, and a device check with a real vault follows. The guardian rules below (any guardian change waits, and a guardian that is also the safe address cannot recover to itself) are in source and not yet deployed to devnet; the devnet program still applies an added guardian at once.
+Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade added Hold. The live binary is the 2026-09-26 upgrade built from commit `e2a66db`, SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681` ("Hold migration and safe-address upgrade, 2026-09-26" in [docs/DEVNET.md](docs/DEVNET.md)). The app screens exist. A written device check of Hold with a real vault is not recorded in this repository yet. The guardian rules below (any guardian change waits, and a guardian that is also the safe address cannot recover to itself) are in source and not yet deployed to devnet; the devnet program still applies an added guardian at once.
 
 An everyday withdrawal pays at once only when the vault is not frozen, the destination token account has already been paid by this vault, and the running 24 hour total stays inside both the daily limit and `big_share_bps` of the current balance. The app sets that share at 2500, a quarter of the vault. The delay is 1, 2, or 3 days. Anything else is held until `execute` after `unlock_at` on the chain clock. It is not refused, except when the vault cannot cover the amount, or the pending list is full (8). Those two write a refusal and pay nothing. A full known-destination list (16) still pays, and does not grow.
 
@@ -406,7 +406,7 @@ docs/PROBLEM.md           the problem, who has it, what they do today, what Veto
 docs/PLAN.md              build plan, milestones, and prior art
 docs/PITCH.md             the pitch: position and the sixty seconds
 docs/DECK.md              the deck, slide by slide
-docs/DEVNET.md            public devnet addresses, and the 2026-09-25 Hold upgrade
+docs/DEVNET.md            public devnet addresses, and every recorded upgrade (live: 2026-09-26, e2a66db)
 docs/VIDEO.md             the three-minute shot list
 docs/SECURITY_REVIEW.md   review of the mandate program at an earlier commit; Hold is out of scope
 docs/GCP_SETUP.md         the watcher GCP project, checked by scripts/gcp-verify.sh
@@ -481,20 +481,26 @@ What a key can do under a mandate.
 - **A compromised agent key cannot** widen any field of the mandate, name a different merchant,
   extend the expiry, grant itself an override, or touch any other mandate. Every widening
   instruction requires the owner's signature, and `charge` requires `has_one = agent`.
-- **The program cannot move funds the owner has not delegated.** The SPL delegation is the hard
-  ceiling underneath the program's own accounting.
+- **Outside Hold, the program moves only what the owner delegated.** For a spending rule or a
+  trade rule, the SPL delegation is the hard ceiling underneath the program's own accounting.
+- **Hold balances are held by the program.** A Hold vault is custody, not a delegation: the vault
+  PDA is the authority of the vault's token account, and the program moves a deposited balance
+  under the Hold rules above.
 - **A malicious merchant** can only receive what the mandate allows. A merchant cannot submit a
   charge at all; only the named agent signs `charge`.
 - **A forged mandate account cannot be substituted.** `charge` re-derives the mandate address from
   the fields stored inside it and rejects a mismatch, and the CPI signs as that PDA.
 - **Hold is live on devnet.** The vault instructions are in this repository and tested. The
-  2026-09-25 upgrade is recorded in [docs/DEVNET.md](docs/DEVNET.md). The app screens exist,
-  and a device check with a real vault follows. The bounds in the bullets above are the
-  spending rule on the program that file records.
+  2026-09-25 upgrade added Hold. The live binary is the 2026-09-26 upgrade built from commit
+  `e2a66db`, SHA-256 `58e6180576f280ba22f42d9ef5927a4d0f872b3ecd0db891390587d678975681`,
+  recorded in [docs/DEVNET.md](docs/DEVNET.md). The bounds in the bullets above are bounds on
+  that binary.
 - **Devnet upgrade authority.** The devnet program is owned by the upgradeable loader. Its
   upgrade authority is the deployer key listed in [docs/DEVNET.md](docs/DEVNET.md), confirmed
-  on chain. Whoever holds that key can replace the program logic and, through it, move anything
-  still delegated to a mandate PDA. Every bound in this list is a bound on the program as
+  on chain. On devnet that is one key, `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`, held by the
+  maintainer, with no multisig and no timelock. Whoever holds that key can replace the program
+  logic and, through it, move anything still delegated to a mandate or trade-rule PDA and every
+  Hold vault balance. Every bound in this list is a bound on the program as
   deployed, and every devnet record verified by `tools/verify.ts` rests on that. The intent for
   mainnet, where this program is not deployed, is to set the upgrade authority to none before
   the first mandate is opened, after an external audit. A multisig would shrink the set of

@@ -463,7 +463,7 @@ test("connect accepts the rule that matches the request over a u64::MAX decoy an
     assert.notEqual(saved.rule, decoy);
     assert.ok(runtime.lines.includes(`Rule ${w.mandate.toBase58()}`));
     assert.ok(runtime.lines.includes(`Owner ${w.owner.publicKey.toBase58()}`));
-    assert.ok(runtime.lines.includes("Check that this owner and rule match what your phone shows."));
+    assert.ok(runtime.lines.includes("Check that this owner is your wallet. If it is not, stop and run veto connect --owner <your wallet address>."));
   } finally {
     removeHome(home);
   }
@@ -479,7 +479,7 @@ test("connect picks no rule when several match the request", async () => {
     assert.equal(code, 1);
     assert.equal(
       runtime.errs.join("\n"),
-      "Several rules match this request, so none was chosen. Run veto connect --rule <address> with the rule your phone shows.",
+      "Several rules match this request, so none was chosen. Run veto connect --owner <your wallet address> to pick the rule you approved.",
     );
     const text = output(runtime);
     assert.ok(text.includes(`Matching rule ${decoy} from owner `));
@@ -523,6 +523,39 @@ test("connect accepts a rule the owner lowered on the phone", async () => {
     assert.equal(code, 0);
     const saved = JSON.parse(readFileSync(configFile(home), "utf8")) as { rule: string };
     assert.equal(saved.rule, w.mandate.toBase58());
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect --owner picks the owner's rule when a copied decoy also matches", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    plantDecoy(w, { merchant: w.merchant.publicKey });
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(
+      ["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w), "--owner", w.owner.publicKey.toBase58()],
+      runtime,
+    );
+    assert.equal(code, 0);
+    const text = output(runtime);
+    assert.ok(text.includes(`Rule ${w.mandate.toBase58()}`));
+    assert.equal(text.includes("If it is not, stop"), false);
+    assert.equal(existsSync(configFile(home)), true);
+  } finally {
+    removeHome(home);
+  }
+});
+
+test("connect --owner refuses a value that is not a wallet address", async () => {
+  const home = tempHome();
+  try {
+    const w = openedWorld();
+    const runtime = harness(home, chainOf(w.fake));
+    const code = await run(["connect", ...(await agentKey(home, w.agent.secretKey)), ...matchingFlags(w), "--owner", "not-a-key"], runtime);
+    assert.equal(code, 1);
+    assert.equal(runtime.errs.join("\n"), "--owner must be a wallet address.");
   } finally {
     removeHome(home);
   }

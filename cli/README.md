@@ -18,6 +18,8 @@ npx @veto-hq/veto connect
 
 Version 0.1.0 was published to npm on 2026-09-27. See [the publishing guide](https://github.com/Arlencho/veto/blob/main/docs/PUBLISH.md) for maintainer release steps.
 
+`veto connect --owner <your wallet address>` accepts only a rule opened by that wallet. Use it when anyone else could have seen the rule request or its QR code: a copied request from another owner is then ignored.
+
 ## One command, one scan, one hold
 
 ```bash

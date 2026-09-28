@@ -78,7 +78,7 @@ test("pay prints a refusal and exits 0", async () => {
       output(runtime),
       [
         "kind refused",
-        "amount 0.001 USDC (1000 base units)",
+        "asked 0.001 USDC (1000 base units)",
         `payee ${w.merchant.publicKey.toBase58()}`,
         "reason 5 over per-payment maximum",
         "override 0.50 USDC",

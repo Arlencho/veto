@@ -35,7 +35,7 @@ const POLL_MS = 5_000;
 const EXPIRY_SLACK_SECONDS = 3_600n;
 const SECONDS_PER_DAY = 86_400n;
 const AIRDROP_LAMPORTS = 1_000_000_000;
-const CONNECT_FLAGS = ["key", "rule", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster"] as const;
+const CONNECT_FLAGS = ["key", "rule", "owner", "payee", "mint", "max", "cap", "days", "purpose", "rpc", "cluster"] as const;
 
 type RuleFields = {
   payee: string;
@@ -173,7 +173,7 @@ async function pay(args: Args, runtime: Runtime): Promise<void> {
 export function payLines(outcome: PayOutcome): string[] {
   return [
     `kind ${outcome.kind}`,
-    `amount ${outcome.amount} (${outcome.amountBaseUnits} base units)`,
+    `${outcome.kind === "paid" ? "amount" : "asked"} ${outcome.amount} (${outcome.amountBaseUnits} base units)`,
     `payee ${outcome.payee}`,
     `reason ${outcome.reasonCode} ${outcome.reasonText}`,
     `override ${outcome.override}`,
@@ -368,6 +368,7 @@ async function requestAndWait(
   const request = parsed.request;
   runtime.stdout(url);
   runtime.stdout(runtime.qr(url));
+  const owner = args.owner === undefined ? undefined : ownerKey(args.owner);
   runtime.stdout("Waiting for you to approve on the phone.");
   for (let poll = 0; poll < runtime.maxPolls; poll += 1) {
     let rules;
@@ -378,25 +379,39 @@ async function requestAndWait(
       throw err;
     }
     const now = unixSeconds(runtime.now());
-    const matches = rules.filter((rule) => matchesRequest(rule, keypair.publicKey, request, now));
+    const matches = rules.filter(
+      (rule) => matchesRequest(rule, keypair.publicKey, request, now) && (!owner || rule.owner.equals(owner)),
+    );
     if (matches.length > 1) {
       for (const rule of matches) {
         runtime.stdout(`Matching rule ${rule.address.toBase58()} from owner ${rule.owner.toBase58()}`);
       }
       throw new CliError(
-        "Several rules match this request, so none was chosen. Run veto connect --rule <address> with the rule your phone shows.",
+        "Several rules match this request, so none was chosen. Run veto connect --owner <your wallet address> to pick the rule you approved.",
       );
     }
     const match = matches[0];
     if (match) {
       runtime.stdout(`Rule ${match.address.toBase58()}`);
       runtime.stdout(`Owner ${match.owner.toBase58()}`);
-      runtime.stdout("Check that this owner and rule match what your phone shows.");
+      if (!owner) {
+        runtime.stdout("Check that this owner is your wallet. If it is not, stop and run veto connect --owner <your wallet address>.");
+      }
       return match.address.toBase58();
     }
     await runtime.sleep(POLL_MS);
   }
   throw new CliError("Still waiting for you to approve on the phone.");
+}
+
+function ownerKey(text: string): Address {
+  try {
+    const key = new PublicKey(text.trim());
+    if (key.toBase58() === text.trim()) return key;
+  } catch {
+    // Fall through to the plain error below.
+  }
+  throw new CliError("--owner must be a wallet address.");
 }
 
 /**

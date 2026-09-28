@@ -28,10 +28,11 @@ Capped agent spending is not new. The table names the limits that already exist.
 | Squads v4 spending limits | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec, Trail of Bits, two formal verifications underway | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
 | SPL `approve` / delegate | Caps what a delegate can pull | Cap only. No purpose, no expiry, no reason, no record |
 | LazorKit | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
-| SolAgent Pay | An overspend "is not a policy violation logged after the fact, it is an impossible transaction". Funds are escrowed into a vault | Veto records the decline and leaves the funds in an account the owner controls |
 | Oculus | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves |
 | x402 / AP2 | HTTP 402 settlement; signed Intent, Cart and Payment mandates as verifiable credentials | The record of a yes, held off chain as evidence for the merchant |
 | Seed Vault | Hardware-held keys, human approves every signature | The default on this platform. Unattended agent spend needs a bound beside that key |
+
+SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28, and no archived copy was found, so its row and quote were removed.
 
 By the time this plan was written, capped on-chain agent budgets were already commodity, including
 tutorials from infrastructure vendors. The entry is the mobile build, the recorded refusal, and
@@ -174,7 +175,6 @@ On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiG
 2. **The quoted rule's history is the span above.** A later charge on that mandate does not turn the existing rows into a week.
 3. **A refusal has to confirm.** The balance is unchanged and the ledger entry exists in the same confirmed transaction. That is what the refusal test asserts.
 4. **A charge the agent never submits has no record.** Nothing on chain can provide one. The record is every decision the agent submits. [PROBLEM.md](PROBLEM.md) states that limit.
-5. **SolAgent Pay describes an overspend as an impossible transaction and escrows into a vault.** The record here is the refusal, on a phone.
 
 ## House rules
 

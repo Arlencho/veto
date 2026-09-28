@@ -49,6 +49,9 @@ The closest of them, SolAgent Pay, states outright that an overspend "is not a p
 logged after the fact, it is an impossible transaction". That is the opposite thesis and it is what
 we differentiate against. An impossible transaction leaves no artifact, no reason and no trail.
 
+Update 2026-09-28: the SolAgent Pay repository returned HTTP 404 and no archived copy was found, so
+the quote above can no longer be checked. It was removed from the README, PLAN, PITCH and DECK.
+
 So the claim is narrowed and sharpened: the refusal is legible. A recorded no, a reason, and the
 override that would clear it, on a phone, with the key in Seed Vault.
 

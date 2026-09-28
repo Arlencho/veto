@@ -18,9 +18,9 @@ The claim is the recorded refusal. When a rule fails, the transfer is never exec
 
 A rule opened in the app keeps the cap in a token account derived from the owner with the seed `veto-rule-<mandate id>`. The mandate PDA is the SPL delegate on that account. Close rule returns the remaining balance and the rent. The key never leaves Seed Vault. One human, several agents, one rule each. A ruleset is written once and reused on the next agent. The other designs are infrastructure. This one is on a phone.
 
-The names are the table in [PLAN.md](PLAN.md): Squads v4 spending limits, SPL `approve` / delegate, LazorKit, SolAgent Pay, Oculus, x402, AP2, and Seed Vault.
+The names are the table in [PLAN.md](PLAN.md): Squads v4 spending limits, SPL `approve` / delegate, LazorKit, Oculus, x402, AP2, and Seed Vault.
 
-SolAgent Pay's README says an overspend "is not a policy violation logged after the fact, it is an impossible transaction." They escrow into a vault. On a Veto spending rule the funds stay in an account the owner controls, under a delegate, and the decline is recorded. Hold is a separate vault in the same program, for money the owner deposits and cannot move with a raw transfer. Hold is merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows.
+On a Veto spending rule the funds stay in an account the owner controls, under a delegate, and the decline is recorded. Hold is a separate vault in the same program, for money the owner deposits and cannot move with a raw transfer. Hold is merged and tested, and live on devnet. The app screens exist, and a device check with a real vault follows.
 
 AP2 mandates are the record of a yes, held off chain as the merchant's evidence. The word mandate, in this repository, is the on-chain rule. Oculus reimburses a breach from a USDC reserve after the fact. This declines before money moves, and the decline is recorded.
 

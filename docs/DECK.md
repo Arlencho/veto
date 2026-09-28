@@ -56,7 +56,6 @@ These are the limits that already exist.
 | Squads v4 | Audited spending limits, formal verification underway |
 | SPL delegate | A cap on what a delegate may pull |
 | LazorKit | Session keys with on-chain roles and limits |
-| SolAgent Pay | Session PDA, ceilings, allowlist, TTL |
 | AP2 | Signed mandates carrying limits and validity |
 
 > Capped agent spending on Solana is not new. An infrastructure vendor publishes a tutorial on it.
@@ -68,9 +67,6 @@ These are the limits that already exist.
 > The difference is what is left behind. Elsewhere a blocked overspend is a failed
 > transaction: logs and an error code, but nothing in program state. Here the decline is a
 > successful transaction that records a structured reason and moves no payment tokens.
-
-Quote SolAgent Pay's own README on screen, verbatim, in their words: an overspend "is not a policy
-violation logged after the fact, it is an impossible transaction."
 
 Here the transfer is not executed. The decline is recorded.
 

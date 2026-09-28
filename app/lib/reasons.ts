@@ -1,7 +1,7 @@
-import { REASON_NOT_ACTIVE, REASON_OVER_PER_TX_MAX, reasonText } from './constants';
+import { REASON_NOT_ACTIVE, REASON_OVER_PER_TX_MAX, ownerReasonText, reasonText } from './constants';
 import { formatTokenAmount } from './tokens';
 
-export { reasonText };
+export { ownerReasonText, reasonText };
 
 export type ReasonView = {
   reason: number;
@@ -15,7 +15,7 @@ export function renderReason(
   decimals: number,
   mint?: string | null,
 ): ReasonView {
-  const text = reasonText(reason);
+  const text = ownerReasonText(reason);
   if (reason !== REASON_OVER_PER_TX_MAX) {
     return { reason, text, overrideLine: null };
   }

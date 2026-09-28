@@ -83,7 +83,7 @@ test('a paid row on screen shows two decimals and the exact amount stays availab
       signature: 'sig-paid',
     },
     6,
-    10_000_000n,
+    20_000_000n,
     undefined,
   );
   assert.match(face.title, /Paid 15\.15 /);
@@ -96,7 +96,7 @@ test('a paid row on screen shows two decimals and the exact amount stays availab
       signature: 'sig-other',
     },
     6,
-    10_000_000n,
+    20_000_000n,
     undefined,
   );
   assert.match(other.title, /Paid 16\.94 /);

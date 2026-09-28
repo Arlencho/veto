@@ -18,7 +18,7 @@ export function formatBaseUnits(amount: bigint, decimals: number): string {
 }
 
 /** Token-aware rounding for display copy; signing and verification use exact values. */
-export function roundShownAmounts(text: string, rounding: 'nearest' | 'floor' = 'nearest'): string {
+export function roundShownAmounts(text: string, rounding: DisplayRounding = 'nearest'): string {
   return text.replace(/-?\d+\.\d{3,}( wrapped SOL)?/g, (token, sol: string | undefined) => {
     const amount = sol ? token.slice(0, -sol.length) : token;
     const decimals = amount.split('.')[1]!.length;

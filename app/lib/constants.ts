@@ -111,6 +111,17 @@ export function reasonText(reason: number): string {
   return REASON_TEXT[reason] ?? 'unknown';
 }
 
+// REASON_TEXT is the program's own log text: exports carry it as reason_text, and the
+// verifier and the SDK check it against the chain, so it stays byte for byte. Screens
+// use this owner wording instead, which only swaps protocol jargon for plain words.
+const OWNER_REASON_TEXT: Record<number, string> = {
+  [REASON_STALE_NONCE]: 'request already settled',
+};
+
+export function ownerReasonText(reason: number): string {
+  return OWNER_REASON_TEXT[reason] ?? reasonText(reason);
+}
+
 export function statusName(status: number): string {
   return STATUS_NAME[status] ?? `status:${status}`;
 }

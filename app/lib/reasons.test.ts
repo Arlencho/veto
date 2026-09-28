@@ -13,7 +13,7 @@ import {
   REASON_STALE_NONCE,
   REASON_TEXT,
   REASON_ZERO_AMOUNT,
-  reasonText as reasonLabel,
+  ownerReasonText as reasonLabel,
 } from './constants';
 import { formatBaseUnits } from './format';
 import { notActiveHint, reasonText, refusalWhyLine, renderReason } from './reasons';

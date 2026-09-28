@@ -7,7 +7,7 @@ import {
   STATUS_ACTIVE,
   STATUS_EXHAUSTED,
   STATUS_REVOKED,
-  reasonText,
+  ownerReasonText,
   statusName,
 } from './constants';
 import { formatTokenAmount } from './tokens';
@@ -59,6 +59,12 @@ export type NonceSequence = {
   reason: number | null;
 };
 
+// A rule's per-payment max is fixed when the rule opens, and the program only lets a
+// payment above it through under the owner's one-time override for that request.
+export function paidAboveLimit(amount: bigint, perTxMax: bigint | null | undefined): boolean {
+  return perTxMax != null && amount > perTxMax;
+}
+
 export function overrideOfferForReason(reason: number, suggestedOverride: bigint): OverrideOffer {
   if (reason === REASON_OVER_CAP) {
     return { offer: false, why: CAP_OVERRIDE_REFUSAL };
@@ -71,7 +77,7 @@ export function overrideOfferForReason(reason: number, suggestedOverride: bigint
   }
   return {
     offer: false,
-    why: `The program records no override for this reason (${reasonText(reason)}).`,
+    why: `The program records no override for this reason (${ownerReasonText(reason)}).`,
   };
 }
 
@@ -82,7 +88,7 @@ export function overrideGuard(
   nowSec?: bigint,
 ): OverrideGuard {
   if (nonce === 0n) {
-    return { ok: false, why: 'This row has no nonce. The program will not accept an override.' };
+    return { ok: false, why: 'This row has no request number. The program will not accept an override.' };
   }
   if (amount === 0n) {
     return {
@@ -117,7 +123,7 @@ export function overrideGuard(
   if (nonce <= mandate.lastNonce) {
     return {
       ok: false,
-      why: 'This nonce is already settled on chain. An override cannot be granted.',
+      why: 'This request is already settled on chain. An override cannot be granted.',
     };
   }
   const remaining = mandateRemaining(mandate);
@@ -145,16 +151,16 @@ export function overrideCommitCopy(args: {
   const remaining = formatTokenAmount(args.remaining, args.decimals, args.mint);
   const cap = formatTokenAmount(args.cap, args.decimals, args.mint);
   const paragraphs = [
-    `You are about to grant an override of ${amount} for nonce ${args.nonce.toString()}.`,
+    `You are about to grant an override of ${amount} for this request.`,
     `The per-payment maximum on this rule is ${perTxMax}. It does not change. This override allows this one payment of ${amount}, used once, never above the remaining cap (${remaining} remaining of ${cap}). ${CAP_OVERRIDE_REFUSAL}`,
     'This is written to the ledger as an override, a recorded decision. It is not a settings change.',
-    'The owner signs once. The agent can then retry this nonce.',
+    'The owner signs once. The agent can then retry this request.',
   ];
   if (args.pendingOtherNonce != null && args.pendingOtherNonce !== 0n) {
     paragraphs.splice(
       2,
       0,
-      `This replaces the pending override for nonce ${args.pendingOtherNonce.toString()}.`,
+      `This replaces the pending override for request ${args.pendingOtherNonce.toString()}.`,
     );
   }
   return {
@@ -191,7 +197,7 @@ export function assessOverride(args: {
       status: 'already',
       amount: args.mandate.overrideAmount,
       nonce: args.row.nonce,
-      why: `This nonce already has an override of ${amount} on chain. The agent can retry it.`,
+      why: `This request already has an override of ${amount} on chain. The agent can retry it.`,
     };
   }
   const pending =
@@ -256,7 +262,7 @@ export function overrideRowView(
   return {
     say: 'Waived',
     italic: 'by the owner',
-    why: `An override of ${amount} for nonce ${row.nonce.toString()}. This is a recorded decision, not a settings change. It allows this one payment, used once, never above the remaining cap. The per-payment maximum does not change. The total cap is unchanged.`,
+    why: `You allowed this one payment of ${amount}. This is a recorded decision, not a settings change. It allows this one payment, used once, never above the remaining cap. The per-payment maximum does not change. The total cap is unchanged.`,
     amount,
   };
 }
@@ -303,7 +309,7 @@ export function sequenceLine(seq: NonceSequence, decimals: number, mint?: string
     parts.push(`Asked for ${formatTokenAmount(seq.asked, decimals, mint)}.`);
   }
   if (seq.refused) {
-    const why = seq.reason != null ? ` (${reasonText(seq.reason)})` : '';
+    const why = seq.reason != null ? ` (${ownerReasonText(seq.reason)})` : '';
     parts.push(`Refused${why}.`);
   }
   if (seq.waived) {
@@ -312,7 +318,7 @@ export function sequenceLine(seq: NonceSequence, decimals: number, mint?: string
   if (seq.paid) {
     parts.push('Then paid.');
   } else if (seq.waived) {
-    parts.push('The agent can retry this nonce.');
+    parts.push('The agent can retry this request.');
   }
   return parts.join(' ');
 }

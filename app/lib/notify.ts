@@ -3,6 +3,7 @@ import { encodeDecisionId, parseDecisionId } from './exportRecord';
 import { formatTokenAmount } from './tokens';
 import { refusalWhyLine } from './reasons';
 import { tradeDecisionDetail } from './tradeCopy';
+import { paidAboveLimit } from './override';
 import { truncateAddress } from './wallet';
 
 /**
@@ -13,6 +14,7 @@ import { truncateAddress } from './wallet';
 export const DECISION_NOTIFY_INTERVAL_MINUTES = 15;
 
 export const PAID_NOTICE_TITLE = 'Paid within rule';
+export const PAID_ALLOWED_ONCE_NOTICE_TITLE = 'Paid, allowed once by you';
 export const REFUSED_NOTICE_TITLE = 'Refused';
 
 export type NotifyLedgerRow = {
@@ -59,7 +61,10 @@ export function paidDecisionBody(args: {
   const amount = formatTokenAmount(args.amount, args.decimals, args.mint);
   const limit = formatTokenAmount(args.perTxMax, args.decimals, args.mint);
   const payee = truncateAddress(args.merchant);
-  return `${amount}, under ${limit} per payment. The payee for this rule is ${payee}.`;
+  const within = paidAboveLimit(args.amount, args.perTxMax)
+    ? `allowed once by you above your ${limit} per-payment limit`
+    : `under ${limit} per payment`;
+  return `${amount}, ${within}. The payee for this rule is ${payee}.`;
 }
 
 export function seenStorageKey(mandate: string): string {
@@ -106,7 +111,11 @@ function noticeFor(ledger: NotifyMandateLedger, row: NotifyLedgerRow, id: string
   return {
     id,
     path: `/decision/${encodeURIComponent(id)}`,
-    title: refused ? REFUSED_NOTICE_TITLE : PAID_NOTICE_TITLE,
+    title: refused
+      ? REFUSED_NOTICE_TITLE
+      : paidAboveLimit(row.amount, ledger.perTxMax)
+        ? PAID_ALLOWED_ONCE_NOTICE_TITLE
+        : PAID_NOTICE_TITLE,
     body,
   };
 }

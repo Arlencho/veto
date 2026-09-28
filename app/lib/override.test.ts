@@ -21,7 +21,7 @@ import {
   STATUS_EXHAUSTED,
   STATUS_EXPIRED,
   STATUS_REVOKED,
-  reasonText,
+  ownerReasonText,
 } from './constants';
 import { decodeInstructionKind } from './events';
 import { encodeGrantOverrideData } from './instructions';
@@ -110,7 +110,7 @@ test('only a per-payment refusal with a suggested override offers a grant', () =
         } else {
           assert.equal(
             withSuggestion.why,
-            `The program records no override for this reason (${reasonText(reason)}).`,
+            `The program records no override for this reason (${ownerReasonText(reason)}).`,
           );
         }
       }
@@ -154,7 +154,7 @@ test('a settled nonce does not offer an override', () => {
   const atLast = overrideGuard(mandate({ lastNonce: 7n }), 7n, 180n);
   assert.equal(atLast.ok, false);
   if (!atLast.ok) {
-    assert.equal(atLast.why, 'This nonce is already settled on chain. An override cannot be granted.');
+    assert.equal(atLast.why, 'This request is already settled on chain. An override cannot be granted.');
   }
   const beforeLast = overrideGuard(mandate({ lastNonce: 8n }), 7n, 180n);
   assert.equal(beforeLast.ok, false);
@@ -202,7 +202,8 @@ test('an override row reads as a recorded waiver, not a settings change', () => 
   assert.equal(view.amount, '180');
   assert.ok(view.why.includes('recorded decision'));
   assert.ok(view.why.includes('not a settings change'));
-  assert.ok(view.why.includes('nonce 7'));
+  assert.ok(view.why.startsWith('You allowed this one payment of 180.'));
+  assert.doesNotMatch(view.why, /nonce/i);
   assert.equal(view.why.includes('setting'), true);
   assert.equal(/settings change/.test(view.why), true);
 });
@@ -252,7 +253,7 @@ test('a waived nonce that has not paid yet tells the owner the agent can retry',
   );
   assert.equal(
     sequenceLine(seq, 0),
-    'Asked for 180. Refused (over per-payment maximum). Waived by the owner. The agent can retry this nonce.',
+    'Asked for 180. Refused (over per-payment maximum). Waived by the owner. The agent can retry this request.',
   );
 });
 
@@ -314,7 +315,7 @@ test('the commit copy names the amount, the nonce, and that the cap cannot rise'
     pendingOtherNonce: 9n,
   });
   const text = copy.paragraphs.join(' ');
-  assert.ok(text.includes('override of 180 for nonce 7'));
+  assert.ok(text.includes('override of 180 for this request'));
   assert.ok(text.includes('per-payment maximum on this rule is 60'));
   assert.ok(text.includes('allows this one payment of 180, used once, never above the remaining cap'));
   assert.equal(text.includes('raises it to'), false);
@@ -322,8 +323,9 @@ test('the commit copy names the amount, the nonce, and that the cap cannot rise'
   assert.ok(text.includes(CAP_OVERRIDE_REFUSAL));
   assert.ok(text.includes('recorded decision'));
   assert.ok(text.includes('not a settings change'));
-  assert.ok(text.includes('replaces the pending override for nonce 9'));
-  assert.ok(text.includes('agent can then retry this nonce'));
+  assert.ok(text.includes('replaces the pending override for request 9'));
+  assert.ok(text.includes('agent can then retry this request'));
+  assert.doesNotMatch(text, /nonce/i);
 });
 
 test('grant_override instruction data is amount then nonce after the discriminator', () => {

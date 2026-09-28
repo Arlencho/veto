@@ -33,7 +33,7 @@ export default function HelpRefusalScreen() {
       <Text style={styles.body}>
         The agent key holds authority and none of your money. It can pay inside the rule, and nothing else.
         It cannot widen any limit. Each rule has its own agent. An override the owner grants is a
-        recorded decision for one nonce, not a settings change. It allows one payment, used once, never above the remaining cap.
+        recorded decision for one request, not a settings change. It allows one payment, used once, never above the remaining cap.
         The per-payment maximum does not change. The total cap does not.
       </Text>
       <TopicRow

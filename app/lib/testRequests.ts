@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { payeeLookup, readPayeeTokenAccount } from './agentConnect';
-import { CHARGE_IX_DISC, KIND_PAID, KIND_REFUSED, STATUS_EXHAUSTED, writeU64Le, reasonText } from './constants';
+import { CHARGE_IX_DISC, KIND_PAID, KIND_REFUSED, STATUS_EXHAUSTED, writeU64Le, ownerReasonText } from './constants';
 import { decodeEventsFromLogs } from './events';
 import { decodeMandateAccount, isActive, type MandateAccount } from './mandate';
 import { ledgerPda } from './ring';
@@ -22,13 +22,13 @@ export function testRequestAmounts(rule: Pick<MandateAccount, 'cap' | 'spent' | 
 }
 function nextTestNonce(last: bigint, override: bigint): bigint {
   const start = last > override ? last : override;
-  if (start >= U64_MAX) throw new Error('This rule has no room for another request nonce.');
+  if (start >= U64_MAX) throw new Error('This rule has no room for another request.');
   return start + 1n;
 }
 export function testRequestNonces(last: bigint, override: bigint): [bigint, bigint] {
   // Pending approvals are rejected by liveRule before allocating nonces.
   const start = last > override ? last : override;
-  if (start > U64_MAX - 2n) throw new Error('This rule has no room for two more request nonces.');
+  if (start > U64_MAX - 2n) throw new Error('This rule has no room for two more requests.');
   return [start + 1n, start + 2n];
 }
 export const needsTestFeeTopUp = (lamports: number): boolean => lamports < 5_000_000;
@@ -178,7 +178,7 @@ export async function runTestRequests(options: TestRequestOptions, plan: TestReq
         return;
       }
       const decision = decisions[0];
-      report({ text: decision.kind === KIND_PAID ? `Paid ${shown} to the payee.` : `Refused ${shown}: ${reasonText(decision.reason)}.`, signature });
+      report({ text: decision.kind === KIND_PAID ? `Paid ${shown} to the payee.` : `Refused ${shown}: ${ownerReasonText(decision.reason)}.`, signature });
       previous = nonce;
     }
   } catch (error) {

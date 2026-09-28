@@ -26,7 +26,8 @@ cd ..
 `npm pack --dry-run` does not run `prepublishOnly`, so run the checks explicitly.
 Each build deletes its old `dist` output first and disables source maps.
 The SDK builds to `dist/src` and copies its runtime IDL into `dist/idl`.
-The `files` whitelist permits only `dist` and `README.md`; npm also includes
+The `files` whitelist permits only `dist`, `README.md` and `LICENSE` (the full
+Apache License 2.0 text, a copy of the repository `LICENSE`); npm also includes
 `package.json` automatically. Changelogs remain in the repository.
 Reject a file list containing keys, `.env` files, tests, fixtures, source maps,
 or anything outside those allowed paths. Inspect the listed files for secrets

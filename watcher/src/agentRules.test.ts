@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import anchorPkg from "@coral-xyz/anchor";
 import { Keypair, PublicKey, type Connection, type Transaction } from "@solana/web3.js";
@@ -9,30 +11,36 @@ import {
   decodeAgentRule,
   DEFAULT_AGENT_RULES_MAX,
   discoverAgentRules,
+  MANDATE_ACCOUNT,
   MANDATE_AGENT_OFFSET,
   parseAgentRulesMax,
   quoteSlotAmount,
   selectAgentRules,
   type AgentRule,
   type AgentRulesDeps,
-  type MandateCoder,
   type ProgramAccountsReader,
 } from "./agentRules.js";
 import type { ChargeReceipt } from "./chain.js";
-import { ledgerPda, loadIdl, RULE_CHARGE_TIMEOUT_MS, submitRuleCharge, TOKEN_PROGRAM_ID } from "./chain.js";
-import type { Veto } from "./idl.js";
+import { ledgerPda, programFromIdl, RULE_CHARGE_TIMEOUT_MS, submitRuleCharge, TOKEN_PROGRAM_ID } from "./chain.js";
 import { WATCHER_DIR } from "./config.js";
 import type { PriceFeed } from "./feed.js";
 import { nonceFromSlot } from "./nonce.js";
 import { RateLimitedError } from "./rpc.js";
 
-const { AnchorProvider, BN, BorshAccountsCoder, Program, Wallet } = anchorPkg;
-
-const coder = new BorshAccountsCoder(loadIdl(join(WATCHER_DIR, "idl", "veto.json")) as never) as unknown as MandateCoder & {
-  encode(name: string, value: unknown): Promise<Buffer>;
-};
+const { BN } = anchorPkg;
 
 const PROGRAM = new PublicKey("3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV");
+const IDL_PATH = join(WATCHER_DIR, "idl", "veto.json");
+
+// The same construction index.ts runs through connect(): programFromIdl, then
+// program.coder.accounts. A coder built any other way could disagree on the
+// account name or field casing and pass here while production fails.
+const coder = programFromIdl(
+  {} as Connection,
+  Keypair.generate(),
+  IDL_PATH,
+  PROGRAM.toBase58(),
+).coder.accounts;
 const AGENT = new PublicKey("6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w");
 const MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 const MERCHANT = new PublicKey("6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG");
@@ -66,24 +74,24 @@ function rule(over: Partial<AgentRule> = {}): AgentRule {
 }
 
 async function encodeRule(r: AgentRule): Promise<Buffer> {
-  return coder.encode("Mandate", {
+  return coder.encode(MANDATE_ACCOUNT, {
     owner: r.owner,
     agent: r.agent,
     mint: r.mint,
     source: r.source,
     merchant: r.merchant,
-    mandate_id: new BN(r.mandateId.toString()),
+    mandateId: new BN(r.mandateId.toString()),
     cap: new BN(r.cap.toString()),
     spent: new BN(r.spent.toString()),
-    per_tx_max: new BN(r.perTxMax.toString()),
-    expires_at: new BN(r.expiresAt.toString()),
-    override_amount: new BN(0),
-    override_nonce: new BN(0),
-    last_nonce: new BN(r.lastNonce.toString()),
+    perTxMax: new BN(r.perTxMax.toString()),
+    expiresAt: new BN(r.expiresAt.toString()),
+    overrideAmount: new BN(0),
+    overrideNonce: new BN(0),
+    lastNonce: new BN(r.lastNonce.toString()),
     purpose: "tester rule",
     status: r.status,
-    spend_count: 0,
-    refusal_count: 0,
+    spendCount: 0,
+    refusalCount: 0,
     bump: 255,
   });
 }
@@ -167,7 +175,7 @@ test("discovery asks the chain for Mandate accounts that name the agent, and dro
   const logs: string[] = [];
   const found = await discoverAgentRules({ connection, programId: PROGRAM, agent: AGENT, coder, log: (l) => logs.push(l) });
   assert.deepEqual(seenFilters, [
-    { memcmp: { offset: 0, bytes: coder.memcmp("Mandate").bytes } },
+    { memcmp: { offset: 0, bytes: coder.memcmp(MANDATE_ACCOUNT).bytes } },
     { memcmp: { offset: 40, bytes: AGENT.toBase58() } },
   ]);
   assert.equal(found.length, 1);
@@ -375,9 +383,7 @@ function fakeProgram(
 ) {
   const connection = { sendTransaction, ...extra } as unknown as Connection;
   const payer = Keypair.generate();
-  const provider = new AnchorProvider(connection, new Wallet(payer), { commitment: "confirmed" });
-  const idl = loadIdl(join(WATCHER_DIR, "idl", "veto.json"));
-  const program = new Program<Veto>({ ...idl, address: PROGRAM.toBase58() } as never, provider);
+  const program = programFromIdl(connection, payer, IDL_PATH, PROGRAM.toBase58());
   return { connection, program, payer };
 }
 
@@ -491,4 +497,41 @@ test("a slot with a price gap a retry cannot change is settled; feed and fx outa
   for (const reason of ["feed unavailable", "fx unavailable", "fx rate stale (2026-09-10)", "unreadable price"]) {
     assert.equal(agentRulesSlotSettled({ quoted: false, quoteReason: reason }), false, reason);
   }
+});
+
+test("the running Program's coder names the account mandate and decodes camelCase fields", () => {
+  assert.equal(MANDATE_ACCOUNT, "mandate");
+  assert.throws(() => coder.memcmp("Mandate"), /Account not found: Mandate/);
+  assert.equal(coder.memcmp(MANDATE_ACCOUNT).bytes, "L3ScUhMvnTK");
+});
+
+test("a recorded devnet mandate decodes through the running coder and is found by discovery", async () => {
+  // Devnet mandate id 3, the same account bytes as sdk/fixtures/mandate-3.bin.
+  const raw = readFileSync(fileURLToPath(new URL("./fixtures/mandate-3.bin", import.meta.url)));
+  const address = key();
+  const decoded = decodeAgentRule(coder, address, raw);
+  assert.equal(decoded.owner.toBase58(), "EGQdANFMq6xVjKcSrij4gWiH91q8TvhdY5e87KjjF2yc");
+  assert.ok(decoded.agent.equals(AGENT));
+  assert.equal(decoded.mint.toBase58(), "2dV6DLAUF63ugfD1sgNF8fUmQKr9pMDzeLxJGSwkMcCU");
+  assert.equal(decoded.source.toBase58(), "FbhygYPyFk5PeiFppCezmMkqPqywTdAZxhkqxw79FBBE");
+  assert.ok(decoded.merchant.equals(MERCHANT));
+  assert.equal(decoded.mandateId, 3n);
+  assert.equal(decoded.cap, 300_000_000n);
+  assert.equal(decoded.spent, 0n);
+  assert.equal(decoded.perTxMax, 10_000_000n);
+  assert.equal(decoded.expiresAt, 1_797_805_739n);
+  assert.equal(decoded.lastNonce, 0n);
+  assert.equal(decoded.status, 0);
+  assert.ok(raw.subarray(MANDATE_AGENT_OFFSET, MANDATE_AGENT_OFFSET + 32).equals(AGENT.toBuffer()));
+
+  const connection: ProgramAccountsReader = {
+    getProgramAccounts: (async () => [{ pubkey: address, account: { data: raw } }]) as unknown as ProgramAccountsReader["getProgramAccounts"],
+  };
+  const logs: string[] = [];
+  const found = await discoverAgentRules({ connection, programId: PROGRAM, agent: AGENT, coder, log: (l) => logs.push(l) });
+  assert.equal(found.length, 1, logs.join("\n"));
+  assert.equal(found[0]!.mandateId, 3n);
+  // Old test mint, so selection skips it for the USDC watcher; it is still decoded, not dropped.
+  const { skipped } = selectAgentRules(found, selectOpts());
+  assert.equal(skipped[0]?.reason, "another mint");
 });

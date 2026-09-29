@@ -369,8 +369,11 @@ test("the discovered-rule amount is the configured rule's spot amount for the sa
 
 // submitRuleCharge against the real IDL program with a fake connection, so the
 // instruction keys are the ones the program would see.
-function fakeProgram(sendTransaction: (tx: Transaction) => Promise<string>) {
-  const connection = { sendTransaction } as unknown as Connection;
+function fakeProgram(
+  sendTransaction: (tx: Transaction) => Promise<string>,
+  extra: Record<string, unknown> = {},
+) {
+  const connection = { sendTransaction, ...extra } as unknown as Connection;
   const payer = Keypair.generate();
   const provider = new AnchorProvider(connection, new Wallet(payer), { commitment: "confirmed" });
   const idl = loadIdl(join(WATCHER_DIR, "idl", "veto.json"));
@@ -420,8 +423,24 @@ test("submitRuleCharge charges the rule's own source into the configured merchan
   assert.equal(ix.data.readBigUInt64LE(16), NONCE);
 });
 
-test("a submit that never resolves times out as failed and the next rule is still charged", async () => {
-  const { connection, program, payer } = fakeProgram(() => new Promise<string>(() => {}));
+function pendingTimeouts(): number {
+  return process.getActiveResourcesInfo().filter((r) => r === "Timeout").length;
+}
+
+test("a charge that never confirms times out as failed, stops its confirm wait, and the next rule is still charged", async () => {
+  let statusCalls = 0;
+  const removed: number[] = [];
+  const { connection, program, payer } = fakeProgram(async () => "stuck-sig", {
+    onSignature: () => 7,
+    removeSignatureListener: async (id: number) => {
+      removed.push(id);
+    },
+    getSignatureStatus: async () => {
+      statusCalls += 1;
+      return { value: null };
+    },
+  });
+  const timersBefore = pendingTimeouts();
   const rules = [rule(), rule()].sort((a, b) => (a.address.toBase58() < b.address.toBase58() ? -1 : 1));
   const charged: string[] = [];
   const deps: AgentRulesDeps = {
@@ -453,6 +472,15 @@ test("a submit that never resolves times out as failed and the next rule is stil
   assert.equal(summary.paid, 1);
   assert.ok(errs.some((l) => l.includes(rules[0]!.address.toBase58()) && l.includes("not confirmed within 50ms")));
   assert.equal(RULE_CHARGE_TIMEOUT_MS, 90_000);
+
+  // The losing confirm wait is torn down: the listener is removed once, and
+  // polling stops after at most the poll sleep that was already running.
+  assert.deepEqual(removed, [7]);
+  const callsAtReject = statusCalls;
+  assert.ok(callsAtReject >= 1);
+  await new Promise((r) => setTimeout(r, 1_300));
+  assert.equal(statusCalls, callsAtReject, "no status poll after the deadline");
+  assert.equal(pendingTimeouts(), timersBefore, "no timer left pending");
 });
 
 test("a slot with a price gap a retry cannot change is settled; feed and fx outages stay open", () => {

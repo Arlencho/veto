@@ -22,6 +22,8 @@ export async function confirmSignature(
     commitment?: Finality;
     graceMs?: number;
     log?: (line: string) => void;
+    /** Give up after this long: polling stops, the listener is removed, and the call rejects. */
+    timeoutMs?: number;
   } = {},
 ): Promise<void> {
   const commitment = opts.commitment ?? "confirmed";
@@ -59,6 +61,20 @@ export async function confirmSignature(
       commitment,
     );
   });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline: Promise<never>[] = [];
+  if (opts.timeoutMs !== undefined) {
+    const timeoutMs = opts.timeoutMs;
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        stopped = true;
+        reject(new Error(`transaction ${signature} not confirmed within ${timeoutMs}ms; it may still land`));
+      }, timeoutMs);
+    });
+    void expired.catch(() => {});
+    deadline.push(expired);
+  }
 
   const poll = (async () => {
     while (!stopped) {
@@ -98,6 +114,7 @@ export async function confirmSignature(
         leftover = leftover ?? err;
         return "refused" as const;
       }),
+      ...deadline,
     ]);
 
     if (winner === "ws" || winner === "poll") {
@@ -112,6 +129,7 @@ export async function confirmSignature(
     try {
       await Promise.race([
         ws,
+        ...deadline,
         sleep(graceMs).then(() => {
           throw leftover instanceof Error ? leftover : new Error(String(leftover ?? "confirm status poll failed"));
         }),
@@ -126,6 +144,7 @@ export async function confirmSignature(
     }
   } finally {
     stopped = true;
+    clearTimeout(timer);
     if (subId !== undefined) {
       await connection.removeSignatureListener(subId);
     }
@@ -136,13 +155,17 @@ export async function sendAndConfirm(
   connection: Connection,
   tx: Transaction,
   signers: Keypair[],
-  opts?: { commitment?: Finality; log?: (line: string) => void },
+  opts?: { commitment?: Finality; log?: (line: string) => void; timeoutMs?: number },
 ): Promise<TransactionSignature> {
   const commitment = opts?.commitment ?? "confirmed";
   const signature = await connection.sendTransaction(tx, signers, {
     skipPreflight: false,
     preflightCommitment: commitment,
   });
-  await confirmSignature(connection, signature, { commitment, log: opts?.log });
+  await confirmSignature(connection, signature, {
+    commitment,
+    log: opts?.log,
+    timeoutMs: opts?.timeoutMs,
+  });
   return signature;
 }

@@ -154,7 +154,7 @@ export async function submitRuleCharge(args: {
   mint: PublicKey;
   amount: bigint;
   nonce: bigint;
-  /** Send and confirm give up after this long, so one stuck rule cannot hold the pass. */
+  /** The confirm wait gives up after this long, so one stuck rule cannot hold the pass. */
   timeoutMs?: number;
 }): Promise<ChargeReceipt> {
   const ix = await args.program.methods
@@ -170,23 +170,12 @@ export async function submitRuleCharge(args: {
     })
     .instruction();
   const tx = new Transaction().add(ix);
-  const timeoutMs = args.timeoutMs ?? RULE_CHARGE_TIMEOUT_MS;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`charge not confirmed within ${timeoutMs}ms; it may still land`)),
-      timeoutMs,
-    );
+  // The confirm wait stops its own polling and listener at the deadline, so a
+  // stuck charge cannot keep a `once` process alive.
+  const signature = await sendAndConfirm(args.connection, tx, [args.agent], {
+    commitment: "confirmed",
+    timeoutMs: args.timeoutMs ?? RULE_CHARGE_TIMEOUT_MS,
   });
-  let signature: string;
-  try {
-    signature = await Promise.race([
-      sendAndConfirm(args.connection, tx, [args.agent], { commitment: "confirmed" }),
-      timeout,
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
   const parsed = await args.connection.getTransaction(signature, {
     commitment: "confirmed",
     maxSupportedTransactionVersion: 0,

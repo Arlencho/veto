@@ -83,7 +83,7 @@ Start with the [tester guide](TESTERS.md) or the Try page at
 ## Report a problem
 
 Use the [tester issue form](https://github.com/Arlencho/veto/issues/new?template=tester-feedback.yml).
-Include your device model, which tasks you completed, where you got stuck and
-what you expected to happen. Add the APK version and any visible error text
-when available. Leave blocked tasks unchecked and describe the blocker.
-Issues are public. Never include a recovery phrase or private key.
+It asks which phone and wallet you used, how far you got, where you got stuck
+and whether you would use Veto with a real agent. Add the APK version and any
+visible error text when available. Issues are public. Never include a recovery
+phrase or private key.

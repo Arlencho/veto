@@ -7,6 +7,7 @@ import anchorPkg from "@coral-xyz/anchor";
 import { Keypair, PublicKey, type Connection, type Transaction } from "@solana/web3.js";
 import {
   agentRulesSlotSettled,
+  allowOnceRetry,
   chargeAgentRules,
   decodeAgentRule,
   DEFAULT_AGENT_RULES_MAX,
@@ -15,13 +16,21 @@ import {
   MANDATE_AGENT_OFFSET,
   parseAgentRulesMax,
   quoteSlotAmount,
+  retryConfiguredAllowOnce,
   selectAgentRules,
   type AgentRule,
   type AgentRulesDeps,
   type ProgramAccountsReader,
 } from "./agentRules.js";
 import type { ChargeReceipt } from "./chain.js";
-import { ledgerPda, programFromIdl, RULE_CHARGE_TIMEOUT_MS, submitRuleCharge, TOKEN_PROGRAM_ID } from "./chain.js";
+import {
+  findAllowOnceInLedgerBytes,
+  ledgerPda,
+  programFromIdl,
+  RULE_CHARGE_TIMEOUT_MS,
+  submitRuleCharge,
+  TOKEN_PROGRAM_ID,
+} from "./chain.js";
 import { WATCHER_DIR } from "./config.js";
 import type { PriceFeed } from "./feed.js";
 import { nonceFromSlot } from "./nonce.js";
@@ -68,6 +77,8 @@ function rule(over: Partial<AgentRule> = {}): AgentRule {
     perTxMax: 500_000n,
     expiresAt: NOW_UNIX + 86_400n,
     lastNonce: 0n,
+    overrideAmount: 0n,
+    overrideNonce: 0n,
     status: 0,
     ...over,
   };
@@ -85,8 +96,8 @@ async function encodeRule(r: AgentRule): Promise<Buffer> {
     spent: new BN(r.spent.toString()),
     perTxMax: new BN(r.perTxMax.toString()),
     expiresAt: new BN(r.expiresAt.toString()),
-    overrideAmount: new BN(0),
-    overrideNonce: new BN(0),
+    overrideAmount: new BN(r.overrideAmount.toString()),
+    overrideNonce: new BN(r.overrideNonce.toString()),
     lastNonce: new BN(r.lastNonce.toString()),
     purpose: "tester rule",
     status: r.status,
@@ -534,4 +545,421 @@ test("a recorded devnet mandate decodes through the running coder and is found b
   // Old test mint, so selection skips it for the USDC watcher; it is still decoded, not dropped.
   const { skipped } = selectAgentRules(found, selectOpts());
   assert.equal(skipped[0]?.reason, "another mint");
+});
+
+// ---- Allow one: the agent retries the request the owner allowed ----
+
+type Row = { kind: 1 | 2 | 3; nonce: bigint; amount: bigint; reason?: number };
+
+/** A ledger ring written the way Ledger::record writes it (state.rs), oldest row first. */
+function ledgerRows(rows: readonly Row[]): Uint8Array {
+  const buf = Buffer.alloc(8 + 40 + 32 * 72);
+  LEDGER_DISCRIMINATOR.copy(buf, 0);
+  let head = 0;
+  for (const row of rows) {
+    const entry = 8 + 40 + head * 72;
+    buf.fill(0, entry, entry + 72);
+    buf.writeBigUInt64LE(row.amount, entry + 8);
+    buf.writeBigUInt64LE(row.nonce, entry + 48);
+    buf.writeUInt8(row.kind, entry + 64);
+    buf.writeUInt8(row.reason ?? 0, entry + 65);
+    head = (head + 1) % 32;
+  }
+  buf.writeUInt32LE(rows.length, 8 + 32);
+  buf.writeUInt16LE(head, 8 + 36);
+  return buf;
+}
+
+const PREV = NONCE - 21_600n;
+const OVER_MAX = 5;
+
+/** A tester rule whose PREV request was refused over the per-payment maximum and then allowed once. */
+function allowedRule(over: Partial<AgentRule> = {}): { rule: AgentRule; rows: Row[] } {
+  const r = rule({ perTxMax: 1_000_000n, overrideAmount: 1_200_000n, overrideNonce: PREV, ...over });
+  const rows: Row[] = [
+    { kind: 2, nonce: PREV, amount: 1_200_000n, reason: OVER_MAX },
+    { kind: 3, nonce: PREV, amount: 1_200_000n },
+  ];
+  return { rule: r, rows };
+}
+
+/** The charge decision of lib.rs evaluate() and the paid branch of charge(),
+ * enough of it to prove the order of a retry and a slot charge. */
+function simulateChain(rules: AgentRule[], rows: Map<string, Row[]>) {
+  const sent: { id: string; amount: bigint; nonce: bigint; decision: string }[] = [];
+  const submit: AgentRulesDeps["submit"] = async (r, amount, nonce) => {
+    const live = rules.find((s) => s.address.equals(r.address))!;
+    const id = live.address.toBase58();
+    const ring = rows.get(id) ?? [];
+    const effective =
+      live.overrideNonce !== 0n && live.overrideNonce === nonce && live.overrideAmount > live.perTxMax
+        ? live.overrideAmount
+        : live.perTxMax;
+    let reason = 0;
+    if (nonce <= live.lastNonce) reason = 3;
+    else if (amount > effective) reason = OVER_MAX;
+    else if (live.spent + amount > live.cap) reason = 6;
+    if (reason === 0) {
+      live.spent += amount;
+      live.lastNonce = nonce;
+      if (live.overrideNonce === nonce) {
+        live.overrideNonce = 0n;
+        live.overrideAmount = 0n;
+      }
+      ring.push({ kind: 1, nonce, amount });
+    } else {
+      ring.push({ kind: 2, nonce, amount, reason });
+    }
+    rows.set(id, ring);
+    sent.push({ id, amount, nonce, decision: reason === 0 ? "paid" : "refused" });
+    return reason === 0
+      ? paid(`sig-${nonce.toString()}`)
+      : { decision: "refused", reason: `code ${reason}`, reasonCode: reason, suggestedOverride: null, signature: "rsig" };
+  };
+  const deps: AgentRulesDeps = {
+    quote: quoteOk(300_000n),
+    discover: async () => rules.map((r) => ({ ...r })),
+    readLedgers: async (rs) => rs.map((r) => ledgerRows(rows.get(r.address.toBase58()) ?? [])),
+    submit,
+  };
+  return { deps, sent };
+}
+
+test("an allowed request is retried with its own nonce and refused amount, before the slot charge, and both pay", async () => {
+  const { rule: r, rows } = allowedRule();
+  const rules = [r];
+  const ring = new Map([[r.address.toBase58(), rows]]);
+  const { deps, sent } = simulateChain(rules, ring);
+  const lines: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), lines, []));
+  const id = r.address.toBase58();
+  assert.deepEqual(sent, [
+    { id, amount: 1_200_000n, nonce: PREV, decision: "paid" },
+    { id, amount: 300_000n, nonce: NONCE, decision: "paid" },
+  ]);
+  assert.equal(summary.retried, 1);
+  assert.equal(summary.charged, 2);
+  assert.equal(summary.paid, 2);
+  const retryLines = lines.filter((l) => l.includes("allow-one retry"));
+  assert.deepEqual(retryLines, [
+    `agent rule ${id} allow-one retry paid amount=1200000 nonce=${PREV.toString()} sig=sig-${PREV.toString()}`,
+  ]);
+  assert.ok(lines.some((l) => l.includes("retried=1")));
+  // The program cleared the override on the paid retry (lib.rs charge), so it is not pending any more.
+  assert.equal(rules[0]!.overrideNonce, 0n);
+});
+
+test("the slot charge first would strand the allowed request: the program refuses it as stale", async () => {
+  // The reason the pass retries first, shown on the same simulated chain.
+  const { rule: r, rows } = allowedRule();
+  const { deps, sent } = simulateChain([r], new Map([[r.address.toBase58(), rows]]));
+  await deps.submit(r, 300_000n, NONCE);
+  await deps.submit(r, 1_200_000n, PREV);
+  assert.deepEqual(
+    sent.map((s) => s.decision),
+    ["paid", "refused"],
+  );
+});
+
+test("a second pass after the retry paid sends nothing again, in the same slot or the next", async () => {
+  const { rule: r, rows } = allowedRule();
+  const rules = [r];
+  const ring = new Map([[r.address.toBase58(), rows]]);
+  const { deps, sent } = simulateChain(rules, ring);
+  await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.equal(sent.length, 2);
+  const again = await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.equal(sent.length, 2);
+  assert.equal(again.retried, 0);
+  const nextSlot = new Date(SLOT.getTime() + 21_600_000);
+  const next = await chargeAgentRules({
+    ...runArgs(deps, key(), [], []),
+    slot: nextSlot,
+    now: new Date(nextSlot.getTime() + 60_000),
+  });
+  assert.equal(next.retried, 0);
+  assert.deepEqual(
+    sent.slice(2).map((s) => s.nonce),
+    [nonceFromSlot(nextSlot)],
+  );
+});
+
+test("a used or stranded allow is not retried", async () => {
+  const opts = { agent: AGENT, mint: MINT, merchant: MERCHANT, nowUnix: NOW_UNIX, nonce: NONCE };
+  const cases: Partial<AgentRule>[] = [
+    { overrideNonce: 0n, overrideAmount: 0n },
+    { lastNonce: PREV },
+    { lastNonce: PREV + 1n },
+  ];
+  for (const over of cases) {
+    const { rule: r, rows } = allowedRule(over);
+    assert.deepEqual(allowOnceRetry(r, ledgerRows(rows), opts), { skip: "no allow pending" });
+  }
+
+  const { rule: r, rows } = allowedRule({ lastNonce: PREV });
+  const { deps, sent } = simulateChain([r], new Map([[r.address.toBase58(), rows]]));
+  const summary = await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.equal(summary.retried, 0);
+  assert.deepEqual(
+    sent.map((s) => s.nonce),
+    [NONCE],
+    "only the slot charge",
+  );
+});
+
+test("no allow means no retry: the pass is the slot charge alone", async () => {
+  const r = rule();
+  const { deps, sent } = simulateChain([r], new Map());
+  const lines: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), lines, []));
+  assert.deepEqual(
+    sent.map((s) => s.nonce),
+    [NONCE],
+  );
+  assert.equal(summary.retried, 0);
+  assert.ok(!lines.some((l) => l.includes("allow-one")));
+});
+
+test("a refused retry is not sent again for the same allow; a new allow gets a new retry", () => {
+  // The source ran dry: the retry is refused and the override stays set.
+  const { rule: r, rows } = allowedRule();
+  rows.push({ kind: 2, nonce: PREV, amount: 1_200_000n, reason: 8 });
+  const opts = { agent: AGENT, mint: MINT, merchant: MERCHANT, nowUnix: NOW_UNIX, nonce: NONCE };
+  assert.deepEqual(allowOnceRetry(r, ledgerRows(rows), opts), { skip: "already retried since the allow" });
+  rows.push({ kind: 3, nonce: PREV, amount: 1_200_000n });
+  assert.deepEqual(allowOnceRetry(r, ledgerRows(rows), opts), { nonce: PREV, amount: 1_200_000n });
+});
+
+test("the retry is not sent when the program would refuse it again or it would strand a charge", () => {
+  const opts = { agent: AGENT, mint: MINT, merchant: MERCHANT, nowUnix: NOW_UNIX, nonce: NONCE };
+  const plan = (over: Partial<AgentRule>, rows?: Row[]) => {
+    const built = allowedRule(over);
+    return allowOnceRetry(built.rule, ledgerRows(rows ?? built.rows), opts);
+  };
+  assert.deepEqual(plan({ overrideAmount: 1_100_000n }), { skip: "the refused amount is above the allowed amount" });
+  assert.deepEqual(plan({ spent: 19_000_000n }), { skip: "over the remaining cap" });
+  assert.deepEqual(plan({ overrideNonce: NONCE + 21_600n }), { skip: "the allowed request is later than this slot" });
+  assert.deepEqual(plan({ status: 1 }), { skip: "not open" });
+  assert.deepEqual(plan({ expiresAt: NOW_UNIX }), { skip: "expired" });
+  assert.deepEqual(plan({}, []), { skip: "the allow is not in the ledger ring" });
+  assert.deepEqual(plan({}, [{ kind: 3, nonce: PREV, amount: 1_200_000n }]), {
+    skip: "no refused request for that nonce in the ledger ring",
+  });
+  assert.deepEqual(allowOnceRetry(allowedRule().rule, null, opts), { skip: "no ledger" });
+  // An allow for this very slot is retried; the slot charge then sees the ring row and stays out.
+  const same = allowedRule({ overrideNonce: NONCE });
+  const rows: Row[] = [
+    { kind: 2, nonce: NONCE, amount: 1_200_000n, reason: OVER_MAX },
+    { kind: 3, nonce: NONCE, amount: 1_200_000n },
+  ];
+  assert.deepEqual(allowOnceRetry(same.rule, ledgerRows(rows), opts), { nonce: NONCE, amount: 1_200_000n });
+});
+
+test("the ring reader finds the allow after the ring wraps", () => {
+  const filler: Row[] = Array.from({ length: 35 }, (_, i) => ({ kind: 1 as const, nonce: BigInt(i + 1), amount: 1n }));
+  const rows: Row[] = [
+    ...filler,
+    { kind: 2, nonce: PREV, amount: 1_200_000n, reason: OVER_MAX },
+    { kind: 3, nonce: PREV, amount: 1_200_000n },
+  ];
+  assert.deepEqual(findAllowOnceInLedgerBytes(ledgerRows(rows), PREV), {
+    refused: { amount: 1_200_000n, reason: OVER_MAX, suggestedOverride: 0n },
+    retried: false,
+  });
+  assert.equal(findAllowOnceInLedgerBytes(ledgerRows(filler), PREV), null);
+});
+
+test("a failing retry does not block its slot charge or other rules", async () => {
+  const a = allowedRule();
+  const b = allowedRule();
+  const c = rule();
+  const rules = [a.rule, b.rule, c];
+  const ring = new Map([
+    [a.rule.address.toBase58(), a.rows],
+    [b.rule.address.toBase58(), b.rows],
+  ]);
+  const { deps, sent } = simulateChain(rules, ring);
+  const failing = a.rule.address.toBase58();
+  const inner = deps.submit;
+  deps.submit = async (r, amount, nonce) => {
+    if (r.address.toBase58() === failing && nonce === PREV) {
+      throw new Error("boom at https://rpc.example.com/secret-key");
+    }
+    return inner(r, amount, nonce);
+  };
+  const errs: string[] = [];
+  const pauses: number[] = [];
+  const summary = await chargeAgentRules({
+    ...runArgs(deps, key(), [], errs),
+    sleep: async (ms: number) => {
+      pauses.push(ms);
+    },
+  });
+  assert.equal(summary.retried, 2);
+  assert.equal(summary.failed, 1);
+  assert.equal(summary.paid, 4, "the other retry and all three slot charges");
+  assert.deepEqual(
+    sent
+      .filter((s) => s.nonce === NONCE)
+      .map((s) => s.id)
+      .sort(),
+    rules.map((r) => r.address.toBase58()).sort(),
+  );
+  assert.equal(pauses.length, 4, "a pause between every two sends");
+  const failLine = errs.find((l) => l.includes(failing) && l.includes("allow-one retry failed"));
+  assert.ok(failLine !== undefined);
+  assert.ok(!failLine.includes("secret-key"), "the RPC URL path is not logged");
+});
+
+test("a rate-limited retry ends the pass", async () => {
+  const { rule: r, rows } = allowedRule();
+  const { deps } = simulateChain([r, rule()], new Map([[r.address.toBase58(), rows]]));
+  let calls = 0;
+  deps.submit = async () => {
+    calls += 1;
+    throw new RateLimitedError("429");
+  };
+  const summary = await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.equal(summary.rateLimited, true);
+  assert.equal(calls, 1);
+  assert.equal(summary.charged, 1);
+});
+
+test("retries count toward the per-run cap and the configured rule is left to its own path", async () => {
+  const a = allowedRule();
+  const configured = allowedRule();
+  const other = rule();
+  const ring = new Map([
+    [a.rule.address.toBase58(), a.rows],
+    [configured.rule.address.toBase58(), configured.rows],
+  ]);
+  const { deps, sent } = simulateChain([a.rule, configured.rule, other], ring);
+  const lines: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, configured.rule.address, lines, [], 1));
+  assert.deepEqual(
+    sent.map((s) => [s.id, s.nonce]),
+    [[a.rule.address.toBase58(), PREV]],
+  );
+  assert.equal(summary.charged, 1);
+  assert.ok(lines.some((l) => l.includes("over the per-run cap")));
+});
+
+test("without a price the allowed request waits for the priced pass and nothing is read", async () => {
+  const { rule: r, rows } = allowedRule();
+  const { deps, sent } = simulateChain([r], new Map([[r.address.toBase58(), rows]]));
+  const quote = deps.quote;
+  let discovered = 0;
+  const discover = deps.discover;
+  deps.discover = async () => {
+    discovered += 1;
+    return discover();
+  };
+  deps.quote = async () => ({ ok: false, reason: "feed unavailable" });
+  const outage = await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.equal(outage.retried, 0);
+  assert.equal(discovered, 0);
+  deps.quote = quote;
+  const priced = await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.equal(priced.retried, 1);
+  assert.deepEqual(
+    sent.map((s) => s.nonce),
+    [PREV, NONCE],
+  );
+});
+
+test("the configured rule's retry reads its mandate and ledger and charges its own source with the allowed nonce and amount", async () => {
+  let sent: Transaction | null = null;
+  const { connection, program, payer } = fakeProgram(async (tx) => {
+    sent = tx;
+    throw new Error("stop after capture");
+  });
+  const { rule: r, rows } = allowedRule({ agent: payer.publicKey });
+  const ledger = ledgerPda(PROGRAM, r.address);
+  const destination = key();
+  const reads: string[][] = [];
+  const errs: string[] = [];
+  const outcome = await retryConfiguredAllowOnce({
+    mandate: r.address,
+    ledger,
+    coder,
+    readAccounts: async (addresses) => {
+      reads.push(addresses.map((a) => a.toBase58()));
+      return [await encodeRule(r), ledgerRows(rows)];
+    },
+    opts: { agent: payer.publicKey, mint: MINT, merchant: MERCHANT, nowUnix: NOW_UNIX, nonce: NONCE },
+    submit: (rl, amount, nonce) =>
+      submitRuleCharge({
+        connection,
+        program,
+        programId: PROGRAM,
+        agent: payer,
+        mandate: rl.address,
+        source: rl.source,
+        destination,
+        mint: MINT,
+        amount,
+        nonce,
+      }),
+    log: () => {},
+    logError: (l) => errs.push(l),
+  });
+  assert.equal(outcome, "failed");
+  assert.deepEqual(reads, [[r.address.toBase58(), ledger.toBase58()]]);
+  const ix = (sent as Transaction | null)?.instructions[0];
+  assert.ok(ix !== undefined);
+  assert.deepEqual(
+    ix.keys.map((k) => k.pubkey.toBase58()),
+    [
+      payer.publicKey.toBase58(),
+      r.address.toBase58(),
+      ledger.toBase58(),
+      r.source.toBase58(),
+      destination.toBase58(),
+      MINT.toBase58(),
+      TOKEN_PROGRAM_ID.toBase58(),
+    ],
+  );
+  assert.equal(ix.data.readBigUInt64LE(8), 1_200_000n);
+  assert.equal(ix.data.readBigUInt64LE(16), PREV);
+  assert.ok(errs.some((l) => l.includes("allow-one retry failed") && l.includes("stop after capture")));
+});
+
+test("the configured rule's check is silent with no allow, and a read failure does not throw", async () => {
+  const r = rule();
+  const lines: string[] = [];
+  const errs: string[] = [];
+  let submitted = false;
+  const base = {
+    mandate: r.address,
+    ledger: ledgerPda(PROGRAM, r.address),
+    coder,
+    opts: { agent: AGENT, mint: MINT, merchant: MERCHANT, nowUnix: NOW_UNIX, nonce: NONCE },
+    submit: async () => {
+      submitted = true;
+      return paid();
+    },
+    log: (l: string) => lines.push(l),
+    logError: (l: string) => errs.push(l),
+  };
+  assert.equal(await retryConfiguredAllowOnce({ ...base, readAccounts: async () => [await encodeRule(r), null] }), "none");
+  assert.equal(
+    await retryConfiguredAllowOnce({
+      ...base,
+      readAccounts: async () => {
+        throw new Error("down at https://rpc.example.com/secret-key");
+      },
+    }),
+    "none",
+  );
+  assert.equal(submitted, false);
+  assert.deepEqual(lines, []);
+  assert.equal(errs.length, 1);
+  assert.ok(!errs[0]!.includes("secret-key"));
+});
+
+test("a mandate's override fields decode through the running coder", async () => {
+  const { rule: r } = allowedRule();
+  const decoded = decodeAgentRule(coder, r.address, await encodeRule(r));
+  assert.equal(decoded.overrideNonce, PREV);
+  assert.equal(decoded.overrideAmount, 1_200_000n);
 });

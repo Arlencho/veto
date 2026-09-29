@@ -98,6 +98,7 @@ const LEDGER_HEADER_SIZE = 40;
 const ENTRY_SIZE = 72;
 const KIND_PAID = 1;
 const KIND_REFUSED = 2;
+const KIND_OVERRIDE = 3;
 const MANDATE_LAST_NONCE_OFFSET = 224;
 const RECOVERED_SIGNATURE = "recovered-from-chain";
 
@@ -325,6 +326,57 @@ export function findRefusedInLedgerBytes(data: Uint8Array, nonce: bigint): RingR
     };
   }
   return found;
+}
+
+export type RingAllowOnce = {
+  /** The refusal the owner allowed: the last refused row for the nonce before the allow. */
+  refused: RingRefused | null;
+  /** True when a refusal for the nonce was written after the allow, so the agent already retried it. */
+  retried: boolean;
+};
+
+/** What the ring says about an "Allow one" (grant_override) for this nonce.
+ *
+ * Null when the ring holds no override row for the nonce. Rows are read
+ * oldest first, and the last override row counts, so a second allow of the
+ * same request gets its own retry.
+ */
+export function findAllowOnceInLedgerBytes(data: Uint8Array, nonce: bigint): RingAllowOnce | null {
+  const minSize = 8 + LEDGER_HEADER_SIZE + ENTRY_SIZE;
+  if (data.length < minSize) return null;
+  if (!LEDGER_DISCRIMINATOR.equals(Buffer.from(data.subarray(0, 8)))) return null;
+  const body = data.subarray(8);
+  const total = Buffer.from(body.subarray(32, 36)).readUInt32LE(0);
+  const head = Buffer.from(body.subarray(36, 38)).readUInt16LE(0);
+  const occupied = Math.min(total, LEDGER_CAPACITY);
+  const start = total >= LEDGER_CAPACITY ? head % LEDGER_CAPACITY : 0;
+  let allowed = false;
+  let refusedBefore: RingRefused | null = null;
+  let lastRefused: RingRefused | null = null;
+  let retried = false;
+  for (let i = 0; i < occupied; i += 1) {
+    const idx = (start + i) % LEDGER_CAPACITY;
+    const off = LEDGER_HEADER_SIZE + idx * ENTRY_SIZE;
+    const raw = body.subarray(off, off + ENTRY_SIZE);
+    if (raw.length < ENTRY_SIZE) continue;
+    const entryNonce = Buffer.from(raw.subarray(48, 56)).readBigUInt64LE(0);
+    if (entryNonce !== nonce) continue;
+    const kind = raw[64] ?? 0;
+    if (kind === KIND_OVERRIDE) {
+      allowed = true;
+      refusedBefore = lastRefused;
+      retried = false;
+    } else if (kind === KIND_REFUSED) {
+      lastRefused = {
+        amount: Buffer.from(raw.subarray(8, 16)).readBigUInt64LE(0),
+        reason: raw[65] ?? 0,
+        suggestedOverride: Buffer.from(raw.subarray(56, 64)).readBigUInt64LE(0),
+      };
+      if (allowed) retried = true;
+    }
+  }
+  if (!allowed) return null;
+  return { refused: refusedBefore, retried };
 }
 
 /** Ring row for this nonce. A payment wins over a refusal of the same nonce. One account read, no history walk. */

@@ -80,15 +80,16 @@ moves no money.
 
 ### Get ongoing charges from our demo agent
 
-1. In the Veto app, choose owner-direct connect and paste the agent address
-   `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` (the Agent row in
-   [docs/DEVNET.md](../docs/DEVNET.md)).
+1. In the Veto app, open Rules, tap Write a rule, keep Payment rule selected
+   and paste the agent address `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w`
+   in the Agent field (the Agent row in [docs/DEVNET.md](../docs/DEVNET.md)).
 2. Set the payee to the demo payee `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`.
    A rule with any other payee is skipped.
-3. Use devnet USDC and small limits, for example 0.50 per payment and 5 in
-   total, and approve the rule.
+3. Use devnet USDC with 1 USDC per payment and 10 USDC in total, and approve
+   the rule.
 4. Expect one request every six hours, at 00:00, 06:00, 12:00 and 18:00
-   Stockholm time. Some are paid and some are refused.
+   Stockholm time. With these limits, cheaper hours are paid and pricier hours
+   are refused, so you see both.
 
 ## Hold alerts
 

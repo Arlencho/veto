@@ -251,6 +251,16 @@ export async function quoteSlotAmount(args: {
   return { ok: true, amount, window };
 }
 
+/** Quote gaps that a later read in the same slot cannot change. */
+const SETTLED_QUOTE_REASONS = new Set(["negative price", "zero amount", "window start does not match slot"]);
+
+/** True when this slot's pass is over for this process: it was quoted, or the
+ * price gap is one a retry would only repeat. Feed and FX outages stay open. */
+export function agentRulesSlotSettled(summary: Pick<AgentRulesSummary, "quoted" | "quoteReason">): boolean {
+  if (summary.quoted) return true;
+  return summary.quoteReason !== null && SETTLED_QUOTE_REASONS.has(summary.quoteReason);
+}
+
 export type AgentRulesDeps = {
   discover: () => Promise<AgentRule[]>;
   /** Ledger account bytes for each rule, in order. Null when the ledger is missing. */
@@ -262,6 +272,8 @@ export type AgentRulesDeps = {
 export type AgentRulesSummary = {
   /** False when the slot had no chargeable price, so nothing was discovered or sent. */
   quoted: boolean;
+  /** Why the slot had no chargeable price. Null when it was quoted. */
+  quoteReason: string | null;
   found: number;
   charged: number;
   paid: number;
@@ -295,6 +307,7 @@ export async function chargeAgentRules(args: {
 }): Promise<AgentRulesSummary> {
   const summary: AgentRulesSummary = {
     quoted: false,
+    quoteReason: null,
     found: 0,
     charged: 0,
     paid: 0,
@@ -306,6 +319,7 @@ export async function chargeAgentRules(args: {
   const nonce = nonceFromSlot(args.slot);
   const quote = await args.deps.quote(args.slot);
   if (!quote.ok) {
+    summary.quoteReason = quote.reason;
     args.log(`agent rules: no charge this slot nonce=${nonce.toString()} reason=${quote.reason}`);
     return summary;
   }

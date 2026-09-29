@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import anchorPkg from "@coral-xyz/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, type Connection, type Transaction } from "@solana/web3.js";
 import {
+  agentRulesSlotSettled,
   chargeAgentRules,
   decodeAgentRule,
   DEFAULT_AGENT_RULES_MAX,
@@ -18,13 +19,14 @@ import {
   type ProgramAccountsReader,
 } from "./agentRules.js";
 import type { ChargeReceipt } from "./chain.js";
-import { loadIdl } from "./chain.js";
+import { ledgerPda, loadIdl, RULE_CHARGE_TIMEOUT_MS, submitRuleCharge, TOKEN_PROGRAM_ID } from "./chain.js";
+import type { Veto } from "./idl.js";
 import { WATCHER_DIR } from "./config.js";
 import type { PriceFeed } from "./feed.js";
 import { nonceFromSlot } from "./nonce.js";
 import { RateLimitedError } from "./rpc.js";
 
-const { BN, BorshAccountsCoder } = anchorPkg;
+const { AnchorProvider, BN, BorshAccountsCoder, Program, Wallet } = anchorPkg;
 
 const coder = new BorshAccountsCoder(loadIdl(join(WATCHER_DIR, "idl", "veto.json")) as never) as unknown as MandateCoder & {
   encode(name: string, value: unknown): Promise<Buffer>;
@@ -363,4 +365,102 @@ test("the discovered-rule amount is the configured rule's spot amount for the sa
 
   const usdNoFx = await quoteSlotAmount({ at: SLOT, feed, kwhMilli: 6_000n, mintDecimals: 6, quoteCurrency: "USD" });
   assert.deepEqual(usdNoFx, { ok: false, reason: "fx unavailable" });
+});
+
+// submitRuleCharge against the real IDL program with a fake connection, so the
+// instruction keys are the ones the program would see.
+function fakeProgram(sendTransaction: (tx: Transaction) => Promise<string>) {
+  const connection = { sendTransaction } as unknown as Connection;
+  const payer = Keypair.generate();
+  const provider = new AnchorProvider(connection, new Wallet(payer), { commitment: "confirmed" });
+  const idl = loadIdl(join(WATCHER_DIR, "idl", "veto.json"));
+  const program = new Program<Veto>({ ...idl, address: PROGRAM.toBase58() } as never, provider);
+  return { connection, program, payer };
+}
+
+test("submitRuleCharge charges the rule's own source into the configured merchant account", async () => {
+  let sent: Transaction | null = null;
+  const { connection, program, payer } = fakeProgram(async (tx) => {
+    sent = tx;
+    throw new Error("stop after capture");
+  });
+  const r = rule();
+  const destination = key();
+  await assert.rejects(
+    submitRuleCharge({
+      connection,
+      program,
+      programId: PROGRAM,
+      agent: payer,
+      mandate: r.address,
+      source: r.source,
+      destination,
+      mint: MINT,
+      amount: 300_000n,
+      nonce: NONCE,
+    }),
+    /stop after capture/,
+  );
+  const ix = (sent as Transaction | null)?.instructions[0];
+  assert.ok(ix !== undefined);
+  assert.ok(ix.programId.equals(PROGRAM));
+  assert.deepEqual(
+    ix.keys.map((k) => k.pubkey.toBase58()),
+    [
+      payer.publicKey.toBase58(),
+      r.address.toBase58(),
+      ledgerPda(PROGRAM, r.address).toBase58(),
+      r.source.toBase58(),
+      destination.toBase58(),
+      MINT.toBase58(),
+      TOKEN_PROGRAM_ID.toBase58(),
+    ],
+  );
+  assert.equal(ix.data.readBigUInt64LE(8), 300_000n);
+  assert.equal(ix.data.readBigUInt64LE(16), NONCE);
+});
+
+test("a submit that never resolves times out as failed and the next rule is still charged", async () => {
+  const { connection, program, payer } = fakeProgram(() => new Promise<string>(() => {}));
+  const rules = [rule(), rule()].sort((a, b) => (a.address.toBase58() < b.address.toBase58() ? -1 : 1));
+  const charged: string[] = [];
+  const deps: AgentRulesDeps = {
+    quote: quoteOk(),
+    discover: async () => rules,
+    readLedgers: async (rs) => rs.map(() => null),
+    submit: async (r, amount, nonce) => {
+      charged.push(r.address.toBase58());
+      if (r !== rules[0]) return paid("next");
+      return submitRuleCharge({
+        connection,
+        program,
+        programId: PROGRAM,
+        agent: payer,
+        mandate: r.address,
+        source: r.source,
+        destination: key(),
+        mint: MINT,
+        amount,
+        nonce,
+        timeoutMs: 50,
+      });
+    },
+  };
+  const errs: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), [], errs));
+  assert.equal(charged.length, 2);
+  assert.equal(summary.failed, 1);
+  assert.equal(summary.paid, 1);
+  assert.ok(errs.some((l) => l.includes(rules[0]!.address.toBase58()) && l.includes("not confirmed within 50ms")));
+  assert.equal(RULE_CHARGE_TIMEOUT_MS, 90_000);
+});
+
+test("a slot with a price gap a retry cannot change is settled; feed and fx outages stay open", () => {
+  assert.equal(agentRulesSlotSettled({ quoted: true, quoteReason: null }), true);
+  for (const reason of ["negative price", "zero amount", "window start does not match slot"]) {
+    assert.equal(agentRulesSlotSettled({ quoted: false, quoteReason: reason }), true, reason);
+  }
+  for (const reason of ["feed unavailable", "fx unavailable", "fx rate stale (2026-09-10)", "unreadable price"]) {
+    assert.equal(agentRulesSlotSettled({ quoted: false, quoteReason: reason }), false, reason);
+  }
 });

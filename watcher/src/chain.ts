@@ -137,6 +137,8 @@ export async function submitCharge(args: {
   return { ...outcome, signature };
 }
 
+export const RULE_CHARGE_TIMEOUT_MS = 90_000;
+
 /** Charge one discovered rule. The source is the rule's own token account,
  * the destination is the configured merchant token account. The caller has
  * already checked last_nonce and the ledger ring for this nonce; the program
@@ -152,6 +154,8 @@ export async function submitRuleCharge(args: {
   mint: PublicKey;
   amount: bigint;
   nonce: bigint;
+  /** Send and confirm give up after this long, so one stuck rule cannot hold the pass. */
+  timeoutMs?: number;
 }): Promise<ChargeReceipt> {
   const ix = await args.program.methods
     .charge(new BN(args.amount.toString()), new BN(args.nonce.toString()))
@@ -166,9 +170,23 @@ export async function submitRuleCharge(args: {
     })
     .instruction();
   const tx = new Transaction().add(ix);
-  const signature = await sendAndConfirm(args.connection, tx, [args.agent], {
-    commitment: "confirmed",
+  const timeoutMs = args.timeoutMs ?? RULE_CHARGE_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`charge not confirmed within ${timeoutMs}ms; it may still land`)),
+      timeoutMs,
+    );
   });
+  let signature: string;
+  try {
+    signature = await Promise.race([
+      sendAndConfirm(args.connection, tx, [args.agent], { commitment: "confirmed" }),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
   const parsed = await args.connection.getTransaction(signature, {
     commitment: "confirmed",
     maxSupportedTransactionVersion: 0,

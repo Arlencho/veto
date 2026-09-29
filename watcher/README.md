@@ -64,7 +64,9 @@ configured rule.
 - At most `VETO_AGENT_RULES_MAX` rules per pass (default 25, at most 100,
   `0` turns this off). When more are eligible, the starting point moves each
   slot so every rule gets a turn.
-- Charges are sequential with a 1.5 second pause. A rule that fails is logged
+- This pass runs last, after the configured rule and the hold alerts.
+  Charges are sequential with a 1.5 second pause. A send that is not
+  confirmed within 90 seconds counts as failed. A rule that fails is logged
   and the next one is still charged. A rate limit ends the pass; the rest are
   charged next slot. A failure here never changes the configured rule's
   outcome or the exit code.
@@ -72,9 +74,9 @@ configured rule.
   These charges are not written to the journal; each rule's on-chain ledger is
   the record. The RPC URL and keys are never logged.
 
-The demo agent sometimes asks for more than your limit on purpose, so you see
-refusals. The request follows the spot price, not your per-payment limit, so a
-tight limit refuses the expensive hours and pays the cheap ones.
+The request follows the spot price, not your per-payment limit, so a
+tight limit refuses the expensive hours and pays the cheap ones. A refusal
+moves no money.
 
 ### Get ongoing charges from our demo agent
 

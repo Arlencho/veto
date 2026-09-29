@@ -2,6 +2,7 @@
 import { existsSync, statSync } from "node:fs";
 import { dueSlots, msUntil, nextSlot, STALE_AFTER_MS } from "./cadence.js";
 import {
+  agentRulesSlotSettled,
   chargeAgentRules,
   discoverAgentRules,
   quoteSlotAmount,
@@ -145,6 +146,8 @@ async function processAt(at: Date): Promise<ProcessResult> {
   return result;
 }
 
+type AgentRulesCtx = Pick<Awaited<ReturnType<typeof withJournalAndFeed>>, "cfg" | "agent" | "feed" | "fx">;
+
 // The nonce whose agent-rule pass this process already ran. `run` loops every
 // 30 seconds; without this it would re-read every rule on each loop.
 let agentRulesDoneNonce: bigint | null = null;
@@ -152,7 +155,7 @@ let agentRulesDoneNonce: bigint | null = null;
 /** Charge every other open rule that names this agent, once for the latest due slot. */
 async function chargeOtherAgentRules(
   now: Date,
-  ctx: Pick<Awaited<ReturnType<typeof withJournalAndFeed>>, "cfg" | "agent" | "feed" | "fx">,
+  ctx: AgentRulesCtx,
 ): Promise<void> {
   const { cfg, agent, feed, fx } = ctx;
   if (cfg.agentRulesMax === 0) return;
@@ -215,8 +218,8 @@ async function chargeOtherAgentRules(
           }),
       },
     });
-    // A slot without a price stays open so a later loop can still charge it.
-    if (summary.quoted) agentRulesDoneNonce = nonce;
+    // A feed or FX outage stays open so a later loop can still charge the slot.
+    if (agentRulesSlotSettled(summary)) agentRulesDoneNonce = nonce;
   } catch (err) {
     agentRulesDoneNonce = nonce;
     const message = redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
@@ -224,7 +227,10 @@ async function chargeOtherAgentRules(
   }
 }
 
-async function processDue(now: Date, announceIdle = false): Promise<boolean> {
+async function processDue(
+  now: Date,
+  announceIdle = false,
+): Promise<{ deferred: boolean; agentRulesCtx: AgentRulesCtx }> {
   const { cfg, journal, feed, submit, agent, store, chainLastNonce, recoverSettled, recordedCharge, fx } =
     await withJournalAndFeed(now);
   let acted = false;
@@ -257,8 +263,7 @@ async function processDue(now: Date, announceIdle = false): Promise<boolean> {
   if (!acted && announceIdle) {
     logLine("caught up: no due cadence slots left to submit");
   }
-  await chargeOtherAgentRules(now, { cfg, agent, feed, fx });
-  return deferred;
+  return { deferred, agentRulesCtx: { cfg, agent, feed, fx } };
 }
 
 async function scanHolds(now: Date): Promise<void> {
@@ -288,12 +293,15 @@ async function cmdOnce(): Promise<void> {
     await scanHolds(new Date());
     return;
   }
-  const deferred = await processDue(new Date(), true);
+  const now = new Date();
+  const { deferred, agentRulesCtx } = await processDue(now, true);
   if (deferred) {
     logError("once: rpc rate limited on all endpoints");
     process.exitCode = 1;
   }
   await scanHolds(new Date());
+  // Last, so a slow pass over other rules cannot delay the configured rule or hold alerts.
+  await chargeOtherAgentRules(now, agentRulesCtx);
 }
 
 async function cmdRun(): Promise<void> {
@@ -311,9 +319,11 @@ async function cmdRun(): Promise<void> {
 
   while (!stopping) {
     const now = new Date();
-    await processDue(now);
+    const { agentRulesCtx } = await processDue(now);
     if (stopping) break;
     await scanHolds(now);
+    if (stopping) break;
+    await chargeOtherAgentRules(now, agentRulesCtx);
     if (stopping) break;
     const wait = msUntil(nextSlot(now), new Date());
     const chunk = wait < 30_000 ? wait : 30_000;

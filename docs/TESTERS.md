@@ -101,8 +101,9 @@ that names it. Approve one rule for it to get paid and refused notifications for
 4. Expect a request every six hours, at 00:00, 06:00, 12:00 and 18:00 Stockholm
    time. The amount follows the Swedish electricity spot price.
 
-The demo agent sometimes asks for more than your limit on purpose, so you see
-refusals. A refusal moves no money. Revoke the rule in the app to stop the requests.
+The request follows the spot price, not your per-payment limit, so a
+tight limit refuses the expensive hours and pays the cheap ones. A refusal
+moves no money. Revoke the rule in the app to stop the requests.
 
 ## Tell us
 

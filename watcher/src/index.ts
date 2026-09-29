@@ -6,7 +6,6 @@ import {
   chargeAgentRules,
   discoverAgentRules,
   quoteSlotAmount,
-  type MandateCoder,
 } from "./agentRules.js";
 import {
   connect,
@@ -193,7 +192,7 @@ async function chargeOtherAgentRules(
             connection,
             programId,
             agent: agent.publicKey,
-            coder: program.coder.accounts as unknown as MandateCoder,
+            coder: program.coder.accounts,
             log: logLine,
           }),
         readLedgers: async (rules) => {

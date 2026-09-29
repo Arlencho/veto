@@ -8,17 +8,20 @@
  *
  * Discovery is one getProgramAccounts call: the Mandate discriminator at 0 and
  * the agent pubkey at MANDATE_AGENT_OFFSET, the same filters as
- * mandatesForAgent in sdk/src/read.ts. Decoding uses the bundled IDL, which is
- * the layout sdk/src/layout.ts decodes by hand. The image builds from
- * watcher/ alone, so it does not import the sdk package.
+ * mandatesForAgent in sdk/src/read.ts. Decoding uses the running Program's
+ * account coder (the bundled IDL), which is the layout sdk/src/layout.ts
+ * decodes by hand. The image builds from watcher/ alone, so it does not
+ * import the sdk package.
  */
 
+import type { IdlAccounts } from "@coral-xyz/anchor";
 import type { Connection, PublicKey } from "@solana/web3.js";
 import type { ChargeReceipt } from "./chain.js";
 import { recordedFromLedgerBytes } from "./chain.js";
 import type { PriceFeed, PriceWindow } from "./feed.js";
 import { fxFixingIsFresh, readFxOrUnreachable, type FxSource } from "./fx.js";
 import { amountBaseUnitsQuoted, sekPerKwhToScaled, type SpotQuoteCurrency } from "./money.js";
+import type { Veto } from "./idl.js";
 import { nonceFromSlot, nonceFromWindowStart } from "./nonce.js";
 import { isRateLimitError, redactRpcUrlsInText } from "./rpc.js";
 
@@ -47,30 +50,22 @@ export type AgentRule = {
   status: number;
 };
 
-type BnLike = { toString(): string };
+/** The account name as the Program's coder knows it. The Program constructor
+ * camelCases the IDL, so this is `mandate`, not the JSON's `Mandate`. Typed
+ * against src/idl.ts so a rename fails the typecheck. */
+export const MANDATE_ACCOUNT: keyof IdlAccounts<Veto> & string = "mandate";
 
+/** What the Program's coder returns for a mandate: camelCase fields, BN numbers. */
+type RawMandate = IdlAccounts<Veto>["mandate"];
+
+/** program.coder.accounts from the running Program (see programFromIdl in chain.ts). */
 export type MandateCoder = {
-  decode(name: string, data: Buffer): unknown;
+  decode<T = unknown>(name: string, data: Buffer): T;
   memcmp(name: string): { offset?: number; bytes?: string };
 };
 
-type RawMandate = {
-  owner: PublicKey;
-  agent: PublicKey;
-  mint: PublicKey;
-  source: PublicKey;
-  merchant: PublicKey;
-  mandate_id: BnLike;
-  cap: BnLike;
-  spent: BnLike;
-  per_tx_max: BnLike;
-  expires_at: BnLike;
-  last_nonce: BnLike;
-  status: number;
-};
-
 export function decodeAgentRule(coder: MandateCoder, address: PublicKey, data: Buffer): AgentRule {
-  const m = coder.decode("Mandate", data) as RawMandate;
+  const m = coder.decode<RawMandate>(MANDATE_ACCOUNT, data);
   return {
     address,
     owner: m.owner,
@@ -78,12 +73,12 @@ export function decodeAgentRule(coder: MandateCoder, address: PublicKey, data: B
     mint: m.mint,
     source: m.source,
     merchant: m.merchant,
-    mandateId: BigInt(m.mandate_id.toString()),
+    mandateId: BigInt(m.mandateId.toString()),
     cap: BigInt(m.cap.toString()),
     spent: BigInt(m.spent.toString()),
-    perTxMax: BigInt(m.per_tx_max.toString()),
-    expiresAt: BigInt(m.expires_at.toString()),
-    lastNonce: BigInt(m.last_nonce.toString()),
+    perTxMax: BigInt(m.perTxMax.toString()),
+    expiresAt: BigInt(m.expiresAt.toString()),
+    lastNonce: BigInt(m.lastNonce.toString()),
     status: m.status,
   };
 }
@@ -98,11 +93,15 @@ export async function discoverAgentRules(args: {
   coder: MandateCoder;
   log?: (line: string) => void;
 }): Promise<AgentRule[]> {
-  const disc = args.coder.memcmp("Mandate");
+  const disc = args.coder.memcmp(MANDATE_ACCOUNT);
+  // An empty filter would match every account the program owns.
+  if (disc.bytes === undefined || disc.bytes.length === 0) {
+    throw new Error("agent rules: the IDL coder has no Mandate discriminator");
+  }
   const rows = await args.connection.getProgramAccounts(args.programId, {
     commitment: "confirmed",
     filters: [
-      { memcmp: { offset: 0, bytes: disc.bytes ?? "" } },
+      { memcmp: { offset: 0, bytes: disc.bytes } },
       { memcmp: { offset: MANDATE_AGENT_OFFSET, bytes: args.agent.toBase58() } },
     ],
   });

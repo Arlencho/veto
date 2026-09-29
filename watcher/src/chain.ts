@@ -61,16 +61,30 @@ export function connect(cfg: WatcherConfig, payer: Keypair): {
   programId: PublicKey;
 } {
   const connection = createFailoverConnection(cfg.rpcs, logLine);
+  const program = programFromIdl(connection, payer, cfg.idlPath, cfg.programId);
+  return { connection, program, programId: new PublicKey(cfg.programId) };
+}
+
+/** The typed program the watcher runs with. Tests build theirs here too.
+ *
+ * The Program constructor rewrites the IDL to camelCase: its coder knows the
+ * account as `mandate` (not the JSON's `Mandate`) and decodes fields such as
+ * `lastNonce` and `perTxMax` (not `last_nonce`). */
+export function programFromIdl(
+  connection: Connection,
+  payer: Keypair,
+  idlPath: string,
+  programId: string,
+): Program<Veto> {
   const provider = new AnchorProvider(connection, new Wallet(payer), {
     commitment: "confirmed",
     skipPreflight: false,
   });
-  const idl = loadIdl(cfg.idlPath) as unknown as Idl;
-  if (idl.address && idl.address !== cfg.programId) {
-    idl.address = cfg.programId;
+  const idl = loadIdl(idlPath) as unknown as Idl;
+  if (idl.address && idl.address !== programId) {
+    idl.address = programId;
   }
-  const program = new Program<Veto>(idl as unknown as Veto & Idl, provider);
-  return { connection, program, programId: new PublicKey(cfg.programId) };
+  return new Program<Veto>(idl as unknown as Veto & Idl, provider);
 }
 
 export type ChargeReceipt = ChargeOutcome & { signature: string };

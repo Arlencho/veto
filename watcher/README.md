@@ -38,6 +38,56 @@ count it. A gap is not terminal.
 The `PriceFeed` interface exists because the feed may be revisited
 (`docs/internal/DECISIONS.md`, 2026-09-20). The only implementation is `EnergySpotFeed`.
 
+## Every rule that names the agent
+
+Each `once` or `run` pass also charges every other open payment rule on the
+program whose agent is this process's agent key. A tester who approves a rule
+for the agent's public address gets a request on the same schedule as the
+configured rule.
+
+- Discovery is one `getProgramAccounts` call filtered on the Mandate
+  discriminator and the agent pubkey at byte 40, the filters
+  `mandatesForAgent` in `sdk/src/read.ts` uses. Rows decode with the bundled IDL.
+- A rule is skipped, with one log line naming it and the reason, when it is
+  not open, is past expiry, is for another mint than `VETO_MINT`, pays another
+  payee than `VETO_MERCHANT`, has nothing left under its cap, or already has a
+  paid or refused row for this slot's nonce.
+- The configured rule (`VETO_OWNER` + `VETO_MANDATE_ID`) is left to its own
+  journaled path, so it is charged once, not twice.
+- Only the latest due slot is charged. A rule approved at 17:00 gets the 18:00
+  request, not a catch-up burst for the morning. The nonce is that slot's unix
+  seconds, the same number the configured rule uses, checked against each
+  rule's own `last_nonce` and ledger ring.
+- The amount is the same spot arithmetic as the configured rule (volume,
+  price, and FX when `VETO_QUOTE_CURRENCY=USD`). Demo calibration is not
+  applied: it is sized to the configured rule's cap. No price means no request.
+- At most `VETO_AGENT_RULES_MAX` rules per pass (default 25, at most 100,
+  `0` turns this off). When more are eligible, the starting point moves each
+  slot so every rule gets a turn.
+- Charges are sequential with a 1.5 second pause. A rule that fails is logged
+  and the next one is still charged. A rate limit ends the pass; the rest are
+  charged next slot. A failure here never changes the configured rule's
+  outcome or the exit code.
+- Each charge logs `agent rule <address> paid|refused ... amount=... nonce=... sig=...`.
+  These charges are not written to the journal; each rule's on-chain ledger is
+  the record. The RPC URL and keys are never logged.
+
+The demo agent sometimes asks for more than your limit on purpose, so you see
+refusals. The request follows the spot price, not your per-payment limit, so a
+tight limit refuses the expensive hours and pays the cheap ones.
+
+### Get ongoing charges from our demo agent
+
+1. In the Veto app, choose owner-direct connect and paste the agent address
+   `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` (the Agent row in
+   [docs/DEVNET.md](../docs/DEVNET.md)).
+2. Set the payee to the demo payee `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`.
+   A rule with any other payee is skipped.
+3. Use devnet USDC and small limits, for example 0.50 per payment and 5 in
+   total, and approve the rule.
+4. Expect one request every six hours, at 00:00, 06:00, 12:00 and 18:00
+   Stockholm time. Some are paid and some are refused.
+
 ## Hold alerts
 
 `VETO_HOLD_VAULTS` is an optional comma-separated list of Hold vault addresses. When it is unset, the mandate loop is unchanged and no vault is read.
@@ -67,10 +117,10 @@ npm run open-mandate
 
 RPC, program id, mint, and the owner / merchant / agent accounts come from
 the environment, `keys/devnet-addresses.env`, `watcher/.env`, or
-`terminal/.env`. The charge source is `VETO_OWNER_TOKEN`. The watcher does not
-look up a per-rule account. A rule opened in the app keeps its budget in
-`veto-rule-<mandate id>`, and this process will not charge that account unless
-`VETO_OWNER_TOKEN` is set to it. There is no hardcoded fallback for those. File keys may be
+`terminal/.env`. The configured rule's charge source is `VETO_OWNER_TOKEN`.
+A rule opened in the app keeps its budget in `veto-rule-<mandate id>`; the
+other rules that name the agent are charged from the source stored in each
+rule (see above). There is no hardcoded fallback for those. File keys may be
 `VETO_RPC=` or `RPC=`. Both packages read both package env files, so they
 cannot silently disagree about the quoted volume. Copy `.env.example` to
 `watcher/.env` and uncomment the identity lines with values you supply. The
@@ -86,6 +136,7 @@ Process defaults that cannot select a chain identity (overridable with env):
 | Per-payment max | 0.5 tokens |
 | Mandate id | 1 |
 | Purpose | `SE3 home charging` |
+| Other rules per pass | 25 (`VETO_AGENT_RULES_MAX`, `0` turns it off) |
 
 0.5 tokens per 50 kWh is 0.01 SEK/kWh. On 2026-09-20 that pays the cheapest night
 and midday dips and refuses the evening spike. Raise `VETO_PER_TX_MAX` before
@@ -290,5 +341,8 @@ Covered: integer money conversion, no float in the money or FX source,
 deterministic nonce, re-running the same window does not resubmit, a refusal
 is recorded rather than thrown, a down feed writes a gap, a 429 is failed over
 and a rate limited slot stays due, an ECB document converts three known rows,
-a stale fixing and an unreachable FX source leave the slot due, and USD off
-matches today's base units.
+a stale fixing and an unreachable FX source leave the slot due, USD off
+matches today's base units, and for the other rules naming the agent:
+discovery filters, the per-pass cap and its rotation, one failing rule not
+stopping the rest, and no second charge for the configured rule or a slot
+already decided.

@@ -2,7 +2,14 @@
 import { existsSync, statSync } from "node:fs";
 import { dueSlots, msUntil, nextSlot, STALE_AFTER_MS } from "./cadence.js";
 import {
+  chargeAgentRules,
+  discoverAgentRules,
+  quoteSlotAmount,
+  type MandateCoder,
+} from "./agentRules.js";
+import {
   connect,
+  ledgerPda,
   loadKeypair,
   mandatePda,
   openMandate,
@@ -10,6 +17,7 @@ import {
   readRecordedCharge,
   recoverSettledCharge,
   submitCharge,
+  submitRuleCharge,
 } from "./chain.js";
 import { keyPath, loadConfig } from "./config.js";
 import { EcbFxFeed } from "./fx.js";
@@ -26,7 +34,7 @@ import {
 import { scanHoldVaults } from "./hold.js";
 import { logError, logLine } from "./log.js";
 import { nonceFromSlot } from "./nonce.js";
-import { isRateLimitError, redactRpcUrl } from "./rpc.js";
+import { isRateLimitError, redactRpcUrl, redactRpcUrlsInText } from "./rpc.js";
 import { processWindow, sleep, withRpcBackoff, type ProcessResult } from "./run.js";
 import { isJournalStale, lastDecisionAt } from "./stale.js";
 import { PublicKey } from "@solana/web3.js";
@@ -137,8 +145,87 @@ async function processAt(at: Date): Promise<ProcessResult> {
   return result;
 }
 
+// The nonce whose agent-rule pass this process already ran. `run` loops every
+// 30 seconds; without this it would re-read every rule on each loop.
+let agentRulesDoneNonce: bigint | null = null;
+
+/** Charge every other open rule that names this agent, once for the latest due slot. */
+async function chargeOtherAgentRules(
+  now: Date,
+  ctx: Pick<Awaited<ReturnType<typeof withJournalAndFeed>>, "cfg" | "agent" | "feed" | "fx">,
+): Promise<void> {
+  const { cfg, agent, feed, fx } = ctx;
+  if (cfg.agentRulesMax === 0) return;
+  const slots = dueSlots(now);
+  const slot = slots[slots.length - 1];
+  if (slot === undefined) return;
+  const nonce = nonceFromSlot(slot);
+  if (agentRulesDoneNonce === nonce) return;
+  try {
+    const { connection, program, programId } = connect(cfg, agent);
+    const mint = new PublicKey(cfg.mint);
+    const destination = new PublicKey(cfg.merchantTokenAccount);
+    const summary = await chargeAgentRules({
+      slot,
+      now,
+      agent: agent.publicKey,
+      mint,
+      merchant: new PublicKey(cfg.merchant),
+      configured: mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId),
+      max: cfg.agentRulesMax,
+      log: logLine,
+      logError,
+      deps: {
+        quote: (at) =>
+          quoteSlotAmount({
+            at,
+            feed,
+            fx,
+            kwhMilli: cfg.kwhMilli,
+            mintDecimals: cfg.mintDecimals,
+            quoteCurrency: cfg.quoteCurrency,
+          }),
+        discover: () =>
+          discoverAgentRules({
+            connection,
+            programId,
+            agent: agent.publicKey,
+            coder: program.coder.accounts as unknown as MandateCoder,
+            log: logLine,
+          }),
+        readLedgers: async (rules) => {
+          const infos = await connection.getMultipleAccountsInfo(
+            rules.map((rule) => ledgerPda(programId, rule.address)),
+            "confirmed",
+          );
+          return infos.map((info) => (info === null ? null : info.data));
+        },
+        submit: (rule, amount, chargeNonce) =>
+          submitRuleCharge({
+            connection,
+            program,
+            programId,
+            agent,
+            mandate: rule.address,
+            source: rule.source,
+            destination,
+            mint,
+            amount,
+            nonce: chargeNonce,
+          }),
+      },
+    });
+    // A slot without a price stays open so a later loop can still charge it.
+    if (summary.quoted) agentRulesDoneNonce = nonce;
+  } catch (err) {
+    agentRulesDoneNonce = nonce;
+    const message = redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
+    logError(`agent rules: pass failed, the configured rule is not affected: ${message}`);
+  }
+}
+
 async function processDue(now: Date, announceIdle = false): Promise<boolean> {
-  const { cfg, journal, feed, submit, store, chainLastNonce, recoverSettled, recordedCharge, fx } =
+  const { cfg, journal, feed, submit, agent, store, chainLastNonce, recoverSettled, recordedCharge, fx } =
     await withJournalAndFeed(now);
   let acted = false;
   let deferred = false;
@@ -170,6 +257,7 @@ async function processDue(now: Date, announceIdle = false): Promise<boolean> {
   if (!acted && announceIdle) {
     logLine("caught up: no due cadence slots left to submit");
   }
+  await chargeOtherAgentRules(now, { cfg, agent, feed, fx });
   return deferred;
 }
 

@@ -5,6 +5,7 @@ import { parseGsUri } from "./journalStore.js";
 import { DEFAULT_KWH_MILLI, DEFAULT_MINT_DECIMALS, type SpotQuoteCurrency } from "./money.js";
 import { loadCalibration, type DemoCalibration } from "./calibration.js";
 import { parseRpcList } from "./rpc.js";
+import { parseAgentRulesMax } from "./agentRules.js";
 
 export const WATCHER_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const REPO_DIR = join(WATCHER_DIR, "..");
@@ -49,6 +50,8 @@ export type WatcherConfig = {
   holdVaults: string[];
   /** USD converts the SEK spot before charging. Unset and SEK keep 1 token as 1 SEK. */
   quoteCurrency: SpotQuoteCurrency;
+  /** VETO_AGENT_RULES_MAX: other open rules naming this agent charged per run. 0 turns that off. */
+  agentRulesMax: number;
 };
 
 /** Unset, empty, and SEK keep today's arithmetic. Only USD turns conversion on. */
@@ -202,6 +205,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts?: LoadConf
     holdVaults: parseHoldVaultList(lookupFrom(env, files, "VETO_HOLD_VAULTS")),
     calibration: loadCalibration(key => lookupFrom(env, files, key)),
     quoteCurrency: parseQuoteCurrency(lookupFrom(env, files, "VETO_QUOTE_CURRENCY")),
+    agentRulesMax: parseAgentRulesMax(lookupFrom(env, files, "VETO_AGENT_RULES_MAX")),
   };
 }
 

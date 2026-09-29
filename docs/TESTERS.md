@@ -107,9 +107,7 @@ moves no money. Revoke the rule in the app to stop the requests.
 
 ## Tell us
 
-[Send tester feedback](https://github.com/Arlencho/veto/issues/new?template=tester-feedback.yml),
-including anything that blocked a task. The optional wallet address is for the tester list;
-issues are public. Never include a recovery phrase or private key.
+[Send tester feedback](https://github.com/Arlencho/veto/issues/new?template=tester-feedback.yml): which phone and wallet you used, how far you got and where you got stuck. The optional wallet address lets us match your feedback with what happened on devnet; issues are public. Never include a recovery phrase or private key.
 
 ## Building the public tester APK
 

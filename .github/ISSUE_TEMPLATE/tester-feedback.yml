@@ -1,51 +1,62 @@
 name: Tester feedback
-description: Tell us how Veto felt on your Seeker on devnet.
+description: Tell us how Veto felt on your phone on devnet. About 2 minutes.
 title: "[Tester feedback] "
 labels: [tester-feedback]
 body:
+  - type: markdown
+    attributes:
+      value: Thanks for trying Veto. Everything you did was on devnet with test money that has no value. This issue is public. Never paste a recovery phrase or private key.
   - type: input
     id: device
     attributes:
-      label: Device model
-    validations:
-      required: true
-  - type: checkboxes
-    id: tasks
-    attributes:
-      label: Which tasks did you finish?
-      description: Leave unfinished or blocked tasks unchecked.
-      options:
-        - label: Wrote a rule for a test agent
-        - label: Saw one payment and one refusal in Decisions
-        - label: Set up Hold, held a withdrawal and stopped it
-        - label: Looked at Agents and the grade
-  - type: textarea
-    id: confusion
-    attributes:
-      label: What confused you?
-      description: Include where you got stuck, or write "Nothing".
-    validations:
-      required: true
-  - type: textarea
-    id: change
-    attributes:
-      label: What is one thing you would change?
+      label: Which phone and wallet did you use?
+      description: For example, Seeker with Seed Vault, or Pixel 8 with another wallet.
     validations:
       required: true
   - type: dropdown
-    id: real-money
+    id: progress
     attributes:
-      label: Would you use it with real money?
+      label: How far did you get?
       options:
-        - "Yes"
-        - "No"
-        - "Maybe"
+        - I saw one paid and one refused request
+        - I approved a rule but did not see both results
+        - I installed the app but did not approve a rule
+        - I could not install or open the app
     validations:
       required: true
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where did you get stuck, or what confused you?
+      description: Write "Nothing" if it all went smoothly. Faucets, wallet network, the rule screen and the test button are all useful to hear about.
+    validations:
+      required: true
+  - type: dropdown
+    id: real-agent
+    attributes:
+      label: Would you use Veto with a real agent?
+      options:
+        - "Yes"
+        - "Maybe"
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why, and which agent would you use it with?
+    validations:
+      required: true
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else?
+    validations:
+      required: false
   - type: input
     id: wallet
     attributes:
-      label: Wallet address for the tester list (optional)
-      description: Public address only. This issue is public. Never share a recovery phrase or private key.
+      label: Wallet address you used (optional)
+      description: Lets us match your feedback with what happened on devnet. A wallet address is public. Share only the public address, never a recovery phrase or private key.
     validations:
       required: false

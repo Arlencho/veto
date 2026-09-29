@@ -137,6 +137,59 @@ export async function submitCharge(args: {
   return { ...outcome, signature };
 }
 
+export const RULE_CHARGE_TIMEOUT_MS = 90_000;
+
+/** Charge one discovered rule. The source is the rule's own token account,
+ * the destination is the configured merchant token account. The caller has
+ * already checked last_nonce and the ledger ring for this nonce; the program
+ * still refuses a stale nonce on its own. */
+export async function submitRuleCharge(args: {
+  connection: Connection;
+  program: Program<Veto>;
+  programId: PublicKey;
+  agent: Keypair;
+  mandate: PublicKey;
+  source: PublicKey;
+  destination: PublicKey;
+  mint: PublicKey;
+  amount: bigint;
+  nonce: bigint;
+  /** The confirm wait gives up after this long, so one stuck rule cannot hold the pass. */
+  timeoutMs?: number;
+}): Promise<ChargeReceipt> {
+  const ix = await args.program.methods
+    .charge(new BN(args.amount.toString()), new BN(args.nonce.toString()))
+    .accountsPartial({
+      agent: args.agent.publicKey,
+      mandate: args.mandate,
+      ledger: ledgerPda(args.programId, args.mandate),
+      source: args.source,
+      destination: args.destination,
+      mint: args.mint,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .instruction();
+  const tx = new Transaction().add(ix);
+  // The confirm wait stops its own polling and listener at the deadline, so a
+  // stuck charge cannot keep a `once` process alive.
+  const signature = await sendAndConfirm(args.connection, tx, [args.agent], {
+    commitment: "confirmed",
+    timeoutMs: args.timeoutMs ?? RULE_CHARGE_TIMEOUT_MS,
+  });
+  const parsed = await args.connection.getTransaction(signature, {
+    commitment: "confirmed",
+    maxSupportedTransactionVersion: 0,
+  });
+  let outcome: ChargeOutcome;
+  try {
+    outcome = parseChargeLogs(parsed?.meta?.logMessages ?? []);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`${message} sig=${signature}`);
+  }
+  return { ...outcome, signature };
+}
+
 export async function openMandate(args: {
   cfg: WatcherConfig;
   owner: Keypair;

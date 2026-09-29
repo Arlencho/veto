@@ -86,6 +86,25 @@ Does the explanation make sense? A grade describes behaviour, not safety.
   **Share** to reach **Export**. Choose JSON or CSV. Records cannot show requests
   an agent never submitted.
 
+## Get ongoing charges from our demo agent
+
+Our demo agent runs all the time and sends a request to every open payment rule
+that names it. Approve one rule for it to get paid and refused notifications for days.
+
+1. Choose owner-direct connect and paste the agent address
+   `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w`
+   (the Agent row in [DEVNET.md](DEVNET.md)).
+2. Set **Payee** to the demo payee `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`.
+   A rule with another payee is skipped.
+3. Fund it with devnet USDC and keep the limits small, for example
+   **Most per payment** 0.50 and **Most in total, ever** 5. Approve the rule.
+4. Expect a request every six hours, at 00:00, 06:00, 12:00 and 18:00 Stockholm
+   time. The amount follows the Swedish electricity spot price.
+
+The request follows the spot price, not your per-payment limit, so a
+tight limit refuses the expensive hours and pays the cheap ones. A refusal
+moves no money. Revoke the rule in the app to stop the requests.
+
 ## Tell us
 
 [Send tester feedback](https://github.com/Arlencho/veto/issues/new?template=tester-feedback.yml): which phone and wallet you used, how far you got and where you got stuck. The optional wallet address lets us match your feedback with what happened on devnet; issues are public. Never include a recovery phrase or private key.

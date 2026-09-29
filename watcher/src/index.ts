@@ -6,6 +6,7 @@ import {
   chargeAgentRules,
   discoverAgentRules,
   quoteSlotAmount,
+  retryConfiguredAllowOnce,
 } from "./agentRules.js";
 import {
   connect,
@@ -226,12 +227,76 @@ async function chargeOtherAgentRules(
   }
 }
 
+/** Retry the configured rule's allowed-once request before its slot charge.
+ *
+ * It runs here, not in the pass over other rules, because a paid slot charge
+ * moves last_nonce past the allowed nonce and the program would then refuse it
+ * as stale. `lowestOwed` is the first slot this run is about to charge; an
+ * allowed request above it waits. VETO_AGENT_RULES_MAX=0 turns this off with
+ * the rest of the agent-rule charges. Errors are logged, never thrown, so the
+ * slot charge always runs.
+ */
+async function retryConfiguredAllowed(
+  now: Date,
+  cfg: AgentRulesCtx["cfg"],
+  agent: AgentRulesCtx["agent"],
+  lowestOwed: bigint,
+): Promise<void> {
+  if (cfg.agentRulesMax === 0) return;
+  try {
+    const { connection, program, programId } = connect(cfg, agent);
+    const mandate = mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId);
+    const mint = new PublicKey(cfg.mint);
+    const destination = new PublicKey(cfg.merchantTokenAccount);
+    await retryConfiguredAllowOnce({
+      mandate,
+      ledger: ledgerPda(programId, mandate),
+      coder: program.coder.accounts,
+      readAccounts: async (addresses) => {
+        const infos = await connection.getMultipleAccountsInfo(addresses, "confirmed");
+        return infos.map((info) => (info === null ? null : info.data));
+      },
+      opts: {
+        agent: agent.publicKey,
+        mint,
+        merchant: new PublicKey(cfg.merchant),
+        nowUnix: BigInt(Math.floor(now.getTime() / 1000)),
+        nonce: lowestOwed,
+      },
+      submit: (rule, amount, nonce) =>
+        submitRuleCharge({
+          connection,
+          program,
+          programId,
+          agent,
+          mandate: rule.address,
+          source: rule.source,
+          destination,
+          mint,
+          amount,
+          nonce,
+        }),
+      log: logLine,
+      logError,
+    });
+  } catch (err) {
+    const message = redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
+    logError(`agent rules: allow-one retry of the configured rule failed, its slot charge still runs: ${message}`);
+  }
+}
+
 async function processDue(
   now: Date,
   announceIdle = false,
 ): Promise<{ deferred: boolean; agentRulesCtx: AgentRulesCtx }> {
   const { cfg, journal, feed, submit, agent, store, chainLastNonce, recoverSettled, recordedCharge, fx } =
     await withJournalAndFeed(now);
+  const owed = dueSlots(now)
+    .map((slot) => nonceFromSlot(slot))
+    .filter((nonce) => !journal.hasNonce(nonce));
+  if (owed.length > 0) {
+    await retryConfiguredAllowed(now, cfg, agent, owed[0]!);
+  }
   let acted = false;
   let deferred = false;
   for (const slot of dueSlots(now)) {

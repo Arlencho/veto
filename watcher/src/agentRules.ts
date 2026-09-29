@@ -17,7 +17,7 @@
 import type { IdlAccounts } from "@coral-xyz/anchor";
 import type { Connection, PublicKey } from "@solana/web3.js";
 import type { ChargeReceipt } from "./chain.js";
-import { recordedFromLedgerBytes } from "./chain.js";
+import { findAllowOnceInLedgerBytes, recordedFromLedgerBytes } from "./chain.js";
 import type { PriceFeed, PriceWindow } from "./feed.js";
 import { fxFixingIsFresh, readFxOrUnreachable, type FxSource } from "./fx.js";
 import { amountBaseUnitsQuoted, sekPerKwhToScaled, type SpotQuoteCurrency } from "./money.js";
@@ -47,6 +47,10 @@ export type AgentRule = {
   perTxMax: bigint;
   expiresAt: bigint;
   lastNonce: bigint;
+  /** The owner's "Allow one": a raised per-payment ceiling for one nonce. */
+  overrideAmount: bigint;
+  /** Zero when no override is pending. */
+  overrideNonce: bigint;
   status: number;
 };
 
@@ -79,6 +83,8 @@ export function decodeAgentRule(coder: MandateCoder, address: PublicKey, data: B
     perTxMax: BigInt(m.perTxMax.toString()),
     expiresAt: BigInt(m.expiresAt.toString()),
     lastNonce: BigInt(m.lastNonce.toString()),
+    overrideAmount: BigInt(m.overrideAmount.toString()),
+    overrideNonce: BigInt(m.overrideNonce.toString()),
     status: m.status,
   };
 }
@@ -182,6 +188,18 @@ function skipReason(
   opts: { agent: PublicKey; mint: PublicKey; merchant: PublicKey; configured: PublicKey; nowUnix: bigint; nonce: bigint },
 ): SkipReason | null {
   if (rule.address.equals(opts.configured)) return "configured rule, charged on its own path";
+  const unusable = unusableReason(rule, opts);
+  if (unusable !== null) return unusable;
+  if (rule.spent >= rule.cap) return "nothing left";
+  if (rule.lastNonce >= opts.nonce) return "already paid this slot";
+  return null;
+}
+
+/** Why this agent cannot charge the rule at all, or null when it can. */
+function unusableReason(
+  rule: AgentRule,
+  opts: { agent: PublicKey; mint: PublicKey; merchant: PublicKey; nowUnix: bigint },
+): SkipReason | null {
   if (!rule.agent.equals(opts.agent)) return "another agent";
   if (rule.status !== STATUS_ACTIVE) return "not open";
   if (opts.nowUnix >= rule.expiresAt) return "expired";
@@ -189,9 +207,128 @@ function skipReason(
   // The program refuses a destination whose owner is not the rule's payee,
   // and this agent pays one merchant token account.
   if (!rule.merchant.equals(opts.merchant)) return "another payee";
-  if (rule.spent >= rule.cap) return "nothing left";
-  if (rule.lastNonce >= opts.nonce) return "already paid this slot";
   return null;
+}
+
+/** True when the owner tapped "Allow one" and no payment has used it yet.
+ *
+ * grant_override needs nonce > last_nonce, and a paid charge of that nonce
+ * clears override_nonce, so a pending allow is override_nonce above
+ * last_nonce. A paid charge of any later nonce strands it the same way.
+ */
+export function hasPendingAllowOnce(rule: AgentRule): boolean {
+  return rule.overrideNonce !== 0n && rule.overrideNonce > rule.lastNonce;
+}
+
+export type AllowOnceRetry = { nonce: bigint; amount: bigint };
+
+export type AllowOnceOpts = { agent: PublicKey; mint: PublicKey; merchant: PublicKey; nowUnix: bigint; nonce: bigint };
+
+/** The retry an "Allow one" asks for, or why it is not sent.
+ *
+ * The retry repeats the refused request: the same nonce and the same amount,
+ * read from the refused ring row the allow followed. It is sent only when the
+ * program would pay it on its limits: the amount within the raised ceiling
+ * max(per_tx_max, override_amount) and within the remaining cap. One retry per
+ * allow: a refusal written after the allow means the agent already tried.
+ * `opts.nonce` is the lowest request this run is about to charge; an allowed
+ * request above it would strand that charge, so it waits.
+ */
+export function allowOnceRetry(
+  rule: AgentRule,
+  ledger: Uint8Array | null,
+  opts: AllowOnceOpts,
+): AllowOnceRetry | { skip: string } {
+  if (!hasPendingAllowOnce(rule)) return { skip: "no allow pending" };
+  const unusable = unusableReason(rule, opts);
+  if (unusable !== null) return { skip: unusable };
+  if (rule.overrideNonce > opts.nonce) return { skip: "the allowed request is later than this slot" };
+  if (ledger === null) return { skip: "no ledger" };
+  const ring = findAllowOnceInLedgerBytes(ledger, rule.overrideNonce);
+  if (ring === null) return { skip: "the allow is not in the ledger ring" };
+  if (ring.retried) return { skip: "already retried since the allow" };
+  if (ring.refused === null) return { skip: "no refused request for that nonce in the ledger ring" };
+  const amount = ring.refused.amount;
+  const ceiling = rule.overrideAmount > rule.perTxMax ? rule.overrideAmount : rule.perTxMax;
+  if (amount === 0n) return { skip: "the refused amount is zero" };
+  if (amount > ceiling) return { skip: "the refused amount is above the allowed amount" };
+  if (rule.spent + amount > rule.cap) return { skip: "over the remaining cap" };
+  return { nonce: rule.overrideNonce, amount };
+}
+
+export type AllowOnceOutcome = "paid" | "refused" | "failed" | "skipped";
+
+/** The configured rule's allow-one retry, run on its own path before its slot charge.
+ *
+ * One read of the mandate and its ledger. Nothing is logged when no allow is
+ * pending. The journal is not touched: it records slot decisions, and the
+ * retry is on the chain ledger. Never throws.
+ */
+export async function retryConfiguredAllowOnce(args: {
+  mandate: PublicKey;
+  ledger: PublicKey;
+  coder: MandateCoder;
+  readAccounts: (addresses: PublicKey[]) => Promise<(Uint8Array | null)[]>;
+  opts: AllowOnceOpts;
+  submit: (rule: AgentRule, amount: bigint, nonce: bigint) => Promise<ChargeReceipt>;
+  log: (line: string) => void;
+  logError: (line: string) => void;
+}): Promise<AllowOnceOutcome | "none"> {
+  let rule: AgentRule;
+  let ledger: Uint8Array | null;
+  try {
+    const [mandateData, ledgerData] = await args.readAccounts([args.mandate, args.ledger]);
+    if (mandateData === null || mandateData === undefined) return "none";
+    rule = decodeAgentRule(args.coder, args.mandate, Buffer.from(mandateData));
+    ledger = ledgerData ?? null;
+  } catch (err) {
+    args.logError(`agent rule ${args.mandate.toBase58()} allow-one check failed: ${describe(err)}`);
+    return "none";
+  }
+  if (!hasPendingAllowOnce(rule)) return "none";
+  const result = await retryAllowOnce({
+    rule,
+    ledger,
+    opts: args.opts,
+    submit: args.submit,
+    log: args.log,
+    logError: args.logError,
+  });
+  return result.outcome;
+}
+
+/** Send the retry for one rule and write one log line. Never throws; a rate
+ * limit comes back as `rateLimited` so the caller can end its pass. */
+export async function retryAllowOnce(args: {
+  rule: AgentRule;
+  ledger: Uint8Array | null;
+  opts: AllowOnceOpts;
+  submit: (rule: AgentRule, amount: bigint, nonce: bigint) => Promise<ChargeReceipt>;
+  /** Runs just before the charge is sent, so the pause between charges happens only for a real send. */
+  beforeSend?: () => Promise<void>;
+  log: (line: string) => void;
+  logError: (line: string) => void;
+}): Promise<{ outcome: AllowOnceOutcome; rateLimited: boolean }> {
+  const id = args.rule.address.toBase58();
+  const plan = allowOnceRetry(args.rule, args.ledger, args.opts);
+  if ("skip" in plan) {
+    args.log(`agent rule ${id} allow-one retry skipped: ${plan.skip} nonce=${args.rule.overrideNonce.toString()}`);
+    return { outcome: "skipped", rateLimited: false };
+  }
+  const detail = `amount=${plan.amount.toString()} nonce=${plan.nonce.toString()}`;
+  try {
+    await args.beforeSend?.();
+    const receipt = await args.submit(args.rule, plan.amount, plan.nonce);
+    if (receipt.decision === "paid") {
+      args.log(`agent rule ${id} allow-one retry paid ${detail} sig=${receipt.signature || "-"}`);
+      return { outcome: "paid", rateLimited: false };
+    }
+    args.log(`agent rule ${id} allow-one retry refused reason=${receipt.reason} ${detail} sig=${receipt.signature || "-"}`);
+    return { outcome: "refused", rateLimited: false };
+  } catch (err) {
+    args.logError(`agent rule ${id} allow-one retry failed ${detail}: ${describe(err)}`);
+    return { outcome: "failed", rateLimited: isRateLimitError(err) };
+  }
 }
 
 export type SlotQuote =
@@ -269,12 +406,15 @@ export type AgentRulesDeps = {
 };
 
 export type AgentRulesSummary = {
-  /** False when the slot had no chargeable price, so nothing was discovered or sent. */
+  /** False when the slot had no chargeable price, so no slot charge was sent. */
   quoted: boolean;
   /** Why the slot had no chargeable price. Null when it was quoted. */
   quoteReason: string | null;
   found: number;
+  /** Charges sent: allow-one retries and slot charges together. */
   charged: number;
+  /** Allow-one retries sent. Their outcomes also count in paid, refused and failed. */
+  retried: number;
   paid: number;
   refused: number;
   failed: number;
@@ -283,12 +423,22 @@ export type AgentRulesSummary = {
   rateLimited: boolean;
 };
 
-/** One pass: quote the slot, discover, select, then charge each rule in turn.
+/** One pass: quote the slot, discover, retry what owners allowed once, then
+ * charge each selected rule for this slot.
+ *
+ * An allowed request is retried before the slot charge of its rule: a paid
+ * slot charge moves last_nonce past the allowed nonce, and the program then
+ * refuses that nonce as stale. Paying the allowed request first moves
+ * last_nonce to its nonce, which is below this slot's, so the slot charge
+ * still goes through. Retries count toward `max`.
  *
  * Charges are sequential with a pause between them. A rule that throws is
  * logged and the next rule is still charged. A rate limit ends the pass,
  * because every later rule would hit the same endpoint; the rules left over
  * are charged on the next slot.
+ *
+ * Without a price the pass makes no RPC request at all, retries included, so
+ * an idle or outage cycle stays free; the retries wait for the priced pass.
  */
 export async function chargeAgentRules(args: {
   slot: Date;
@@ -309,6 +459,7 @@ export async function chargeAgentRules(args: {
     quoteReason: null,
     found: 0,
     charged: 0,
+    retried: 0,
     paid: 0,
     refused: 0,
     failed: 0,
@@ -316,6 +467,7 @@ export async function chargeAgentRules(args: {
     rateLimited: false,
   };
   const nonce = nonceFromSlot(args.slot);
+  const nowUnix = BigInt(Math.floor(args.now.getTime() / 1000));
   const quote = await args.deps.quote(args.slot);
   if (!quote.ok) {
     summary.quoteReason = quote.reason;
@@ -326,14 +478,79 @@ export async function chargeAgentRules(args: {
 
   const rules = await args.deps.discover();
   summary.found = rules.length;
+
+  const delayMs = args.delayMs ?? AGENT_RULE_DELAY_MS;
+  const pause = args.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let sent = 0;
+  const beforeSend = async (): Promise<void> => {
+    if (sent > 0) await pause(delayMs);
+    sent += 1;
+  };
+  const finish = (): AgentRulesSummary => {
+    args.log(
+      `agent rules: found=${summary.found} charged=${summary.charged} retried=${summary.retried} paid=${summary.paid} refused=${summary.refused} failed=${summary.failed} skipped=${summary.skipped} nonce=${nonce.toString()}`,
+    );
+    return summary;
+  };
+
+  // Allow-one retries first, in address order, at most `max` of them.
+  const seen = new Set<string>();
+  const pending: AgentRule[] = [];
+  for (const rule of rules) {
+    const id = rule.address.toBase58();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (!rule.address.equals(args.configured) && hasPendingAllowOnce(rule)) pending.push(rule);
+  }
+  pending.sort((a, b) => cmp(a.address.toBase58(), b.address.toBase58()));
+  for (const rule of pending.slice(args.max)) {
+    args.log(`agent rule ${rule.address.toBase58()} allow-one retry skipped: over the per-run cap`);
+  }
+  const retryRules = pending.slice(0, args.max);
+  if (retryRules.length > 0) {
+    let ledgers: (Uint8Array | null)[] | null = null;
+    try {
+      ledgers = await args.deps.readLedgers(retryRules);
+    } catch (err) {
+      args.logError(`agent rules: ledger read for allow-one retries failed: ${describe(err)}`);
+      if (isRateLimitError(err)) {
+        summary.rateLimited = true;
+        return finish();
+      }
+    }
+    if (ledgers !== null) {
+      const opts = { agent: args.agent, mint: args.mint, merchant: args.merchant, nowUnix, nonce };
+      for (let i = 0; i < retryRules.length; i += 1) {
+        const result = await retryAllowOnce({
+          rule: retryRules[i]!,
+          ledger: ledgers[i] ?? null,
+          opts,
+          submit: args.deps.submit,
+          beforeSend,
+          log: args.log,
+          logError: args.logError,
+        });
+        if (result.outcome === "skipped") continue;
+        summary.charged += 1;
+        summary.retried += 1;
+        summary[result.outcome] += 1;
+        if (result.rateLimited) {
+          summary.rateLimited = true;
+          args.logError("agent rules: rpc rate limited, the rest wait for the next slot");
+          return finish();
+        }
+      }
+    }
+  }
+
   const { selected, skipped } = selectAgentRules(rules, {
     agent: args.agent,
     mint: args.mint,
     merchant: args.merchant,
     configured: args.configured,
-    nowUnix: BigInt(Math.floor(args.now.getTime() / 1000)),
+    nowUnix,
     nonce,
-    max: args.max,
+    max: Math.max(0, args.max - summary.retried),
   });
   for (const { rule, reason } of skipped) {
     args.log(`agent rule ${rule.address.toBase58()} skipped: ${reason}`);
@@ -354,9 +571,6 @@ export async function chargeAgentRules(args: {
     }
   }
 
-  const delayMs = args.delayMs ?? AGENT_RULE_DELAY_MS;
-  const pause = args.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  let first = true;
   for (let i = 0; i < selected.length; i += 1) {
     const rule = selected[i]!;
     const id = rule.address.toBase58();
@@ -366,8 +580,7 @@ export async function chargeAgentRules(args: {
       summary.skipped += 1;
       continue;
     }
-    if (!first) await pause(delayMs);
-    first = false;
+    await beforeSend();
     summary.charged += 1;
     try {
       const receipt = await args.deps.submit(rule, quote.amount, nonce);
@@ -392,11 +605,9 @@ export async function chargeAgentRules(args: {
       }
     }
   }
-  args.log(
-    `agent rules: found=${summary.found} charged=${summary.charged} paid=${summary.paid} refused=${summary.refused} failed=${summary.failed} skipped=${summary.skipped} nonce=${nonce.toString()}`,
-  );
-  return summary;
+  return finish();
 }
+
 
 function describe(err: unknown): string {
   return redactRpcUrlsInText(err instanceof Error ? err.message : String(err));

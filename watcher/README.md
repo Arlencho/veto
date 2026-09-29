@@ -90,6 +90,15 @@ moves no money.
 4. Expect one request every six hours, at 00:00, 06:00, 12:00 and 18:00
    Stockholm time. With these limits, cheaper hours are paid and pricier hours
    are refused, so on most days you see both.
+5. To let one refused request through, open the refused decision and press and
+   hold "allow this one payment" (the program's `grant_override`). On its next
+   run, within six hours, the watcher sends that request again with the same
+   nonce and amount, before the new slot's request. It retries once per allow,
+   and only when the program would pay it: the amount is within the allowed
+   amount and what is left in the rule. The log line is
+   `agent rule <address> allow-one retry paid|refused amount=... nonce=... sig=...`.
+   The configured rule gets the same retry on its own path, before its slot
+   charge; the journal is not changed, the payment is on the chain ledger.
 
 ## Hold alerts
 

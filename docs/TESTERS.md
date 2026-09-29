@@ -108,6 +108,12 @@ per payment, cheaper hours are paid and pricier hours are refused, so on most
 days you see both. A refusal moves no money. Use **Stop the rule** on the
 rule's screen to stop the requests.
 
+When a request is refused as over your per-payment limit, open that decision
+and press and hold **allow this one payment**. The demo agent sends that same
+request again, same amount, on its next run: the next of 00:00, 06:00, 12:00
+or 18:00 Stockholm time, so within six hours. It is paid once and your limit
+stays as it was. The new request for that run follows right after it.
+
 ## Tell us
 
 [Send tester feedback](https://github.com/Arlencho/veto/issues/new?template=tester-feedback.yml): which phone and wallet you used, how far you got and where you got stuck. The optional wallet address lets us match your feedback with what happened on devnet; issues are public. Never include a recovery phrase or private key.

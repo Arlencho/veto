@@ -86,10 +86,10 @@ moves no money.
 2. Set the payee to the demo payee `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`.
    A rule with any other payee is skipped.
 3. Use devnet USDC with 1 USDC per payment and 10 USDC in total, and approve
-   the rule.
+   the rule. The 10 USDC moves into the rule's own account.
 4. Expect one request every six hours, at 00:00, 06:00, 12:00 and 18:00
    Stockholm time. With these limits, cheaper hours are paid and pricier hours
-   are refused, so you see both.
+   are refused, so on most days you see both.
 
 ## Hold alerts
 

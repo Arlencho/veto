@@ -91,19 +91,22 @@ Does the explanation make sense? A grade describes behaviour, not safety.
 Our demo agent runs all the time and sends a request to every open payment rule
 that names it. Approve one rule for it to get paid and refused notifications for days.
 
-1. Choose owner-direct connect and paste the agent address
-   `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w`
-   (the Agent row in [DEVNET.md](DEVNET.md)).
+1. Open **Rules**, tap **Write a rule**, keep **Payment rule** selected and paste
+   the agent address `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` in the
+   **Agent** field (the Agent row in [DEVNET.md](DEVNET.md)).
 2. Set **Payee** to the demo payee `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`.
    A rule with another payee is skipped.
-3. Fund it with devnet USDC and keep the limits small, for example
-   **Most per payment** 0.50 and **Most in total, ever** 5. Approve the rule.
+3. Fund it with devnet USDC and set **Most per payment** 1 and
+   **Most in total, ever** 10. Approve the rule. The 10 USDC moves into the
+   rule's own account, which you control, so hold at least that much devnet
+   USDC first.
 4. Expect a request every six hours, at 00:00, 06:00, 12:00 and 18:00 Stockholm
-   time. The amount follows the Swedish electricity spot price.
+   time. The amount follows the Swedish electricity spot price for a 6 kWh top-up.
 
-The request follows the spot price, not your per-payment limit, so a
-tight limit refuses the expensive hours and pays the cheap ones. A refusal
-moves no money. Revoke the rule in the app to stop the requests.
+The request follows the spot price, not your per-payment limit. With 1 USDC
+per payment, cheaper hours are paid and pricier hours are refused, so on most
+days you see both. A refusal moves no money. Use **Stop the rule** on the
+rule's screen to stop the requests.
 
 ## Tell us
 

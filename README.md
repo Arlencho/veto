@@ -2,12 +2,14 @@
 
 ## Judges start here
 
-**Veto is a spending rule for your AI agent instead of your wallet.** You approve the rule once in Seed Vault, the agent pays within it with its own key, requests that break the limits are refused and recorded on chain, and you can allow one over-limit payment or stop the rule from your phone.
+**Give your AI agent a spending rule. Keep your wallet key.** Approve in Seed Vault; the agent uses its own key. Requests reaching the program's decision logic are paid or recorded as refused. From your phone, allow one payment over the per-payment limit or stop the rule.
 
-- **Try it in 5 minutes:** install the [APK](https://github.com/Arlencho/veto/releases/latest) (devnet, test USDC) and follow the [guide](https://veto-hq.github.io/try/). The built-in test agent sends one payment inside the rule and one just over it. Our demo agent can charge your rule every six hours.
-- **One real refusal anyone can look up:** [26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) on devnet. The agent asked for 12.90 USDC, the limit is 5 USDC per payment, it was refused and no payment tokens moved. The owner then allowed it once, and the retry paid: [261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
-- **Check a record yourself:** run the `tools/export.ts` and `tools/verify.ts` commands in [See it on devnet](#see-it-on-devnet) with the refusal signature above. Verify ends with "Mandate limits, ledger entry, and charge transaction agree."
-- **Scope:** devnet only, test money with no value. Not externally audited. The devnet program is upgradeable by its single deployer key (see [Threat model](#threat-model)).
+- **Recorded example:** [12.90 USDC refused](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) against a 5 USDC limit; [paid after owner approval](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
+- **Try it:** [Android APK](https://github.com/Arlencho/veto/releases/latest) and [setup guide](https://veto-hq.github.io/try/). Fund a test-agent rule, then tap **Send two test requests**.
+- **Verify:** [Export and verification commands](#see-it-on-devnet), using the refusal signature above.
+- **Scope:** devnet test money only. Not externally audited. [One deployer key can upgrade the program](#threat-model).
+
+## What Veto is
 
 **Everyone stops the overspend. Veto also records why it stopped.**
 

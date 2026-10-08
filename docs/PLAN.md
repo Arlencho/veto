@@ -165,7 +165,7 @@ Dates below are the hackathon calendar. The cut lines and the old self-score liv
 | **Oct 1** | Mandate opened from the phone with one signature. Today view and ledger reading real history. Revoke works. |
 | **Oct 4** | Override path. Local notifications from an on-device background read. Export and off-phone verify. Release APK. |
 | **Oct 6** | Three-minute video shot on device. Deck done. |
-| **Oct 8** | Submitted. The deadline is October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)). |
+| **Oct 8** | Submitted. |
 
 On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiGKYDk4zaVmFxdJ2RPj4MTujgR39g` has three paid charges and six refusals from 2026-09-20 20:57:50 UTC through 2026-09-21 22:00:11 UTC. That span is not a week, and it cannot be backfilled. Mobile Wallet Adapter `authorize` and the Seed Vault signatures have not been checked on a Seeker. Hold is live on devnet as of the 2026-09-25 upgrade recorded in [DEVNET.md](DEVNET.md). The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 

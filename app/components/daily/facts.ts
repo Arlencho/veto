@@ -1,6 +1,7 @@
 import { KIND_ADVISORY_DECLINE } from '../../lib/advisory';
 import { KIND_OPENED, KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, KIND_REVOKED } from '../../lib/constants';
 import { formatBaseUnits } from '../../lib/format';
+import { paidAboveLimit } from '../../lib/override';
 
 const BREAKS_STREAK = new Set<number>([KIND_PAID, KIND_OVERRIDE, KIND_ADVISORY_DECLINE]);
 const SKIP_STREAK = new Set<number>([KIND_OPENED, KIND_REVOKED]);
@@ -144,4 +145,30 @@ export function homeBlockCaption(left: string, right: string, blocks = 30): stri
   return blocks === 30
     ? `1 block is one thirtieth of your ${capText}${suffix}`
     : `1 block is one share of your ${capText}${suffix}`;
+}
+
+export type PaidTileCopy = {
+  hint: string;
+  accessibilityLabel: string;
+};
+
+/**
+ * The Overview "Paid by your agent" tile. `paid` is the rule's on-chain payment count;
+ * `rows` is the ledger history this screen read. "All within the rule" is said only when
+ * every payment is in that history and each one is at or under the per-payment limit.
+ */
+export function paidTileCopy(
+  paid: number,
+  rows: readonly { kind: number; amount: bigint }[],
+  perTxMax: bigint,
+): PaidTileCopy {
+  const paidRows = rows.filter((row) => row.kind === KIND_PAID);
+  const allowedOnce = paidRows.filter((row) => paidAboveLimit(row.amount, perTxMax)).length;
+  const label = `${paid} ${paid === 1 ? 'payment' : 'payments'} paid by your agent`;
+  if (allowedOnce > 0) {
+    const hint = `${allowedOnce} allowed once by you`;
+    return { hint, accessibilityLabel: `${label}, ${hint}` };
+  }
+  const hint = paidRows.length >= paid ? 'all within the rule' : 'each checked against the rule';
+  return { hint, accessibilityLabel: `${label}, ${hint}` };
 }

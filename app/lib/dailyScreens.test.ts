@@ -510,6 +510,46 @@ test('home reads loading, empty, error, and the chain amounts', async () => {
   await act(async () => root.unmount());
 });
 
+test('home paid tile says how many payments the owner allowed once above the limit', async () => {
+  const Screen = (await import('../app/(tabs)/index')).default;
+  const paidRow = (nonce: bigint, amount: bigint, merchant: string) => ({
+    kind: KIND_PAID,
+    ts: 1n,
+    amount,
+    counterparty: merchant,
+    nonce,
+    suggestedOverride: 0n,
+    kindName: 'paid',
+    reason: 0,
+    reasonText: '',
+    signature: null,
+  });
+  const rule = mandate({ perTxMax: 5_000_000n, spendCount: 2, cap: 50_000_000n, spent: 13_900_000n });
+  chain.mandateStatus = 'present';
+  chain.error = null;
+  chain.mandate = rule;
+  chain.mandates = [rule];
+  chain.rows = [paidRow(1n, 1_000_000n, rule.merchant), paidRow(2n, 12_900_000n, rule.merchant)];
+  let root = await mount(createElement(Screen));
+  let text = textOf(root);
+  assert.match(text, /by your agent/);
+  assert.match(text, /1 allowed once by you/);
+  assert.doesNotMatch(text, /all within the rule/);
+  assert.doesNotMatch(text, /nonce/i);
+  assert.ok(
+    root.root.findAll((node) => node.props.accessibilityLabel === '2 payments paid by your agent, 1 allowed once by you').length > 0,
+  );
+  await act(async () => root.unmount());
+
+  chain.rows = [paidRow(1n, 1_000_000n, rule.merchant), paidRow(2n, 5_000_000n, rule.merchant)];
+  root = await mount(createElement(Screen));
+  text = textOf(root);
+  assert.match(text, /all within the rule/);
+  assert.doesNotMatch(text, /allowed once/);
+  await act(async () => root.unmount());
+  chain.rows = [];
+});
+
 test('home offers Get devnet USDC on the empty state only for that mint, and names the USDC note once', async () => {
   const Screen = (await import('../app/(tabs)/index')).default;
   const previous = chain.config;

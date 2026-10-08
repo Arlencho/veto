@@ -1,6 +1,13 @@
 # Veto
 
-Seeker owner? [Try Veto on devnet before October 8](docs/TESTERS.md).
+## Judges start here
+
+**Veto is a spending rule for your AI agent instead of your wallet.** You approve the rule once in Seed Vault, the agent pays within it with its own key, requests that break the limits are refused and recorded on chain, and you can allow one over-limit payment or stop the rule from your phone.
+
+- **Try it in 5 minutes:** install the [APK](https://github.com/Arlencho/veto/releases/latest) (devnet, test USDC) and follow the [guide](https://veto-hq.github.io/try/). The built-in test agent sends one payment inside the rule and one just over it. Our demo agent can charge your rule every six hours.
+- **One real refusal anyone can look up:** [26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) on devnet. The agent asked for 12.90 USDC, the limit is 5 USDC per payment, it was refused and no payment tokens moved. The owner then allowed it once, and the retry paid: [261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
+- **Check a record yourself:** run the `tools/export.ts` and `tools/verify.ts` commands in [See it on devnet](#see-it-on-devnet) with the refusal signature above. Verify ends with "Mandate limits, ledger entry, and charge transaction agree."
+- **Scope:** devnet only, test money with no value. Not externally audited. The devnet program is upgradeable by its single deployer key (see [Threat model](#threat-model)).
 
 **Everyone stops the overspend. Veto also records why it stopped.**
 
@@ -19,8 +26,8 @@ when the owner closes the rule.
 
 AP2 specified the record of a yes. This is the missing half.
 
-> Status: in development for the Solana Mobile "Clock In" hackathon. Submissions close
-> October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
+> Status: built for the Solana Mobile "Clock In" hackathon
+> ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 > See [docs/PLAN.md](docs/PLAN.md) for the build plan,
 > [docs/PITCH.md](docs/PITCH.md) for the positioning, and
 > [docs/internal/DECISIONS.md](docs/internal/DECISIONS.md) for why each choice was made and what would reverse it.

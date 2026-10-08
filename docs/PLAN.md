@@ -2,7 +2,7 @@
 
 This file is the internal build plan. Product claims live in the [README](../README.md), [PITCH.md](PITCH.md), and [PROBLEM.md](PROBLEM.md).
 
-Solana Mobile "Clock In" hackathon. Submissions close October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
+Solana Mobile "Clock In" hackathon ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 
 The project is named veto. The recorded refusal is the product. Capped on-chain agent budgets
 already exist.

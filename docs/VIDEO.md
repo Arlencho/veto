@@ -1,108 +1,93 @@
 # The three-minute video
 
-Recording target: 2026-10-06. This is the intended release shot list, with recording gates below. Maximum running time is 03:00 including the last frame. Use real Seekers with the release APK. Keep both phones visible for the guardian beat. The tabs are Overview, Rules, Agents, and Decisions.
+This is the current shot list. Maximum running time is 03:00 including the last frame. Judges read the transcript, so every spoken line below is written to read well as text on its own. Say the lines as written.
 
-All transactions are on Solana devnet. USDC means Circle's devnet test token, with no value. The indexed bill pays our counterparty and buys no electricity. The trade uses our own pool; its rate is set by its reserves, not a claim about a market price.
+All transactions are on Solana devnet. USDC means Circle's devnet test token, with no value. The charging agent pays our own test payee for a bill priced from a public electricity index. It buys no electricity.
 
-## Recording gates, off screen only
+## The story on chain
 
-| Beat | Dependency | Evidence required before keeping it |
+One rule carries the whole story. Every row below is a confirmed devnet transaction; read it yourself before the take with `getTransaction` on `https://api.devnet.solana.com`.
+
+| Role | Address |
+|---|---|
+| Charging agent | `8hegVoB83hZaLMacF8L5zfjpfo33ZZwBYyeNzxSZHC8i` |
+| Rule | `EWz9bHJVySsdqMSsLp7nsp7T4FheUkdE6pY8MgomYa4v` |
+| Owner | `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` |
+| Payee | `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG` |
+
+The rule allows 5 USDC per payment and 20 USDC in total. Its purpose reads "Charging top-ups at the SE3 spot rate".
+
+| Step (2026-09-29, UTC) | What happened | Transaction |
 |---|---|---|
-| USDC paid and refused | Existing spending rule | Both rows visible on the Seeker, with matching public devnet transactions. |
-| Trade, 00:48 to 01:35 | Trade rule devnet upgrade and app trade screens ([PR 294](https://github.com/Arlencho/veto/pull/294)) by **2026-10-05**, plus matching SDK and script | One trade and all four recorded refusals, with reasons 11, 12, 13 and 14 visible in Decisions and matching explorer logs. |
-| Owner-direct, 01:35 to 02:10 | **npm publish** of `@veto-hq/veto` and its SDK dependency | A clean machine runs the published command, displays a QR, and completes approval plus both MCP payment outcomes. |
-| Protect and Hold | Release APK, funded vault, configured guardian and notification permission | Both Seekers complete the alert, guardian signature and confirmed Stop on devnet. |
+| 11:18:13 | Owner opens the rule: 20 total, 5 per payment | [3M3QoWgc](https://explorer.solana.com/tx/3M3QoWgc2qWuit32P2tsrFk48jPW5NY4J6T7Zpt5vVw6bxqTx1iLBTX1gTSe7TNEHCT2Xqqf3FTSTP5Bk5ym3J5s?cluster=devnet) |
+| 11:18:40 | Agent asks for 4.20, paid. 15.80 left | [deFpkv1m](https://explorer.solana.com/tx/deFpkv1m5jJxyc1725Tsv4KeTUaatnyPrWgc9M3m6LaCWLjSDpc5ddBeVLN3DwVecQfGDFra5g67tuPvRCK2RqR?cluster=devnet) |
+| 11:19:03 | Agent asks for 12.90, refused as over the per-payment limit. No tokens move | [26xUMWrT](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) |
+| 11:23:53 | Owner allows that one payment of 12.90 | [2UctcWfS](https://explorer.solana.com/tx/2UctcWfSsaHCL5WQbPetUGCUdks5LU7nCnPQga7VtyQXHUpGwDTW87cjhc392EUrrsV6tcT5bEGY2cYGhULfecL3?cluster=devnet) |
+| 11:24:21 | Agent retries 12.90, paid. 2.90 of 20 left | [261ED3JC](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet) |
 
-The trade beat does not depend on npm if its rehearsal script uses the matching checkout. The owner-direct spending beat does not depend on the trade upgrade. Cut either gated interval independently if its evidence is missing. Join the preceding shot directly to the next retained beat and shorten the runtime: 02:13 without trade, 02:25 without owner-direct, 01:38 without both. Do not add filler or captions such as pending, coming soon, upgrade required or unpublished. These gates are production notes, never on-screen status words. Real product outcomes such as Paid, Refused and Waiting remain visible.
-
-The trade instruction (#286) and the SDK trade client (#291) are on main. The devnet program was last upgraded 2026-09-25T12:18Z (docs/DEVNET.md), before #286 merged, so the deployed program has no trade instruction until the next upgrade. Trade reasons 11 through 14 are defined in `programs/veto/src/trade_state.rs`. Main has only the trade reason constants in `app/lib/constants.ts`, not trade rules or trade refusals on screen. The app trade screens are on `feat/app-trade-rule` ([PR 294](https://github.com/Arlencho/veto/pull/294)) and are a deliverable of the trade gate alongside the devnet upgrade. Recheck the merged release code before recording. `cli/package.json` is currently private and uses a local SDK dependency, so the npm shot is likewise conditional.
+The refusal's program log is `VETO REFUSED reason=5 (over per-payment maximum) amount=12900000 per_tx_max=5000000 remaining=15800000 override_to_clear=12900000`. Show that log on screen; do not read it aloud.
 
 ## Shot list
 
-**00:00 to 00:03. Both Seekers.**
+**00:00 to 00:10. Open.**
 
-Hold both real Seekers in frame for three seconds, establishing the owner phone and the guardian phone before the first refusal.
+The Seeker in hand, Veto on **Overview**.
 
-**00:03 to 00:15. The USDC refusal.**
+Voice: *"This is Veto. Instead of handing my AI agent my wallet, I give it a spending rule."*
 
-Open a real Refused row from Decisions on the Seeker for rule `UsRHyKtm41XMpQUcFGevYKgdWJEHQUf44QDCxLjEGWh`. Show its amount and refusal sentence. Choose a per-payment refusal above 0.50 USDC: the phone shows the sentence; the explorer log shows reason 5. Use the actual recorded amount, never the old 16.659625-over-10 example.
+**00:10 to 00:32. The rule.**
 
-Voice: *"The agent asked to pay more than I allowed. The program refused, and recorded why. No payment moved."*
+Open the rule from **Rules**. Show 5 USDC per payment, 20 USDC in total, the payee and the purpose. Cut to the approval: **Press and hold to approve rule**, then the Seed Vault sheet.
 
-**00:15 to 00:33. The USDC rule.**
+Voice: *"My charging agent can pay up to 5 USDC at a time, and 20 in total, to one payee. I approved that once, in Seed Vault. The agent pays with its own key. It never gets mine."*
 
-Open that same rule from Rules. The open is not listed on Decisions. Show **Total cap** 20 USDC, **Per payment, max** 0.50 USDC, **Expires**, and **Payee**. It was opened for 40 days. The screen shows an expiry date, not a promise of 40 days remaining. The payee is `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`; the app truncates it.
+**00:32 to 00:45. A payment inside the rule.**
 
-Voice: *"I approved 20 USDC in total, at most half a USDC per payment, for 40 days, to this payee. The agent cannot widen those limits."*
+Open the paid 4.20 row in **Decisions**.
 
-**00:33 to 00:48. One paid, one refused.**
+Voice: *"It asked for 4.20. That fits the rule, so it was paid, and I did not have to do anything."*
 
-In Decisions on the Seeker, open one Paid row within the limit and return to the Refused row on this same USDC rule. Open the refusal's actual transaction in the public explorer with `cluster=devnet`. Show the matching amount: the phone shows the sentence; the explorer log shows reason 5. The payment must also be within the remaining cap, before expiry and otherwise valid. Refused payments still incur transaction fees.
+**00:45 to 01:10. The refusal.**
 
-Voice: *"Inside the rule, it paid without another approval. Over the payment limit, it recorded a refusal. This is devnet test USDC, paying our counterparty for a bill repriced by a public index. It buys no electricity."*
+Open the refused 12.90 row in **Decisions** and show its sentence. Cut to the same transaction in the public explorer with `cluster=devnet`: the transaction succeeded, the token balances are unchanged, and the log line names the reason.
 
-**00:48 to 01:35. Trade and four escape attempts.**
+Voice: *"Then it asked for 12.90. That is more than my limit of 5. Veto said no, and wrote down why, on the blockchain. Not one token moved. Anyone can look this up."*
 
-Recording dependency: trade upgrade gate above. This whole interval is removable.
+**01:10 to 01:35. Allow it once.**
 
-Show the approved trade rule and one agent trade from SOL, represented by wrapped SOL in the token accounts, to USDC. The only approved pool is `DTFPL7GmcFN9yc6Yv2FZrq158gRhM8JG1v6svgcNNjxL`, documented in [DEVNET.md](DEVNET.md). Output goes to the owner's pinned USDC token account.
+On the refused decision, hold **Press and hold to allow this one payment** (the button names the amount), then sign in Seed Vault. Show the agent's retry arriving as a paid row.
 
-Then show a script with only the agent key submit four separate attempts. It must send transactions to the program, not merely trigger SDK validation. Keep other checks valid so each intended reason is reached. Show each refused row and its reason in Decisions on the Seeker, paired with the same transaction in the explorer. Budget 7 seconds for the allowed trade and 10 seconds for each refusal, totaling 47 seconds.
+Voice: *"Maybe that charge was fine. I can allow this one payment, and only this one. I sign in Seed Vault, the agent tries again, and it is paid. My limit is still 5."*
 
-| Attempt | Recorded reason | What the shot establishes |
-|---|---|---|
-| Redirect the swap output to the agent's own account | 11, destination not allowed | Output stays bound to the owner's approved account. |
-| Route through the agent's own pool | 12, pool not allowed | The approved pool cannot be substituted. |
-| Exceed the current 24-hour input allowance | 13, over daily limit | The agent cannot exceed the rule's daily total. |
-| Trade when the quote is below the approved price floor | 14, below floor | The program refuses the below-floor quote. |
+**01:35 to 01:45. What is left.**
 
-Voice: *"The agent can trade SOL to USDC through this one pool, back to my account. Now the same agent key tries its own destination, its own pool, more than the daily allowance, and a quote below my floor. Four refusals, recorded on chain. Each reason is here on the phone and in the explorer."*
+Show the rule with 2.90 of 20 USDC left, and the **Stop the rule** control.
 
-Show confirmed program refusals and no swap balance movement for those attempts. A simulation failure, client rejection, failed transaction, or advisory memo cannot stand in for a recorded trade refusal. Use the deployed app's actual labels; the table describes the reasons, not invented screen copy.
+Voice: *"2.90 of my 20 is left. When it runs out, the agent cannot pay. And I can stop the rule from my phone at any time."*
 
-**01:35 to 02:10. Owner-direct connection.**
+**01:45 to 02:10. Any assistant can use it.**
 
-Recording dependency: npm publish gate above. This whole interval is removable.
+On a laptop, an assistant connected to the Veto command line tool as an MCP server (`npx -y @veto-hq/veto mcp`) calls `veto_pay` once inside its rule and once over the limit. Show both results, then both rows in **Decisions** on the phone. Use the real amounts from the take. Do not show an assistant vendor name, logo, title bar or configuration filename that identifies one.
 
-On a clean laptop run the command with all rule prompts pre-answered so the connection fits its 35 seconds:
+Voice: *"Any assistant that supports MCP can use a rule the same way. It asks to pay. This one is paid. This one is over the limit, so it is refused, and that is recorded too."*
 
-```bash
-npx @veto-hq/veto connect --payee 6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG --max 500000 --cap 20000000 --days 40 --purpose "Demo payments"
-```
+**02:10 to 02:40. Try it yourself.**
 
-Show the generated QR. Use a fresh agent key and a separate spending rule for this shot. On devnet the default mint is USDC; amounts are base units. These flags set 0.50 USDC per payment, 20 USDC total and 40 days.
+Show the Try page, <https://veto-hq.github.io/try/>, and the latest release APK. On the phone, tap **Send two test requests** and show one paid and one refused outcome. Then show a rule named for our demo agent and a request from it.
 
-The Seeker scans the QR, reviews the request and holds **Press and hold to approve rule**, then completes the wallet signature. Hold the camera frame through signing so **Waiting on Seed Vault...** and the Seed Vault sheet are visible. Show the connected result. An MCP-capable assistant connected to the CLI's MCP server then calls `veto_pay` once inside the rule and once above the limit. For the freshly funded rule, use `{"amount":"250000"}` and `{"amount":"500001"}`: 0.25 USDC paid, 0.500001 USDC refused. Show both results and matching Decisions rows: the phone shows the sentence; the explorer and the tool result show reason 5. For example, the phone says "Asked for 0.500001 USDC, over the 0.50 USDC per-payment maximum." Do not show an assistant vendor name, logo, title bar or configuration filename identifying one.
+Voice: *"You can try this in five minutes. Install the app from our Try page. It runs on devnet, with test money. The built-in test agent sends one payment inside your rule and one just over it. Or give our demo agent a rule, and it will charge you every six hours."*
 
-Voice: *"Connect gives me a QR. I scan, review, and hold to approve, signed in the Seeker's Seed Vault. My assistant can now ask to pay. This one pays. This one is refused by the same on-chain rule."*
+**02:40 to 03:00. Close.**
 
-**02:10 to 02:18. Protect cut-in.**
+Return to the refused 12.90 row.
 
-Use a separate first-run take so this survives cutting the owner-direct interval. Show **Next: protect your money**, then **Protect the rest of your money** and **Set up with my second Seeker**. Cut before the full setup; the next shot uses the vault prepared during rehearsal.
-
-Voice: *"Onboarding also offers Hold, with my second Seeker as the guardian."*
-
-**02:18 to 02:50. Hold and the guardian.**
-
-Both Seekers in frame. Use a funded vault configured for **1 day**, with the second Seeker's distinct wallet as guardian. On the owner phone request a big withdrawal above the everyday limit to a new address. Show the waiting withdrawal and chain-clock countdown. Nothing is released by this request.
-
-The second Seeker receives the real alert. Open it to **You are the guardian**, with the matching amount and destination. The guardian taps and holds **Stop this withdrawal**, completes its wallet signature, and shows **Confirmed on the blockchain**. Hold the camera frame through signing so the Seed Vault sheet is visible. Confirm that this withdrawal is stopped and the funds stay in the vault. A quick tap alone does not sign: this control uses the same hold gesture as approval.
-
-Voice: *"A big withdrawal to a new address waits one day. My second Seeker gets the alert. I stop this withdrawal with its guardian key, signed in the Seeker's Seed Vault. The money stays in the vault."*
-
-**02:50 to 03:00. Close.**
-
-Return to the same USDC refusal as the first refusal beat.
-
-Voice: *"Give an agent a rule. Keep the limits on chain. When the answer is no, keep the reason too."*
+Voice: *"Agents are going to spend money for us. Our goal is that every agent pays inside a rule its owner set, and every no leaves a record anyone can check."*
 
 ## Rules for the edit
 
 - A refusal is the product working. No red error flash or error sound.
-- Use real device footage and real matching transaction logs. Do not substitute design mockups or another rule's history.
-- Decisions is the history entry point. Overview only shows today's latest decisions. The on-chain ring holds 32 rows; rehearse and capture before needed rows fall out, and confirm any history source actually displays them.
-- Keep agent advisory declines distinct: an advisory memo submits no charge and is not a program refusal.
-- No assistant vendor names, em dashes, release-status overlays or unsupported claims in titles, narration or captions.
+- Use real device footage and the real matching transactions above. Do not substitute design mockups or another rule's history.
+- The rule's on-chain ledger keeps the latest 32 decisions. The rule has 2.90 USDC left, so at most one more payment of up to 2.90 can be paid; refusals still add rows. Capture the rows before any are overwritten.
+- No captions or narration with reason codes, nonces, base units or other internal terms. The log line on screen is enough.
+- No AI vendor names, em or en dashes, release-status overlays or unsupported claims in titles, narration or captions.
 - Keep devnet visible. No background music over explorer logs. Finish within three minutes.
-
-See [internal/RECORDING.md](internal/RECORDING.md) for the rehearsal checklist and source checks.

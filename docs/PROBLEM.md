@@ -70,4 +70,4 @@ verifiable credential. There is no signing ceremony and no verifier service.
 
 Capped agent spending on chain is not new. The prior art is named in the [README](../README.md).
 
-The record is the prior claim and the decisions under it. Submissions close October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
+The record is the prior claim and the decisions under it.

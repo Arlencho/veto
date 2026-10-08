@@ -221,12 +221,24 @@ function countRule(rows: readonly GradeDecision[], perTxMax?: bigint | null): Co
   const refusalNonces = new Set(refused.map((row) => row.nonce));
   const paidInside: GradeDecision[] = [];
   const settlements: GradeDecision[] = [];
+  // Allowances with no refusal on the record, plus payments above the limit whose refusal
+  // and allowance have both left the ledger window. One entry per request.
+  const outsideFromMissingRefusal = allowances.filter((row) => !refusalNonces.has(row.nonce));
+  const outsideNonces = new Set(outsideFromMissingRefusal.map((row) => row.nonce));
   for (const row of rows) {
     if (row.kind !== KIND_PAID) {
       continue;
     }
     if (allowanceNonces.has(row.nonce) || paidAboveLimit(row.amount, perTxMax)) {
       settlements.push(row);
+      if (
+        !allowanceNonces.has(row.nonce) &&
+        !refusalNonces.has(row.nonce) &&
+        !outsideNonces.has(row.nonce)
+      ) {
+        outsideNonces.add(row.nonce);
+        outsideFromMissingRefusal.push(row);
+      }
     } else {
       paidInside.push(row);
     }
@@ -238,7 +250,7 @@ function countRule(rows: readonly GradeDecision[], perTxMax?: bigint | null): Co
     settlements,
     declines: rows.filter((row) => row.kind === KIND_ADVISORY_DECLINE),
     openedAt: openedAtOf(rows),
-    outsideFromMissingRefusal: allowances.filter((row) => !refusalNonces.has(row.nonce)),
+    outsideFromMissingRefusal,
   };
 }
 

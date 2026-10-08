@@ -126,3 +126,34 @@ test('the first payment inside the rule plaque skips a payment the owner allowed
   const pending = plaquesForRule(snapshotRule(facts(onlyAllowed), now), now).find((item) => item.id === 'first-payment');
   assert.equal(pending?.earned, false);
 });
+
+test('the Overview paid tile names an allowed-once count against the history shown when older payments are out of view', () => {
+  const copy = paidTileCopy(6, [row({ nonce: 6n, amount: 12_900_000n })], LIMIT);
+  assert.equal(copy.hint, '1 of the last 1 allowed once by you');
+  assert.equal(copy.accessibilityLabel, '6 payments paid by your agent, 1 of the last 1 allowed once by you');
+});
+
+test('the Overview paid tile never says more were allowed once than were paid', () => {
+  const rows = [row({ nonce: 1n, amount: 12_900_000n }), row({ nonce: 2n, amount: 6_000_000n })];
+  assert.equal(paidTileCopy(1, rows, LIMIT).hint, '1 allowed once by you');
+});
+
+test('the grade counts a payment above the limit as outside the rule once, with or without its refusal and allowance in view', () => {
+  const now = START + 2n * DAY;
+  const inside = row({ nonce: 1n, amount: 1_000_000n });
+  const above = row({ ts: START + DAY + 180n, nonce: 2n, amount: 12_900_000n });
+  const refusal = row({ kind: KIND_REFUSED, ts: START + DAY + 60n, nonce: 2n, amount: 12_900_000n, reason: REASON_OVER_PER_TX_MAX });
+  const allowance = row({ kind: KIND_OVERRIDE, ts: START + DAY + 120n, nonce: 2n, amount: 12_900_000n });
+  const cases: [string, GradeDecision[]][] = [
+    ['refusal, allowance and payment', [inside, refusal, allowance, above]],
+    ['allowance and payment', [inside, allowance, above]],
+    ['payment only', [inside, above]],
+    ['the same request read twice', [inside, above, { ...above }]],
+  ];
+  for (const [name, rows] of cases) {
+    const grade = gradeRules([snapshotRule(facts(rows), now)], now);
+    assert.equal(grade.paid, 1, name);
+    assert.equal(grade.outside, 1, name);
+    assert.equal(grade.requests, 2, name);
+  }
+});

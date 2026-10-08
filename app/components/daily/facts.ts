@@ -163,12 +163,16 @@ export function paidTileCopy(
   perTxMax: bigint,
 ): PaidTileCopy {
   const paidRows = rows.filter((row) => row.kind === KIND_PAID);
-  const allowedOnce = paidRows.filter((row) => paidAboveLimit(row.amount, perTxMax)).length;
+  const allowedOnce = Math.min(paid, paidRows.filter((row) => paidAboveLimit(row.amount, perTxMax)).length);
+  const complete = paidRows.length >= paid;
   const label = `${paid} ${paid === 1 ? 'payment' : 'payments'} paid by your agent`;
+  let hint: string;
   if (allowedOnce > 0) {
-    const hint = `${allowedOnce} allowed once by you`;
-    return { hint, accessibilityLabel: `${label}, ${hint}` };
+    hint = complete
+      ? `${allowedOnce} allowed once by you`
+      : `${allowedOnce} of the last ${paidRows.length} allowed once by you`;
+  } else {
+    hint = complete ? 'all within the rule' : 'each checked against the rule';
   }
-  const hint = paidRows.length >= paid ? 'all within the rule' : 'each checked against the rule';
   return { hint, accessibilityLabel: `${label}, ${hint}` };
 }

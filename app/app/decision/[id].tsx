@@ -296,7 +296,7 @@ function RefusedBody({
 }) {
   const asked = formatTokenAmount(row.amount, decimals, mint);
   const limit = perTxMax != null ? formatTokenAmount(perTxMax, decimals, mint) : null;
-  const reason = renderReason(row.reason, row.suggestedOverride, decimals, mint);
+  const reason = renderReason(row.reason, row.suggestedOverride, decimals, mint, row.family === 'trade' ? 'trade' : 'payment');
   const split = perTxMax != null ? barSplit(row.amount, perTxMax) : null;
   const needed =
     row.reason === REASON_OVER_PER_TX_MAX && row.suggestedOverride > 0n

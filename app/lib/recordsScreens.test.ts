@@ -757,6 +757,57 @@ for (const reason of [11, 12, 13, 14]) {
   });
 }
 
+test('a trade refusal over the per-trade limit explains a trade, not a payment', async () => {
+  const trade = {
+    address: 'TradeRule111111111111111111111111111111111',
+    owner: 'Owner111111111111111111111111111111111111111',
+    agent: 'Agent111111111111111111111111111111111111111',
+    source: 'Source11111111111111111111111111111111111111',
+    destination: 'Dest111111111111111111111111111111111111111',
+    inMint: VTEST_MINT,
+    outMint: VTEST_MINT,
+    exchangeProgram: 'Exch111111111111111111111111111111111111111',
+    exchangeKind: 0,
+    pool: 'Pool111111111111111111111111111111111111111',
+    poolAuthority: 'PoolAuth1111111111111111111111111111111111',
+    poolInVault: 'PoolIn11111111111111111111111111111111111111',
+    poolOutVault: 'PoolOut1111111111111111111111111111111111111',
+    poolMint: 'PoolMint1111111111111111111111111111111111',
+    poolFeeAccount: 'PoolFee1111111111111111111111111111111111111',
+    ruleId: 1n,
+    cap: 300n,
+    spent: 42n,
+    perTradeMax: 10n,
+    dailyLimit: 0n,
+    dailyBuckets: [],
+    floorNum: 0n,
+    floorDen: 1n,
+    expiresAt: 5_000n,
+    overrideAmount: 0n,
+    overrideNonce: 0n,
+    lastNonce: 1n,
+    purpose: 'Swap test',
+    status: STATUS_ACTIVE,
+    tradeCount: 1,
+    refusalCount: 1,
+    bump: 1,
+  };
+  const row = refusedRow({ family: 'trade', reasonText: 'over per-trade maximum', suggestedOverride: 14n });
+  params = { id: `${trade.address}:1700:2:2` };
+  chainState = baseChain({ mandate: null, mandates: [], tradeRule: trade, tradeRules: [trade], rows: [row] });
+  const { default: Detail } = await import('../app/decision/[id]');
+  const text = visibleText(await mount(createElement(Detail)));
+  assert.match(text, /Your agent asked to trade 14 VTEST\. Your rule allows 10 VTEST per trade, so the program refused\./);
+  assert.match(text, /Your limit per trade/);
+  assert.match(text, /Over your per-trade limit of 10 VTEST/);
+  assert.doesNotMatch(text, /per-payment|per payment/);
+  const { renderReason } = await import('./reasons');
+  assert.equal(
+    renderReason(row.reason, 14n, 0, VTEST_MINT, 'trade').overrideLine,
+    'A one-time allowance of 14 VTEST would have cleared the per-trade limit. All other checks still apply.',
+  );
+});
+
 test('the trade detail headline preserves every base unit', async () => {
   const { WSOL_MINT, DEVNET_USDC_MINT } = await import('./tokens');
   const row = { ...paidRow(), family: 'trade' as const, amount: 999_994n,

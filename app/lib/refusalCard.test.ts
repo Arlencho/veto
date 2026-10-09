@@ -194,7 +194,7 @@ test('the grant copy says this override allows this one payment, used once, neve
   const text = copy.paragraphs.join(' ');
   assert.match(
     text,
-    /allows this one payment of 14, used once, never above the remaining cap/,
+    /covers this one payment of 14, used once, never above the remaining cap/,
   );
   assert.match(text, /per-payment maximum on this rule is 10/);
   assert.match(text, /does not change/);
@@ -229,4 +229,29 @@ test('help says an override allows one payment, used once, never above the remai
   assert.match(refusalText, new RegExp(ALLOWS_ONE));
   assert.doesNotMatch(ruleText, RAISES_THE_MAXIMUM);
   assert.doesNotMatch(refusalText, RAISES_THE_MAXIMUM);
+});
+
+test('rendered help text never says override and does not overclaim what an allowance clears', async () => {
+  const [rule, refusalScreen] = await Promise.all([
+    import('../app/help/index'),
+    import('../app/help/refusal'),
+  ]);
+  const ruleText = visibleText(await mount(createElement(rule.default)));
+  const refusalText = visibleText(await mount(createElement(refusalScreen.default)));
+  for (const text of [ruleText, refusalText]) {
+    assert.doesNotMatch(text, /override/i);
+    assert.doesNotMatch(text, /would have cleared it/);
+  }
+  assert.match(ruleText, /A one-time allowance\s+does not change those numbers\./);
+  assert.match(
+    refusalText,
+    /If the payment exceeds the per-payment limit but fits within the\s+remaining cap, it also records the one-time allowance needed to clear that limit\. All other\s+checks still apply\./,
+  );
+});
+
+test('the home empty state names one-time allowances, not overrides', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
+  assert.match(source, /No payments, refusals, or one-time allowances on this rule today\./);
+  assert.doesNotMatch(source, /refusals, or overrides/);
 });

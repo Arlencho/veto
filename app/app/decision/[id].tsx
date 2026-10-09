@@ -296,12 +296,12 @@ function RefusedBody({
 }) {
   const asked = formatTokenAmount(row.amount, decimals, mint);
   const limit = perTxMax != null ? formatTokenAmount(perTxMax, decimals, mint) : null;
-  const reason = renderReason(row.reason, row.suggestedOverride, decimals, mint);
+  const reason = renderReason(row.reason, row.suggestedOverride, decimals, mint, row.family === 'trade' ? 'trade' : 'payment');
   const split = perTxMax != null ? barSplit(row.amount, perTxMax) : null;
   const needed =
     row.reason === REASON_OVER_PER_TX_MAX && row.suggestedOverride > 0n
       ? formatTokenAmount(row.suggestedOverride, decimals, mint)
-      : 'No override would have cleared this.';
+      : 'No one-time allowance would have cleared this.';
   return (
     <View style={styles.stack}>
       <StatusPill label="Refused" tone="refused" when={when} />

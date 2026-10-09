@@ -19,7 +19,9 @@ export default function HelpRefusalScreen() {
       </BrassWell>
       <Text style={styles.body}>
         When a payment would break the rule, the program does not pay. It records the refusal on
-        chain with the reason and the override that would have cleared it. Elsewhere the same
+        chain with the reason. If the payment exceeds the per-payment limit but fits within the
+        remaining cap, it also records the one-time allowance needed to clear that limit. All other
+        checks still apply. Elsewhere the same
         block is a failed transaction that leaves no trace. Here the no is the product.
       </Text>
       <Text style={styles.body}>
@@ -28,13 +30,13 @@ export default function HelpRefusalScreen() {
       <Text style={styles.h1}>The two keys</Text>
       <Text style={styles.body}>
         The owner key lives in Seed Vault and never leaves it. It is the only key that can open a
-        rule, grant an override, or revoke.
+        rule, allow a payment once, or revoke.
       </Text>
       <Text style={styles.body}>
         The agent key holds authority and none of your money. It can pay inside the rule, and nothing else.
-        It cannot widen any limit. Each rule has its own agent. An override the owner grants is a
+        It cannot widen any limit. Each rule has its own agent. A one-time allowance the owner grants is a
         recorded decision for one request, not a settings change. It allows one payment, used once, never above the remaining cap.
-        The per-payment maximum does not change. The total cap does not.
+        The per-payment maximum does not change. The total cap, payee and expiry rules still apply.
       </Text>
       <TopicRow
         tone="brass"

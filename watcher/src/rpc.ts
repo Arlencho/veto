@@ -310,7 +310,18 @@ export function redactRpcUrlsDeep(value: unknown, depth = 0, seen: WeakSet<objec
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) return "[redacted]";
   const out: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value)) out[key] = redactRpcUrlsDeep(item, depth + 1, seen);
+  for (const [key, item] of Object.entries(value)) {
+    // A key can be a URL too. Two keys that redact alike get a numeric suffix.
+    let name = redactRpcUrlsInText(key);
+    for (let n = 2; Object.prototype.hasOwnProperty.call(out, name); n += 1) name = `${redactRpcUrlsInText(key)}#${n}`;
+    // defineProperty, so a key named __proto__ is a plain property, not a prototype change.
+    Object.defineProperty(out, name, {
+      value: redactRpcUrlsDeep(item, depth + 1, seen),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
   return out;
 }
 

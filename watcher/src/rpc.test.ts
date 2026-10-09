@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { inspect } from "node:util";
 import { loadConfig } from "./config.js";
 import {
   DEFAULT_RPC_TIMEOUT_MS,
@@ -398,7 +399,10 @@ test("pr 395 review: a plain JSON-RPC rejection is redacted in message and neste
   const rpcError = {
     code: -32000,
     message: `subscribe refused at ${KEYED_URL_TEXT}`,
-    data: { endpoint: "wss://user:hunter2@rpc.example.com/v2/PATH-TOKEN?api-key=QUERY-TOKEN", nested: { urls: [KEYED_URL_TEXT], slot: 7 } },
+    data: {
+      endpoint: "wss://user:hunter2@rpc.example.com/v2/PATH-TOKEN?api-key=QUERY-TOKEN",
+      nested: { urls: [KEYED_URL_TEXT], slot: 7, "wss://user:hunter2@rpc.example.com/v2/PATH-TOKEN?api-key=QUERY-TOKEN": "keyed" },
+    },
   };
   let target: { _rpcWebSocketGeneration: number } | null = null;
   let calls = 0;
@@ -432,6 +436,10 @@ test("pr 395 review: a plain JSON-RPC rejection is redacted in message and neste
   const logged = (line[1] as { error: { code: number; message: string; data: { nested: { slot: number } } } }).error;
   const text = JSON.stringify(line);
   for (const token of KEY_TOKENS) assert.equal(text.includes(token), false, text);
+  // The console's own rendering, as it would appear in the job log.
+  const rendered = inspect(line, { depth: null });
+  for (const token of KEY_TOKENS) assert.equal(rendered.includes(token), false, rendered);
+  assert.equal((logged.data.nested as unknown as Record<string, unknown>)["wss://rpc.example.com"], "keyed", "a URL key is kept, redacted");
   assert.equal(logged.code, -32000, "the numeric code is kept");
   assert.equal(logged.data.nested.slot, 7, "the structure and other values are kept");
   assert.ok(logged.message.includes("https://rpc.example.com"), logged.message);
@@ -452,6 +460,14 @@ test("pr 395 review: deep redaction keeps scalars and shape and drops what it ca
   assert.ok(out.err instanceof Error);
   assert.equal((out.err as Error).cause, undefined, "no unsanitized cause is kept");
   assert.equal(out.when, "[redacted]");
+  const keyed = JSON.parse(
+    '{"code":3,"https://rpc.example.com/PATH-TOKEN":1,"https://rpc.example.com/QUERY-TOKEN":2,"__proto__":{"polluted":true}}',
+  );
+  const keyedOut = redactRpcUrlsDeep(keyed) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(keyedOut), ["code", "https://rpc.example.com", "https://rpc.example.com#2", "__proto__"]);
+  assert.equal(keyedOut.code, 3);
+  assert.equal(Object.getPrototypeOf(keyedOut), Object.prototype, "a __proto__ key does not change the prototype");
+  assert.equal(({} as Record<string, unknown>).polluted, undefined);
   const cyclic: Record<string, unknown> = { message: "https://rpc.example.com/PATH-TOKEN" };
   cyclic.self = cyclic;
   assert.equal(JSON.stringify(redactRpcUrlsDeep(cyclic)).includes("TOKEN"), false);

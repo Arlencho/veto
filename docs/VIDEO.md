@@ -6,7 +6,7 @@ All transactions are on Solana devnet. USDC means Circle's devnet test token, wi
 
 ## Submitted take
 
-Submitted take, recorded 2026-10-09 on a Seeker with release build 29: rule `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, agent `G1UKSxWvNRNep6Ec6yD67iKEkmDNRZP3pPcHDHa6QMDU`, owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`, 5 USDC per payment, 20 total, until 18 Nov 2026.
+Submitted take, recorded 2026-10-09 on a Seeker with release build 29 (v1.0.0-devnet.5): rule `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, agent `G1UKSxWvNRNep6Ec6yD67iKEkmDNRZP3pPcHDHa6QMDU`, owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`, 5 USDC per payment, 20 total, until 18 Nov 2026.
 
 The table lists every transaction on the rule, read with getSignaturesForAddress and getTransaction on https://api.devnet.solana.com on 2026-10-09. Each is finalized with no error.
 

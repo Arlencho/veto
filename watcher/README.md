@@ -92,18 +92,25 @@ moves no money.
    A rule with any other payee is skipped.
 3. Use devnet USDC with 1 USDC per payment and 10 USDC in total, and approve
    the rule. The 10 USDC moves into the rule's own account.
-4. Expect one request every six hours, at 00:00, 06:00, 12:00 and 18:00
-   Stockholm time. With these limits, cheaper hours are paid and pricier hours
-   are refused, so on most days you see both.
-5. To let one refused request through, open the refused decision and press and
-   hold "allow this one payment" (the program's `grant_override`). On its next
-   run, within six hours, the watcher sends that request again with the same
-   nonce and amount, before the new slot's request. It retries once per allow,
-   and only when the program would pay it: the amount is within the allowed
-   amount and what is left in the rule. The log line is
+4. Requests are scheduled for 00:00, 06:00, 12:00 and 18:00 Stockholm time,
+   subject to service availability and the pass limits above. Requests above
+   1 USDC are refused; requests at or below it can pay if the other rule
+   checks pass. Tester rules bypass calibration, so a mix of paid and
+   refused requests is not guaranteed.
+5. To request a retry, open the refused decision and press and hold
+   "allow this one payment" (the program's `grant_override`). Normally the
+   watcher checks on its next scheduled run. It uses the same nonce and
+   amount, provided the rule and allowance remain usable, the refusal and
+   allowance are still in the ledger ring, and the amount fits the raised
+   ceiling and remaining cap. Delegation, balance, frozen accounts and other
+   program checks can still stop payment. A recorded refusal after the
+   allowance stops another automatic retry for that allowance. Service or
+   RPC problems and per-pass limits can delay or prevent a retry. The log
+   line is
    `agent rule <address> allow-one retry paid|refused amount=... nonce=... sig=...`.
-   The configured rule gets the same retry on its own path, before its slot
-   charge; the journal is not changed, the payment is on the chain ledger.
+   The configured rule uses the same retry checks before its slot charge;
+   its retry does not change the journal. A successful retry transaction
+   records a paid or refused decision on the chain ledger.
 
 ## Hold alerts
 

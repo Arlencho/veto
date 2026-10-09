@@ -26,7 +26,7 @@ Every decision is a confirmed transaction that anyone can look up by its signatu
 program state is the rule's on-chain ledger. It keeps the latest 32 decisions, and it is deleted
 when the owner closes the rule.
 
-AP2 specified the record of a yes. This is the missing half.
+AP2 provides signed authorization mandates; Veto adds a structured refusal record on chain.
 
 > Status: built for the Solana Mobile "Clock In" hackathon
 > ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
@@ -537,7 +537,7 @@ To take a decision off the phone and check it from a laptop:
 ```bash
 cd indexer && npm ci
 cd ../tools && npm ci
-# maintainer only: npx tsx produce.ts (needs keys/owner.json)
+# maintainer only: npx tsx produce.ts (needs the gitignored keypairs under keys/)
 VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --signature <tx> --out refused.json
 VETO_RPC=https://api.devnet.solana.com npx tsx verify.ts refused.json
 VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --mandate <mandate> --format csv --out rule.csv
@@ -569,8 +569,9 @@ What a key can do under a mandate.
 - **Hold balances are held by the program.** A Hold vault is custody, not a delegation: the vault
   PDA is the authority of the vault's token account, and the program moves a deposited balance
   under the Hold rules above.
-- **A malicious merchant** can only receive what the mandate allows. A merchant cannot submit a
-  charge at all; only the named agent signs `charge`.
+- **A malicious merchant** can receive only what the mandate allows through `charge`. Being the
+  merchant grants no signing authority: submitting a charge requires the named agent's key. If
+  the merchant also controls that key, the compromised-agent bounds above apply.
 - **A forged mandate account cannot be substituted.** `charge` re-derives the mandate address from
   the fields stored inside it and rejects a mismatch, and the CPI signs as that PDA.
 - **Hold is live on devnet.** The vault instructions are in this repository and tested. The
@@ -590,7 +591,7 @@ What a key can do under a mandate.
   people who can replace the program and would still leave that replacement possible. A fix
   after the authority is set to none is a new program id and a new mandate. Devnet stays
   upgradeable under the single deployer key so findings can be fixed in place.
-- **Known limit.** The ledger records every decision this program reaches. A frozen source or
+- **Known limit.** The ledger records decisions reached in charge transactions that succeed; a failed transaction rolls back every ledger write, including a refusal reached before a later instruction fails. A frozen source or
   destination is inspected in `evaluate` and recorded as a refusal. Anchor account validation
   failures (wrong mint, wrong source, wrong ledger) and token-program declines this program does
   not inspect are errors with no entry. The program ledger has no entry for a charge the agent

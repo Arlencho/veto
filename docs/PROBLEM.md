@@ -57,8 +57,9 @@ A decision can be exported and checked against the chain from another machine. T
 
 ## What this does not claim
 
-The record is every payment made under the mandate, and every refusal the agent submitted. A
-charge the agent never submitted leaves no program ledger entry. When the operator supplies a
+The record covers payments and refusals produced by charge transactions that succeed. A failed
+charge transaction leaves no decision record, and a charge the agent never submits leaves no
+program ledger entry. When the operator supplies a
 purpose check and it declines, the agent records a memo shown as Agent declined (advisory). The
 program still enforces every number, whoever runs the agent can skip the check, and verify does
 not treat that memo as a program refusal. A refusal is one declined attempt against the mandate.

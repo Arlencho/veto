@@ -11,10 +11,9 @@ already exist.
 
 Limits on chain already exist. An overspend that is simply impossible protects the money and
 leaves only a failed transaction's logs, nothing in program state. Veto makes the refusal legible. A
-recorded no, a one-line why, and the override that would have cleared it. On a phone, with the
-key in Seed Vault.
+recorded no, a one-line why, and a suggested one-time allowance when one applies. Other checks can still stop the payment. On a phone, with the key in Seed Vault.
 
-AP2 specified the record of a yes. This is the missing half.
+AP2 provides signed authorization mandates; Veto adds a structured refusal record on chain.
 
 The mandate is the prior claim, the ledger is the evidence, and neither is worth anything alone.
 Who has the problem, and how a burner wallet compares, is in [PROBLEM.md](PROBLEM.md).
@@ -29,7 +28,7 @@ Capped agent spending is not new. The table names the limits that already exist.
 | SPL `approve` / delegate | Caps what a delegate can pull | Cap only. No purpose, no expiry, no reason, no record |
 | LazorKit | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
 | Oculus | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves |
-| x402 / AP2 | HTTP 402 settlement; signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | The record of a yes, held off chain as evidence for the merchant |
+| x402 / AP2 | HTTP 402 settlement; signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | AP2 provides signed authorization mandates; x402 settles payments over HTTP. Veto adds a structured refusal record on chain |
 | Seed Vault | Hardware-held keys, human approves every signature | The default on this platform. Unattended agent spend needs a bound beside that key |
 
 SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28, and no archived copy was found, so its row and quote were removed.
@@ -78,7 +77,7 @@ Revoking one of those rules does not clear another rule's account. A nonce advan
 payment, so a settled charge cannot be replayed, and a refused one can still be retried after
 an override.
 
-The refusal carries the override that would have cleared it. The live devnet line is in the
+The refusal carries a suggested one-time allowance when one applies; other checks can still stop the payment. The live devnet line is in the
 README: an amount, the per-payment maximum, the remaining cap, and `override_to_clear`.
 
 ### Hold
@@ -175,7 +174,7 @@ On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiG
 
 Snapshot as of 2026-09-24; see [docs/VIDEO.md](VIDEO.md) for the 2026-09-29 and 2026-10-09 device runs.
 
-1. **Done: Mobile Wallet Adapter and Seed Vault on a Seeker.** On 2026-09-24 this was open: the unit tests do not cover `authorize` or the Seed Vault signatures. The 2026-09-29 and 2026-10-09 runs in [VIDEO.md](VIDEO.md) record the rule open and the allow-once signed by the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` ([DEVNET.md](DEVNET.md)); the 2026-10-09 take was recorded on a Seeker with release build 29.
+1. **Done: Mobile Wallet Adapter and Seed Vault on a Seeker.** On 2026-09-24 this was open: the unit tests do not cover `authorize` or the Seed Vault signatures. The 2026-09-29 and 2026-10-09 runs in [VIDEO.md](VIDEO.md) record the rule open and the allow-once signed by the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` ([DEVNET.md](DEVNET.md)); the 2026-10-09 take was recorded on a Seeker with release build 29 (v1.0.0-devnet.5).
 2. **The quoted rule's history is the span above.** A later charge on that mandate does not turn the existing rows into a week.
 3. **A refusal has to confirm.** The balance is unchanged and the ledger entry exists in the same confirmed transaction. That is what the refusal test asserts.
 4. **A charge the agent never submits has no record.** Nothing on chain can provide one. The record is every decision the program reaches in a charge transaction that succeeds; a charge transaction that fails leaves no decision record. [PROBLEM.md](PROBLEM.md) states that limit.

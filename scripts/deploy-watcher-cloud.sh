@@ -710,6 +710,13 @@ job_exists_name() {
       rm -f "$err"
       return 0
     fi
+    # A dry-run against a new project runs before the Cloud Run API is
+    # enabled; there can be no job yet. A real deploy has already required
+    # the API to be on, so there this is still an error.
+    if [[ "$MODE" == "dry-run" ]] && grep -qi 'SERVICE_DISABLED\|has not been used in project\|API.* is disabled\|API.* not enabled' "$err"; then
+      rm -f "$err"
+      return 0
+    fi
     local first
     first="$(head -1 "$err")"
     rm -f "$err"

@@ -35,6 +35,15 @@ export const AGENT_RULE_DELAY_MS = 1_500;
  * at 15 minutes, and one charge can wait up to 90 s for confirmation, so the
  * default leaves room for the charge in flight and everything else the task runs. */
 export const DEFAULT_AGENT_PASS_BUDGET_MS = 8 * 60_000;
+/** In a `once` run the pass comes after the configured rule and the hold scan,
+ * which can take minutes, so its deadline counts from process start. */
+export const ONCE_PASS_DEADLINE_MS = 12 * 60_000;
+
+/** The pass budget for a `once` run: the configured budget, cut so no new
+ * charge starts later than ONCE_PASS_DEADLINE_MS after the process started. */
+export function oncePassBudgetMs(configuredMs: number, uptimeMs: number): number {
+  return Math.max(0, Math.min(configuredMs, ONCE_PASS_DEADLINE_MS - Math.ceil(uptimeMs)));
+}
 const STATUS_ACTIVE = 0;
 const SLOT_SECONDS = 6n * 60n * 60n;
 
@@ -283,9 +292,9 @@ export type AllowOnceOutcome = "paid" | "refused" | "failed" | "skipped";
  * pending. The journal is not touched: it records slot decisions, and the
  * retry is on the chain ledger. Never throws.
  *
- * With `memo`, the check runs once per lowest owed nonce (`opts.nonce`): it
- * is recorded after the read answered and no send failed, so a failed read or
- * a failed send is checked again on the next call.
+ * It is not memoised: an owner can grant an allow while a feed or FX gap
+ * keeps the slot owed, and a cached "nothing pending" would let the slot
+ * charge strand it when the price returns.
  */
 export async function retryConfiguredAllowOnce(args: {
   mandate: PublicKey;
@@ -294,27 +303,21 @@ export async function retryConfiguredAllowOnce(args: {
   readAccounts: (addresses: PublicKey[]) => Promise<(Uint8Array | null)[]>;
   opts: AllowOnceOpts;
   submit: (rule: AgentRule, amount: bigint, nonce: bigint) => Promise<ChargeReceipt>;
-  memo?: ConfiguredRetryMemo;
   log: (line: string) => void;
   logError: (line: string) => void;
 }): Promise<AllowOnceOutcome | "none"> {
-  if (args.memo !== undefined && args.memo.doneNonce === args.opts.nonce) return "none";
-  const done = (outcome: AllowOnceOutcome | "none"): AllowOnceOutcome | "none" => {
-    if (args.memo !== undefined && outcome !== "failed") args.memo.doneNonce = args.opts.nonce;
-    return outcome;
-  };
   let rule: AgentRule;
   let ledger: Uint8Array | null;
   try {
     const [mandateData, ledgerData] = await args.readAccounts([args.mandate, args.ledger]);
-    if (mandateData === null || mandateData === undefined) return done("none");
+    if (mandateData === null || mandateData === undefined) return "none";
     rule = decodeAgentRule(args.coder, args.mandate, Buffer.from(mandateData));
     ledger = ledgerData ?? null;
   } catch (err) {
     args.logError(`agent rule ${args.mandate.toBase58()} allow-one check failed: ${describe(err)}`);
     return "none";
   }
-  if (!hasPendingAllowOnce(rule)) return done("none");
+  if (!hasPendingAllowOnce(rule)) return "none";
   const result = await retryAllowOnce({
     rule,
     ledger,
@@ -323,11 +326,8 @@ export async function retryConfiguredAllowOnce(args: {
     log: args.log,
     logError: args.logError,
   });
-  return done(result.outcome);
+  return result.outcome;
 }
-
-/** The lowest owed nonce whose configured-rule retry check already ran in this process. */
-export type ConfiguredRetryMemo = { doneNonce: bigint | null };
 
 /** Send the retry for one rule and write one log line. Never throws; a rate
  * limit comes back as `rateLimited` so the caller can end its pass. */
@@ -336,11 +336,12 @@ export async function retryAllowOnce(args: {
   ledger: Uint8Array | null;
   opts: AllowOnceOpts;
   submit: (rule: AgentRule, amount: bigint, nonce: bigint) => Promise<ChargeReceipt>;
-  /** Runs just before the charge is sent, so the pause between charges happens only for a real send. */
-  beforeSend?: () => Promise<void>;
+  /** Runs just before the charge is sent, so the pause between charges happens
+   * only for a real send. False means the pass is out of time: nothing is sent. */
+  beforeSend?: () => Promise<boolean>;
   log: (line: string) => void;
   logError: (line: string) => void;
-}): Promise<{ outcome: AllowOnceOutcome; rateLimited: boolean }> {
+}): Promise<{ outcome: AllowOnceOutcome; rateLimited: boolean; stopped?: boolean }> {
   const id = args.rule.address.toBase58();
   const plan = allowOnceRetry(args.rule, args.ledger, args.opts);
   if ("skip" in plan) {
@@ -348,8 +349,10 @@ export async function retryAllowOnce(args: {
     return { outcome: "skipped", rateLimited: false };
   }
   const detail = `amount=${plan.amount.toString()} nonce=${plan.nonce.toString()}`;
+  if (args.beforeSend !== undefined && !(await args.beforeSend())) {
+    return { outcome: "skipped", rateLimited: false, stopped: true };
+  }
   try {
-    await args.beforeSend?.();
     const receipt = await args.submit(args.rule, plan.amount, plan.nonce);
     if (receipt.decision === "paid") {
       args.log(`agent rule ${id} allow-one retry paid ${detail} sig=${receipt.signature || "-"}`);
@@ -459,7 +462,7 @@ export type AgentRulesSummary = {
   rateLimited: boolean;
   /** True when the pass time budget ended it before every selected rule was tried. */
   outOfTime: boolean;
-  /** True when a transient ledger read failure ended the pass, so a later run in this slot should try again. */
+  /** True when a transient read failure left rules uncharged; the `run` loop tries the slot again. */
   unfinished: boolean;
 };
 
@@ -481,9 +484,13 @@ export type AgentRulesSummary = {
  * an idle or outage cycle stays free; the retries wait for the priced pass.
  *
  * No new charge starts once `budgetMs` has passed since the pass began; the
- * rules left over are charged on the next slot. A ledger read that fails ends
- * the pass with its summary line; a transient failure marks it unfinished so a
- * later run in the same slot tries again.
+ * rules left over are charged on the next slot.
+ *
+ * When the ledger read for the retries fails, the rules with a pending allow
+ * sit out this pass and every other rule is charged. When the read for the
+ * slot charges fails, the pass ends. Either way the summary line is written,
+ * and a transient failure marks the pass unfinished: the `run` loop tries the
+ * slot again, while a `once` run leaves it to the next slot.
  */
 export async function chargeAgentRules(args: {
   slot: Date;
@@ -536,9 +543,13 @@ export async function chargeAgentRules(args: {
   const delayMs = args.delayMs ?? AGENT_RULE_DELAY_MS;
   const pause = args.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   let sent = 0;
-  const beforeSend = async (): Promise<void> => {
+  /** The pause between charges, then the budget again: the pause itself can
+   * run past the deadline. False means stop without sending. */
+  const beforeSend = async (): Promise<boolean> => {
     if (sent > 0) await pause(delayMs);
+    if (outOfTime()) return false;
     sent += 1;
+    return true;
   };
   /** True once the budget is spent. Logs one line the first time. */
   const outOfTime = (): boolean => {
@@ -577,29 +588,43 @@ export async function chargeAgentRules(args: {
   for (const rule of over) {
     args.log(`agent rule ${rule.address.toBase58()} allow-one retry skipped: over the per-run cap`);
   }
+  // Rules left out of the slot charges because their allow could not be read.
+  const heldBack = new Set<string>();
+  let retryLedgers: (Uint8Array | null)[] | null = null;
   if (retryRules.length > 0) {
-    let ledgers: (Uint8Array | null)[];
     try {
-      ledgers = await args.deps.readLedgers(retryRules);
+      retryLedgers = await args.deps.readLedgers(retryRules);
     } catch (err) {
-      // Going on to the slot charges would move last_nonce past each allowed
-      // request and strand it, so the pass ends here.
-      args.logError(`agent rules: ledger read for allow-one retries failed, no rule charged this pass: ${describe(err)}`);
-      summary.rateLimited = isRateLimitError(err);
+      if (isRateLimitError(err)) {
+        args.logError(`agent rules: ledger read for allow-one retries rate limited, the rest wait for the next slot: ${describe(err)}`);
+        summary.rateLimited = true;
+        summary.unfinished = true;
+        return finish();
+      }
+      // A slot charge on a rule with an unread allow would move last_nonce
+      // past the allowed request and strand it, so those rules sit out this
+      // pass. Every other rule is still charged: in a once run this pass is
+      // the slot's only chance.
+      args.logError(
+        `agent rules: ledger read for allow-one retries failed, rules with a pending allow sit out this pass: ${describe(err)}`,
+      );
       summary.unfinished = isTransientRpcError(err);
-      return finish();
+      for (const rule of pending) heldBack.add(rule.address.toBase58());
     }
+  }
+  if (retryLedgers !== null) {
     for (let i = 0; i < retryRules.length; i += 1) {
       if (outOfTime()) return finish();
       const result = await retryAllowOnce({
         rule: retryRules[i]!,
-        ledger: ledgers[i] ?? null,
+        ledger: retryLedgers[i] ?? null,
         opts,
         submit: args.deps.submit,
         beforeSend,
         log: args.log,
         logError: args.logError,
       });
+      if (result.stopped === true) return finish();
       if (result.outcome === "skipped") continue;
       summary.charged += 1;
       summary.retried += 1;
@@ -612,7 +637,14 @@ export async function chargeAgentRules(args: {
     }
   }
 
-  const { selected, skipped } = selectAgentRules(rules, {
+  for (const rule of pending) {
+    if (heldBack.has(rule.address.toBase58())) {
+      args.log(`agent rule ${rule.address.toBase58()} skipped: allow-one pending and its ledger did not read`);
+      summary.skipped += 1;
+    }
+  }
+  const chargeable = heldBack.size === 0 ? rules : rules.filter((rule) => !heldBack.has(rule.address.toBase58()));
+  const { selected, skipped } = selectAgentRules(chargeable, {
     agent: args.agent,
     mint: args.mint,
     merchant: args.merchant,
@@ -624,7 +656,7 @@ export async function chargeAgentRules(args: {
   for (const { rule, reason } of skipped) {
     args.log(`agent rule ${rule.address.toBase58()} skipped: ${reason}`);
   }
-  summary.skipped = skipped.length;
+  summary.skipped += skipped.length;
 
   // A refusal does not move last_nonce, so a second run in the same slot
   // reads the ledger ring and leaves a rule alone once it has any row for
@@ -651,7 +683,7 @@ export async function chargeAgentRules(args: {
       continue;
     }
     if (outOfTime()) break;
-    await beforeSend();
+    if (!(await beforeSend())) break;
     summary.charged += 1;
     try {
       const receipt = await args.deps.submit(rule, quote.amount, nonce);

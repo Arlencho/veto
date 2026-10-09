@@ -502,6 +502,10 @@ if [[ "$*" == *'run jobs describe'* ]]; then
       printf 'ERROR: PERMISSION_DENIED: run.jobs.get\n' >&2
       exit 1
       ;;
+    api-disabled)
+      printf 'ERROR: (gcloud.run.jobs.describe) PERMISSION_DENIED: Cloud Run Admin API has not been used in project 123456789 before or it is disabled. reason: SERVICE_DISABLED\n' >&2
+      exit 1
+      ;;
     *)
       printf 'ERROR: (gcloud.run.jobs.describe) Cannot find job [x].\n' >&2
       exit 1
@@ -595,6 +599,26 @@ else
     pass "a job lookup that is denied refuses instead of treating the job as absent"
   else
     bad "denied job lookup message: ${out}"
+  fi
+fi
+
+if out="$(run_jobs api-disabled --dry-run 2>&1)"; then
+  if printf '%s' "$out" | grep -F 'run jobs deploy veto-watcher ' >/dev/null; then
+    pass "dry-run on a new project with the Cloud Run API off counts the jobs as absent"
+  else
+    bad "api-disabled dry-run missing job deploy: ${out}"
+  fi
+else
+  bad "dry-run on a new project with the Cloud Run API off should succeed: ${out}"
+fi
+
+if out="$(run_jobs api-disabled 2>&1)"; then
+  bad "a real deploy whose job lookup says the API is off must refuse"
+else
+  if printf '%s' "$out" | grep -F 'could not look up Cloud Run job veto-watcher' >/dev/null; then
+    pass "a real deploy does not take a disabled-API lookup as an absent job"
+  else
+    bad "api-disabled real deploy message: ${out}"
   fi
 fi
 

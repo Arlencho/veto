@@ -120,20 +120,55 @@ export function isRateLimitError(err: unknown): boolean {
   return RATE_LIMIT_RE.test(msg);
 }
 
-const TRANSIENT_RE =
-  /fetch failed|timed out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|EPIPE|socket hang up|network|\b50[0-4]\b/i;
+/** Node and undici error codes for a connection that failed or dropped. */
+const TRANSIENT_CODES = new Set([
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ECONNABORTED",
+  "ETIMEDOUT",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EPIPE",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_SOCKET",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CLOSED",
+]);
+const TRANSIENT_NAMES = new Set(["RpcTimeoutError", "TimeoutError", "AbortError"]);
+/** Text forms of the same failures, for errors that were rewrapped as a message:
+ * an HTTP 5xx status line as web3.js writes it, undici's "fetch failed", a
+ * Node error code, and this module's own timeout line. */
+const TRANSIENT_TEXT_RE = new RegExp(
+  [
+    String.raw`\b50[0-4] (?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout)\b`,
+    String.raw`\bfetch failed\b`,
+    String.raw`\bsocket hang up\b`,
+    String.raw`\brpc request to \S+ timed out after \d+ ms\b`,
+    String.raw`\b(?:${[...TRANSIENT_CODES].join("|")})\b`,
+  ].join("|"),
+);
 
 /** True for a failure a later read could get past: a rate limit, a timeout,
- * a dropped connection, or a server error. False for an answer the endpoint
- * would give again, such as a rejected request. */
+ * a dropped connection, or an HTTP 5xx. False for an answer the endpoint
+ * would give again, such as a rejected request. Follows `cause` a few levels,
+ * where undici puts the socket error under "fetch failed". */
 export function isTransientRpcError(err: unknown): boolean {
   if (isRateLimitError(err)) return true;
-  if (typeof err === "object" && err !== null && "name" in err) {
-    const name = (err as { name: unknown }).name;
-    if (name === "RpcTimeoutError" || name === "TimeoutError" || name === "AbortError") return true;
+  let current: unknown = err;
+  for (let depth = 0; depth < 4 && current !== null && current !== undefined; depth += 1) {
+    if (typeof current === "object") {
+      const { name, code } = current as { name?: unknown; code?: unknown };
+      if (typeof name === "string" && TRANSIENT_NAMES.has(name)) return true;
+      if (typeof code === "string" && TRANSIENT_CODES.has(code)) return true;
+    }
+    const msg = current instanceof Error ? current.message : String(current);
+    if (TRANSIENT_TEXT_RE.test(msg)) return true;
+    current = typeof current === "object" ? (current as { cause?: unknown }).cause : undefined;
   }
-  const msg = err instanceof Error ? err.message : String(err);
-  return TRANSIENT_RE.test(msg);
+  return false;
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -172,19 +207,36 @@ export function makeFailoverFetch(
     let delay = initialDelayMs;
     let lastErr: unknown;
     // A hung endpoint is tried once per request, not once per pass: each
-    // timeout already cost timeoutMs, so the request ends after every
-    // endpoint has timed out once.
-    let timeouts = 0;
+    // timeout already cost timeoutMs, so later passes skip it and keep
+    // trying the endpoints that still answer.
+    const timedOut = new Set<number>();
+    const hasMoreAfter = (i: number, pass: number): boolean => {
+      for (let j = i + 1; j < list.length; j += 1) if (!timedOut.has(j)) return true;
+      return pass + 1 < maxPasses && timedOut.size < list.length;
+    };
     for (let pass = 0; pass < maxPasses; pass += 1) {
       for (let i = 0; i < list.length; i += 1) {
+        if (timedOut.has(i)) continue;
         const endpoint = list[i]!;
         const url = i === 0 ? requestUrl(input) : endpoint;
-        const hasMore = i + 1 < list.length || pass + 1 < maxPasses;
-        const timer = AbortSignal.timeout(timeoutMs);
+        const hasMore = hasMoreAfter(i, pass);
+        // The timer bounds the wait for the response headers and is cleared
+        // once they arrive, so a large body is not cut off mid-read.
+        const controller = new AbortController();
+        let expired = false;
+        const timer = setTimeout(() => {
+          expired = true;
+          controller.abort(new RpcTimeoutError(`rpc request timed out after ${timeoutMs} ms`));
+        }, timeoutMs);
         const caller = init?.signal ?? null;
-        const signal = caller === null ? timer : AbortSignal.any([caller, timer]);
+        const signal = caller === null ? controller.signal : AbortSignal.any([caller, controller.signal]);
         try {
-          const res = await doFetch(url, { ...init, signal });
+          let res: Response;
+          try {
+            res = await doFetch(url, { ...init, signal });
+          } finally {
+            clearTimeout(timer);
+          }
           if (res.status === 429) {
             const shown = redactRpcUrl(endpoint);
             log(`rpc rate limited on ${shown}`);
@@ -197,12 +249,12 @@ export function makeFailoverFetch(
           return res;
         } catch (err) {
           if (err instanceof RateLimitedError && !hasMore) throw err;
-          if (timer.aborted && !(caller?.aborted ?? false)) {
+          if (expired && !(caller?.aborted ?? false)) {
             const shown = redactRpcUrl(endpoint);
             log(`rpc request to ${shown} timed out after ${timeoutMs} ms`);
-            timeouts += 1;
+            timedOut.add(i);
             lastErr = new RpcTimeoutError(`rpc request to ${shown} timed out after ${timeoutMs} ms`);
-            if (timeouts >= list.length || !hasMore) throw lastErr;
+            if (!hasMoreAfter(i, pass)) throw lastErr;
             continue;
           }
           lastErr = err;

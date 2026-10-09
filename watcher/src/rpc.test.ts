@@ -310,7 +310,58 @@ test("final audit L4: ws and wss URLs are redacted to scheme and host like http"
 
 test("transient RPC errors are told apart from answers a later read would repeat", () => {
   assert.equal(isTransientRpcError(new Error("failed to get info about accounts: TypeError: fetch failed")), true);
-  assert.equal(isTransientRpcError(new Error("503 Service Unavailable")), true);
+  assert.equal(isTransientRpcError(new Error("503 Service Unavailable: upstream down")), true);
+  assert.equal(isTransientRpcError(new Error("502 Bad Gateway: ")), true);
   assert.equal(isTransientRpcError(new RateLimitedError("429")), true);
+  assert.equal(isTransientRpcError(new RpcTimeoutError("rpc request to http://a timed out after 5 ms")), true);
+  const dropped = Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("other side closed"), { code: "UND_ERR_SOCKET" }) });
+  assert.equal(isTransientRpcError(dropped), true);
+  const refused = Object.assign(new Error("connect failed"), { code: "ECONNREFUSED" });
+  assert.equal(isTransientRpcError(refused), true);
   assert.equal(isTransientRpcError(new Error("failed to get info about accounts: Invalid param: WrongSize")), false);
+});
+
+test("pr 395 review: transient matching is narrow: a stray 500 or the word network is not a server error", () => {
+  assert.equal(isTransientRpcError(new Error("Invalid param: expected at most 500 accounts")), false);
+  assert.equal(isTransientRpcError(new Error("account belongs to another network")), false);
+  assert.equal(isTransientRpcError(new Error("decode timeout field missing")), false);
+  assert.equal(isTransientRpcError(new Error("Transaction simulation failed: 5000 lamports")), false);
+});
+
+test("pr 395 review: a timed-out endpoint is skipped on later passes, so a recovering fallback gets its retry", async () => {
+  const calls: string[] = [];
+  let bCalls = 0;
+  const failover = makeFailoverFetch(["http://a.invalid", "http://b.invalid"], () => {}, {
+    fetch: async (input, init) => {
+      const url = String(input);
+      calls.push(url.includes("a.invalid") ? "A" : "B");
+      if (url.includes("a.invalid")) return hangingUntilAborted(init);
+      bCalls += 1;
+      if (bCalls === 1) return new Response("Too Many Requests", { status: 429 });
+      return okResponse();
+    },
+    sleep: async () => {},
+    initialDelayMs: 0,
+    timeoutMs: 30,
+  });
+  const res = await failover("http://a.invalid", { method: "POST" });
+  assert.equal(res.status, 200);
+  assert.deepEqual(calls, ["A", "B", "B"]);
+});
+
+test("pr 395 review: the timeout stops once headers arrive, so a slow body is not cut off", async () => {
+  let seen: AbortSignal | undefined;
+  const failover = makeFailoverFetch(["http://a.invalid"], () => {}, {
+    fetch: async (_input, init) => {
+      seen = init?.signal ?? undefined;
+      return okResponse();
+    },
+    timeoutMs: 20,
+  });
+  const res = await failover("http://a.invalid", { method: "POST" });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.ok(seen !== undefined);
+  assert.equal(seen.aborted, false, "the signal the body reads under is not aborted after the timeout");
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { jsonrpc: "2.0", id: 1, result: "ok" });
 });

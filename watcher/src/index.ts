@@ -7,7 +7,7 @@ import {
   discoverAgentRules,
   quoteSlotAmount,
   retryConfiguredAllowOnce,
-  type ConfiguredRetryMemo,
+  oncePassBudgetMs,
 } from "./agentRules.js";
 import {
   connect,
@@ -157,6 +157,7 @@ let agentRulesDoneNonce: bigint | null = null;
 async function chargeOtherAgentRules(
   now: Date,
   ctx: AgentRulesCtx,
+  budgetMs: number = ctx.cfg.agentPassBudgetMs,
 ): Promise<void> {
   const { cfg, agent, feed, fx } = ctx;
   if (cfg.agentRulesMax === 0) return;
@@ -177,7 +178,7 @@ async function chargeOtherAgentRules(
       merchant: new PublicKey(cfg.merchant),
       configured: mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId),
       max: cfg.agentRulesMax,
-      budgetMs: cfg.agentPassBudgetMs,
+      budgetMs,
       log: logLine,
       logError,
       deps: {
@@ -232,13 +233,6 @@ async function chargeOtherAgentRules(
   }
 }
 
-// The lowest owed nonce whose configured-rule retry check this process already
-// ran (configuredRetryDoneNonce). `run` loops every 30 seconds, and while a
-// feed or rate-limit gap keeps that slot owed, each loop would otherwise read
-// the mandate and ledger again. retryConfiguredAllowOnce sets it only after
-// the read answered and no send failed.
-const configuredRetryMemo: ConfiguredRetryMemo = { doneNonce: null };
-
 /** Retry the configured rule's allowed-once request before its slot charge.
  *
  * It runs here, not in the pass over other rules, because a paid slot charge
@@ -255,7 +249,6 @@ async function retryConfiguredAllowed(
   lowestOwed: bigint,
 ): Promise<void> {
   if (cfg.agentRulesMax === 0) return;
-  if (configuredRetryMemo.doneNonce === lowestOwed) return;
   try {
     const { connection, program, programId } = connect(cfg, agent);
     const mandate = mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId);
@@ -265,7 +258,6 @@ async function retryConfiguredAllowed(
       mandate,
       ledger: ledgerPda(programId, mandate),
       coder: program.coder.accounts,
-      memo: configuredRetryMemo,
       readAccounts: async (addresses) => {
         const infos = await connection.getMultipleAccountsInfo(addresses, "confirmed");
         return infos.map((info) => (info === null ? null : info.data));
@@ -378,8 +370,14 @@ async function cmdOnce(): Promise<void> {
     process.exitCode = 1;
   }
   await scanHolds(new Date());
-  // Last, so a slow pass over other rules cannot delay the configured rule or hold alerts.
-  await chargeOtherAgentRules(now, agentRulesCtx);
+  // Last, so a slow pass over other rules cannot delay the configured rule or
+  // hold alerts. Its deadline counts from process start: the work above can
+  // take minutes of the 15 minute task limit.
+  await chargeOtherAgentRules(
+    now,
+    agentRulesCtx,
+    oncePassBudgetMs(agentRulesCtx.cfg.agentPassBudgetMs, process.uptime() * 1000),
+  );
 }
 
 async function cmdRun(): Promise<void> {

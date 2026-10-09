@@ -6,7 +6,7 @@
 
 - **Recorded example:** [12.90 USDC refused](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) against a 5 USDC limit; [paid after owner approval](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
 - **Try it:** [Android APK](https://github.com/Arlencho/veto/releases/latest) and [setup guide](https://veto-hq.github.io/try/). Fund a test-agent rule, then tap **Send two test requests**.
-- **Verify:** [Export and verification commands](#see-it-on-devnet), using the refusal signature above.
+- **Verify:** [Export and verification commands](#see-it-on-devnet) with the refusal signature `26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC`.
 - **Scope:** devnet test money only. Not externally audited. [One deployer key can upgrade the program](#threat-model).
 
 ## What Veto is

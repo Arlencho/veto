@@ -4,8 +4,8 @@
 
 Do not open a public issue, pull request or discussion for a vulnerability.
 
-Report it through GitHub private vulnerability reporting on this repository: open the
-**Security** tab and choose **Report a vulnerability**. The report is visible only to you and the repository maintainers.
+Report it through GitHub private vulnerability reporting on this repository. Open the
+**Security** tab and choose **Report a vulnerability**. Only you and the repository maintainers can see the report.
 
 Include what you found, the affected file or instruction, the commit you read, and the steps or
 transactions that show it. A devnet transaction signature is the most useful evidence.
@@ -14,10 +14,10 @@ transactions that show it. A devnet transaction signature is the most useful evi
 
 Veto runs on Solana devnet only. The program `3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV`
 is not deployed on mainnet, and devnet tokens have no value. The devnet program is upgradeable
-by one key, named in the README threat model and in [docs/DEVNET.md](docs/DEVNET.md). Known
-issues are listed in the README, including the repaired Hold guardian issue (2026-09-28) and remaining limitations under "If someone forces you".
+by one key, named in the README threat model and in [docs/DEVNET.md](docs/DEVNET.md). The README
+lists known issues, including the Hold guardian issue repaired on 2026-09-28 and the remaining limitations under "If someone forces you".
 
-In scope: the Anchor program under `programs/veto/`, the Android app under `app/`, the agent SDK
+The scope is the Anchor program under `programs/veto/`, the Android app under `app/`, the agent SDK
 under `sdk/`, the CLI under `cli/`, and the watcher, indexer and tools in this repository.
 
 ## No bounty

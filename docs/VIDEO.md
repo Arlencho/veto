@@ -1,12 +1,12 @@
 # The three-minute video
 
-This is the current shot list. Maximum running time is 03:00 including the last frame. Judges read the transcript, so every spoken line below is written to read well as text on its own. Say the lines as written.
+This is the current shot list. The maximum running time is 03:00, including the last frame. Judges read the transcript, so every spoken line below is written to read well as text on its own. Say the lines as written.
 
 All transactions are on Solana devnet. USDC means Circle's devnet test token, with no value. The charging agent pays our own test payee for a bill priced from a public electricity index. It buys no electricity.
 
 ## Submitted take
 
-Submitted take, recorded 2026-10-09 on a Seeker with release build 29 (v1.0.0-devnet.5): rule `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, agent `G1UKSxWvNRNep6Ec6yD67iKEkmDNRZP3pPcHDHa6QMDU`, owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`, 5 USDC per payment, 20 total, until 18 Nov 2026.
+We recorded the submitted take on 2026-10-09 on a Seeker with release build 29 (v1.0.0-devnet.5). It uses rule `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, agent `G1UKSxWvNRNep6Ec6yD67iKEkmDNRZP3pPcHDHa6QMDU` and owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`, with 5 USDC per payment and 20 in total, until 18 Nov 2026.
 
 The table lists every transaction on the rule, read with getSignaturesForAddress and getTransaction on https://api.devnet.solana.com on 2026-10-09. Each is finalized with no error.
 
@@ -43,59 +43,59 @@ The rule allows 5 USDC per payment and 20 USDC in total. Its purpose reads "Char
 | 11:23:53 | Owner allows that one payment of 12.90 | [2UctcWfS](https://explorer.solana.com/tx/2UctcWfSsaHCL5WQbPetUGCUdks5LU7nCnPQga7VtyQXHUpGwDTW87cjhc392EUrrsV6tcT5bEGY2cYGhULfecL3?cluster=devnet) |
 | 11:24:21 | Agent retries 12.90, paid. 2.90 of 20 left | [261ED3JC](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet) |
 
-The refusal's program log is `VETO REFUSED reason=5 (over per-payment maximum) amount=12900000 per_tx_max=5000000 remaining=15800000 override_to_clear=12900000`. Show that log on screen; do not read it aloud.
+The refusal's program log is `VETO REFUSED reason=5 (over per-payment maximum) amount=12900000 per_tx_max=5000000 remaining=15800000 override_to_clear=12900000`. Show that log on screen. Do not read it aloud.
 
 ## Shot list
 
-**00:00 to 00:10. Open.**
+### Open (00:00 to 00:10)
 
 The Seeker in hand, Veto on **Overview**.
 
 Voice: *"This is Veto. Instead of handing my AI agent my wallet, I give it a spending rule."*
 
-**00:10 to 00:32. The rule.**
+### The rule (00:10 to 00:32)
 
-Open the rule from **Rules**. Show 5 USDC per payment, 20 USDC in total, the payee and the purpose. Cut to the approval: **Press and hold to approve rule**, then the Seed Vault sheet.
+Open the rule from **Rules**. Show 5 USDC per payment, 20 USDC in total, the payee and the purpose. Cut to the approval, showing **Press and hold to approve rule** and then the Seed Vault sheet.
 
 Voice: *"My charging agent can pay up to 5 USDC at a time, and 20 in total, to one payee. I approved that once, in Seed Vault. The agent pays with its own key. It never gets mine."*
 
-**00:32 to 00:45. A payment inside the rule.**
+### A payment inside the rule (00:32 to 00:45)
 
 Open the paid 4.20 row in **Decisions**.
 
 Voice: *"It asked for 4.20. That fits the rule, so it was paid, and I did not have to do anything."*
 
-**00:45 to 01:10. The refusal.**
+### The refusal (00:45 to 01:10)
 
-Open the refused 12.90 row in **Decisions** and show its sentence. Cut to the same transaction in the public explorer with `cluster=devnet`: the transaction succeeded, the token balances are unchanged, and the log line names the reason.
+Open the refused 12.90 row in **Decisions** and show its sentence. Cut to the same transaction in the public explorer with `cluster=devnet`, and show that the transaction succeeded, the token balances are unchanged, and the log line names the reason.
 
 Voice: *"Then it asked for 12.90. That is more than my limit of 5. Veto said no, and wrote down why, on the blockchain. No USDC moved. The agent still paid a transaction fee. Anyone can look this up."*
 
-**01:10 to 01:35. Allow it once.**
+### Allow it once (01:10 to 01:35)
 
 On the refused decision, hold **Press and hold to allow this one payment** (the button names the amount), then sign in Seed Vault. Show the agent's retry arriving as a paid row.
 
 Voice: *"Maybe that charge was fine. I can allow this one payment, and only this one. I sign in Seed Vault, the agent tries again, and it is paid. My limit is still 5."*
 
-**01:35 to 01:45. What is left.**
+### What is left (01:35 to 01:45)
 
 Show the rule with 2.90 of 20 USDC left, and the **Stop the rule** control.
 
 Voice: *"2.90 of my 20 is left. When it runs out, the agent cannot pay. And I can stop the rule from my phone at any time."*
 
-**01:45 to 02:10. Any assistant can use it.**
+### Any assistant can use it (01:45 to 02:10)
 
 Before recording, pair the laptop's agent with a separate funded devnet payment rule using the [CLI connection guide](../cli/README.md). Connect an assistant to that configured agent through the Veto MCP server (`npx -y @veto-hq/veto mcp`). Show the separate rule's name, then call `veto_pay` once inside its limits and once over its per-payment limit. Show both results and the matching rows in **Decisions** on the phone. Use the real amounts from the take. Do not show an assistant vendor name, logo, title bar or configuration filename that identifies one.
 
 Voice: *"Any assistant that supports MCP can use a rule the same way. It asks to pay. This one is paid. This one is over the limit, so it is refused, and that is recorded too."*
 
-**02:10 to 02:40. Try it yourself.**
+### Try it yourself (02:10 to 02:40)
 
 Show the Try page, <https://veto-hq.github.io/try/>, and the latest release APK. On the phone, open a separate funded, active payment rule for the test agent stored on that phone. Tap **Send two test requests** and show the actual outcomes. Then show a separate rule for the ongoing demo agent configured according to [TESTERS.md](TESTERS.md), with a matching recorded request. Keep each rule's name visible so these examples cannot be mistaken for the opening rule's history.
 
 Voice: *"You can try this in five minutes. Install the app from our Try page. It runs on devnet, with test money. The built-in test agent sends one payment inside your rule and one just over it. Or give our demo agent a rule, and it will send a request every six hours."*
 
-**02:40 to 03:00. Close.**
+### Close (02:40 to 03:00)
 
 Return to the refused 12.90 row.
 
@@ -105,7 +105,7 @@ Voice: *"Agents are going to spend money for us. Our goal is that every agent pa
 
 - A refusal is the product working. No red error flash or error sound.
 - For 00:00 to 01:45, use real device footage and the matching transactions above. Do not substitute design mockups or another rule's history there. Later shots use the real rules from the take, each identified by name.
-- The rule's on-chain ledger keeps the latest 32 entries. Immediately after the retry above, 2.90 USDC remained, so payments totalling at most 2.90 more can be paid; refusals still add rows. Recheck the balance and history before recording.
+- The rule's on-chain ledger keeps the latest 32 entries. Immediately after the retry above, 2.90 USDC remained, so payments totalling at most 2.90 more can be paid. Refusals still add rows. Recheck the balance and history before recording.
 - No captions or narration with reason codes, nonces, base units or other internal terms. The log line on screen is enough.
 - No AI vendor names, em or en dashes, release-status overlays or unsupported claims in titles, narration or captions.
 - Keep devnet visible. No background music over explorer logs. Finish within three minutes.

@@ -9,14 +9,14 @@ The price is real, public, and independently verifiable against the same URL. Th
 counterparty is a terminal we run, because no charge point operator accepts this
 mint. Without demo calibration, amounts follow the spot price. Optional
 calibration (watcher/src/calibration.ts) deliberately sizes some scheduled
-requests above the limit for the configured demo rule; tester rules bypass it.
+requests above the limit for the configured demo rule. Tester rules bypass it.
 
-The hosted demo agent runs in USDC mode: VETO_QUOTE_CURRENCY=USD,
+The hosted demo agent runs in USDC mode, with VETO_QUOTE_CURRENCY=USD and
 VETO_KWH_MILLI=6000 (see Quoting USDC).
 
 ## What it does
 
-Four times per Stockholm day (00:00, 06:00, 12:00, 18:00) the process:
+Four times per Stockholm day (00:00, 06:00, 12:00, 18:00) the process runs these steps.
 
 1. Reads `https://www.elprisetjustnu.se/api/v1/prices/YYYY/MM-DD_SE3.json` for the
    15-minute window that starts on that hour.
@@ -30,9 +30,9 @@ Four times per Stockholm day (00:00, 06:00, 12:00, 18:00) the process:
 5. Appends one JSONL row (signature, amount, decision, reason) and prints a
    one-line summary.
 
-A down feed is a gap: the row is recorded, nothing is submitted, no synthetic
+A down feed is a gap. The row is recorded, nothing is submitted, and no synthetic
 price is invented. An RPC failure backs off and retries the same window. The
-thread is not dropped. A rate limit is not a failure: the process logs that it
+thread is not dropped. A rate limit is not a failure. The process logs that it
 was throttled, tries the next configured endpoint (and re-walks a single
 endpoint with bounded doubling), and leaves the cadence slot due so the next
 cycle can still submit it. The outage is written as a gap with a reason that
@@ -49,40 +49,43 @@ program whose agent is this process's agent key. A tester who approves a rule
 for the agent's public address gets a request on the same schedule as the
 configured rule.
 
-- Discovery is one `getProgramAccounts` call filtered on the Mandate
-  discriminator and the agent pubkey at byte 40, the filters
-  `mandatesForAgent` in `sdk/src/read.ts` uses. Rows decode with the bundled IDL.
-- A rule is skipped, with one log line naming it and the reason, when it is
-  not open, is past expiry, is for another mint than `VETO_MINT`, pays another
-  payee than `VETO_MERCHANT`, has nothing left under its cap, or already has a
-  paid or refused row for this slot's nonce.
-- The configured rule (`VETO_OWNER` + `VETO_MANDATE_ID`) is left to its own
-  journaled path, so it is charged once, not twice.
-- Only the latest due slot is charged. A rule approved at 17:00 gets the 18:00
-  request, not a catch-up burst for the morning. The nonce is that slot's unix
-  seconds, the same number the configured rule uses, checked against each
-  rule's own `last_nonce` and ledger ring.
-- The amount is the same spot arithmetic as the configured rule (volume,
-  price, and FX when `VETO_QUOTE_CURRENCY=USD`). Demo calibration is not
-  applied: it is sized to the configured rule's cap. No price means no request.
-- At most `VETO_AGENT_RULES_MAX` rules per pass (default 25, at most 100,
-  `0` turns this off). When more are eligible, the starting point moves each
-  slot so every rule gets a turn. VETO_AGENT_RULES_MAX=0 also turns off the
-  configured rule's allow-once retry.
-- No new charge in this pass starts after `VETO_AGENT_PASS_BUDGET_MS`
-  (default 480000, eight minutes). In `once` mode, no new charge in this
-  pass starts after 12 minutes of process uptime. This leaves time before the
-  job's 15 minute limit for a charge already in progress, but does not
-  guarantee that it finishes before that limit. Rules left over wait for the next slot.
-- This pass runs last, after the configured rule and the hold alerts.
-  Charges are sequential with a 1.5 second pause. A send that is not
-  confirmed within 90 seconds counts as failed. A rule that fails is logged
-  and the next one is still charged. A rate limit ends the pass; the rest are
-  charged next slot. A failure here never changes the configured rule's
-  outcome or the exit code.
-- Each charge logs `agent rule <address> paid|refused ... amount=... nonce=... sig=...`.
-  These charges are not written to the journal; each rule's on-chain ledger is
-  the record. The RPC URL and keys are never logged.
+Discovery is one `getProgramAccounts` call filtered on the Mandate
+discriminator and the agent pubkey at byte 40, the same filters
+`mandatesForAgent` in `sdk/src/read.ts` uses. Rows decode with the bundled IDL.
+A rule is skipped, with one log line naming it and the reason, when it is
+not open, is past expiry, is for another mint than `VETO_MINT`, pays another
+payee than `VETO_MERCHANT`, has nothing left under its cap, or already has a
+paid or refused row for this slot's nonce. The configured rule (`VETO_OWNER` +
+`VETO_MANDATE_ID`) is left to its own journaled path, so it is charged once,
+not twice.
+
+Only the latest due slot is charged. A rule approved at 17:00 gets the 18:00
+request, not a catch-up burst for the morning. The nonce is that slot's unix
+seconds, the same number the configured rule uses, checked against each
+rule's own `last_nonce` and ledger ring. The amount uses the same spot
+arithmetic as the configured rule (volume, price, and FX when
+`VETO_QUOTE_CURRENCY=USD`). Demo calibration is not applied, because it is
+sized to the configured rule's cap. No price means no request.
+
+A pass charges at most `VETO_AGENT_RULES_MAX` rules (default 25, at most 100,
+`0` turns this off). When more are eligible, the starting point moves each
+slot so every rule gets a turn. VETO_AGENT_RULES_MAX=0 also turns off the
+configured rule's allow-once retry. No new charge in this pass starts after
+`VETO_AGENT_PASS_BUDGET_MS` (default 480000, eight minutes). In `once` mode, no
+new charge in this pass starts after 12 minutes of process uptime. That leaves
+time before the job's 15 minute limit for a charge already in progress, but does
+not guarantee that it finishes before that limit. Rules left over wait for the
+next slot.
+
+This pass runs last, after the configured rule and the hold alerts. Charges
+are sequential with a 1.5 second pause. A send that is not confirmed within 90
+seconds counts as failed. A rule that fails is logged and the next one is still
+charged. A rate limit ends the pass, and the rest are charged next slot. A
+failure here never changes the configured rule's outcome or the exit code.
+
+Each charge logs `agent rule <address> paid|refused ... amount=... nonce=... sig=...`.
+These charges are not written to the journal, because each rule's on-chain
+ledger is the record. The RPC URL and keys are never logged.
 
 The request follows the spot price, not your per-payment limit, so a
 tight limit refuses the expensive hours and pays the cheap ones. A refusal
@@ -99,7 +102,7 @@ moves no money.
    the rule. The 10 USDC moves into the rule's own account.
 4. Requests are scheduled for 00:00, 06:00, 12:00 and 18:00 Stockholm time,
    subject to service availability and the pass limits above. Requests above
-   1 USDC are refused; requests at or below it can pay if the other rule
+   1 USDC are refused, and requests at or below it can pay if the other rule
    checks pass. Tester rules bypass calibration, so a mix of paid and
    refused requests is not guaranteed.
 5. To request a retry, open the refused decision and press and hold
@@ -113,8 +116,8 @@ moves no money.
    RPC problems and per-pass limits can delay or prevent a retry. The log
    line is
    `agent rule <address> allow-one retry paid|refused amount=... nonce=... sig=...`.
-   The configured rule uses the same retry checks before its slot charge;
-   its retry does not change the journal. A successful retry transaction
+   The configured rule uses the same retry checks before its slot charge,
+   and its retry does not change the journal. A successful retry transaction
    records a paid or refused decision on the chain ledger.
 
 ## Hold alerts
@@ -138,16 +141,16 @@ npm test
 npm run build
 ```
 
-Open a mandate once (owner signature, rent paid by the owner key):
+Open a mandate once. It takes the owner signature, and the owner key pays the rent.
 
 ```bash
 npm run open-mandate
 ```
 
-RPC, program id, mint, and the owner / merchant / agent accounts come from
+RPC, program id, mint, and the owner, merchant and agent accounts come from
 the environment, `keys/devnet-addresses.env`, `watcher/.env`, or
 `terminal/.env`. The configured rule's charge source is `VETO_OWNER_TOKEN`.
-A rule opened in the app keeps its budget in `veto-rule-<mandate id>`; the
+A rule opened in the app keeps its budget in `veto-rule-<mandate id>`. The
 other rules that name the agent are charged from the source stored in each
 rule (see above). There is no hardcoded fallback for those. File keys may be
 `VETO_RPC=` or `RPC=`. Both packages read both package env files, so they
@@ -155,7 +158,7 @@ cannot silently disagree about the quoted volume. Copy `.env.example` to
 `watcher/.env` and uncomment the identity lines with values you supply. The
 placeholders do not resolve.
 
-Process defaults that cannot select a chain identity (overridable with env):
+These process defaults cannot select a chain identity, and env overrides each one.
 
 | | |
 |---|---|
@@ -171,19 +174,19 @@ Process defaults that cannot select a chain identity (overridable with env):
 
 0.5 tokens per 50 kWh is 0.01 SEK/kWh. On 2026-09-20 that pays the cheapest night
 and midday dips and refuses the evening spike. Raise `VETO_PER_TX_MAX` before
-opening if you want a looser ceiling. Opening is a chain instruction; changing
+opening if you want a looser ceiling. Opening is a chain instruction, so changing
 the env later does not rewrite an existing mandate.
 
 ## Quoting USDC
 
 Set `VETO_QUOTE_CURRENCY=USD` to convert the SEK spot into USDC before `charge`.
-Unset, empty, or `SEK` keeps the arithmetic above, byte for byte: 1 token is 1 SEK.
+Unset, empty, or `SEK` keeps the arithmetic above, byte for byte, with 1 token as 1 SEK.
 
 The demo mint for this mode is Circle's devnet USDC,
 `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, 6 decimals. Set `VETO_MINT` to
 that address. The watcher does not assume a rate.
 
-The rate is the European Central Bank daily reference:
+The rate is the European Central Bank daily reference,
 `https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml`. The file is
 public and needs no key. It is one XML document. The watcher reads the `Cube`
 whose `time` is `YYYY-MM-DD`, and the `Cube` elements whose `currency` is `USD`
@@ -204,7 +207,7 @@ string with 8 places, produced by integer division. Older rows without those
 fields still load. The paid and refused log line names the converted amount,
 the SEK price, the fx rate, and its date.
 
-Sizing for that demo: 6 kWh, per payment 0.50 USDC, cap 20 USDC, 40 days.
+The demo is sized at 6 kWh, 0.50 USDC per payment, a 20 USDC cap, and 40 days.
 Set `VETO_KWH_MILLI=6000`, `VETO_PER_TX_MAX=500000`, and `VETO_CAP=20000000`.
 6 kWh at 0.3 to 1.6 SEK per kWh is about 0.17 to 0.95 USD at roughly 10 SEK
 per USD. That 10 is a size check only. The rate on a charge is the ECB rate
@@ -232,19 +235,19 @@ on all endpoints`. A gap is not terminal, so the slot stays due and is tried aga
 
 ## How to run it
 
-One pass over due slots (useful after a restart):
+Run one pass over due slots, which is useful after a restart.
 
 ```bash
 npm run once
 ```
 
-A specific elapsed 15-minute window (must not be in the future):
+Run a specific elapsed 15-minute window, which must not be in the future.
 
 ```bash
 node dist/index.js once --window 2026-09-20T01:30:00+02:00
 ```
 
-Stay up:
+Or stay up.
 
 ```bash
 npm start
@@ -258,7 +261,7 @@ SIGTERM finish the current slot and exit.
 
 The process has to outlive a laptop lid, or the slots that pass while it is down are missing from the journal. Pick one.
 
-tmux, on the machine that can reach the RPC:
+With tmux, run this on the machine that can reach the RPC.
 
 ```bash
 tmux new -s veto-watcher 'cd /path/to/veto/watcher && npm start'
@@ -267,9 +270,8 @@ tmux new -s veto-watcher 'cd /path/to/veto/watcher && npm start'
 Detach with `Ctrl-b d`. Reattach with `tmux attach -t veto-watcher`. A restart
 of the box still needs something that launches tmux again.
 
-launchd, user agent, macOS. Save as
-`~/Library/LaunchAgents/se.veto.watcher.plist` after editing the paths, then
-`launchctl load` it:
+With launchd on macOS, as a user agent, edit the paths, save the file as
+`~/Library/LaunchAgents/se.veto.watcher.plist`, then `launchctl load` it.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -291,7 +293,7 @@ launchd, user agent, macOS. Save as
 </plist>
 ```
 
-Cloud Run, if the laptop cannot stay up: [CLOUD.md](CLOUD.md). That path
+If the laptop cannot stay up, use Cloud Run as described in [CLOUD.md](CLOUD.md). That path
 persists the journal in Cloud Storage and runs `once` on the cadence.
 
 ## How to read the JSONL
@@ -328,12 +330,12 @@ jq . data/decisions.jsonl | less
 | `signature` | confirmed transaction, or null when no transaction confirmed for this row. A gap or skip left by a stale-nonce race carries the refused transaction's signature. A paid row can carry null when the signature could not be recovered |
 | `sek_per_kwh` | decimal string copied from the feed body |
 
-`refused` is a success path. Count it, keep going. `gap` means the feed or the
+`refused` is a success path. Count it and keep going. `gap` means the feed or the
 FX source did not yield a rate that could be charged. Nothing is submitted,
 and there is no invented price or invented rate in that row. The slot stays due.
 
-First live rows, 2026-09-20, 50 kWh, 0.5 token per-payment max, against the
-cluster in `docs/DEVNET.md`:
+The first live rows, on 2026-09-20 with 50 kWh and a 0.5 token per-payment max, ran against the
+cluster in `docs/DEVNET.md`.
 
 - paid 446000 base units at 00:00 Stockholm, SEK/kWh 0.00892,
   `4N13AokSVj2A9fJyCZiypzhG9P6mdpMvpjcnDvzVUi2Qp6jUx1Ud34tHUDt1TQENzXu7TFWTfrKHHCLfrpKTBJ9a`,
@@ -353,7 +355,7 @@ Devnet stays upgradeable under the deployer key. Regenerate the IDL when the
 program changes, and never from this package. `watcher/idl/veto.json` is the
 IDL the image copies. `watcher/src/idl.ts` is a type helper whose header points
 at that JSON file. It also carries doc comments. This command writes the JSON
-and a types file without those doc comments:
+and a types file without those doc comments.
 
 ```bash
 anchor idl build -p veto -o watcher/idl/veto.json -t watcher/src/idl.ts --no-docs -- --lib
@@ -368,12 +370,12 @@ Anchor is not required to read the committed JSON.
 npm test
 ```
 
-Covered: integer money conversion, no float in the money or FX source,
-deterministic nonce, re-running the same window does not resubmit, a refusal
-is recorded rather than thrown, a down feed writes a gap, a 429 is failed over
-and a rate limited slot stays due, an ECB document converts three known rows,
-a stale fixing and an unreachable FX source leave the slot due, USD off
-matches today's base units, and for the other rules naming the agent:
-discovery filters, the per-pass cap and its rotation, one failing rule not
-stopping the rest, and no second charge for the configured rule or a slot
-already decided.
+The tests check integer money conversion and that no float appears in the money
+or FX source. They check that the nonce is deterministic, that re-running the
+same window does not resubmit, that a refusal is recorded rather than thrown,
+that a down feed writes a gap, and that a 429 is failed over and a rate limited
+slot stays due. An ECB document converts three known rows, a stale fixing and an
+unreachable FX source leave the slot due, and USD off matches today's base
+units. For the other rules naming the agent, they cover the discovery filters,
+the per-pass cap and its rotation, one failing rule not stopping the rest, and
+no second charge for the configured rule or a slot already decided.

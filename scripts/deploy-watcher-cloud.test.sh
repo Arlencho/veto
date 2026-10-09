@@ -478,6 +478,126 @@ else
   bad "dry-run for quote currency forwarding should succeed: ${out}"
 fi
 
+# An existing job is only updated with --replace-env: the deploy rewrites the
+# whole job environment and would put the live jobs back on an older rule.
+# The wrapper answers `run jobs describe` and passes every other call on.
+mv "${FAKE_BIN}/gcloud" "${FAKE_BIN}/gcloud-base"
+cat > "${FAKE_BIN}/gcloud" <<'EOF'
+#!/usr/bin/env bash
+set -u
+if [[ "$*" == *'run jobs describe'* ]]; then
+  printf '%s\n' "$*" >> "${FAKE_GCLOUD_LOG}"
+  case "${FAKE_JOB_MODE:-missing}" in
+    exists)
+      for a in "$@"; do
+        case "$a" in --*) ;; run|jobs|describe) ;; *) printf '%s\n' "$a"; exit 0 ;; esac
+      done
+      exit 0
+      ;;
+    stale-only)
+      if [[ "$*" == *'veto-watcher-stale'* ]]; then printf 'veto-watcher-stale\n'; fi
+      exit 0
+      ;;
+    denied)
+      printf 'ERROR: PERMISSION_DENIED: run.jobs.get\n' >&2
+      exit 1
+      ;;
+    *)
+      printf 'ERROR: (gcloud.run.jobs.describe) Cannot find job [x].\n' >&2
+      exit 1
+      ;;
+  esac
+fi
+exec "$(dirname "$0")/gcloud-base" "$@"
+EOF
+chmod +x "${FAKE_BIN}/gcloud"
+
+run_jobs() {
+  local job_mode="$1"
+  shift
+  : >"$FAKE_LOG"
+  env -i \
+    PATH="${FAKE_BIN}:${PATH}" \
+    HOME="${DIR}" \
+    FAKE_GCLOUD_MODE=clean \
+    FAKE_JOB_MODE="$job_mode" \
+    FAKE_GCLOUD_LOG="$FAKE_LOG" \
+    AGENT_KEY_PATH="$KEY" \
+    "${IDENTITIES[@]}" \
+    "$SCRIPT" "$@"
+}
+env_writes() {
+  grep -E 'run jobs deploy|secrets versions add|secrets create|service-accounts create|buckets create|storage cp' "$FAKE_LOG" || true
+}
+
+if out="$(run_jobs exists 2>&1)"; then
+  bad "existing jobs without --replace-env must refuse"
+else
+  if printf '%s' "$out" | grep -F 'already exist: veto-watcher veto-watcher-stale' >/dev/null \
+    && printf '%s' "$out" | grep -F 'watcher/CLOUD.md "Switching the rule in place"' >/dev/null \
+    && printf '%s' "$out" | grep -F -- '--replace-env' >/dev/null; then
+    if [[ -n "$(env_writes)" ]]; then
+      bad "refusal must come before any write; gcloud log has: $(env_writes)"
+    else
+      pass "existing jobs without --replace-env refuse before any write, naming CLOUD.md"
+    fi
+  else
+    bad "existing jobs refusal message: ${out}"
+  fi
+fi
+
+if out="$(run_jobs exists --dry-run 2>&1)"; then
+  bad "dry-run against existing jobs without --replace-env must refuse too"
+else
+  if printf '%s' "$out" | grep -F 'already exist' >/dev/null && ! printf '%s' "$out" | grep -F 'run jobs deploy' >/dev/null; then
+    pass "dry-run against existing jobs without --replace-env refuses"
+  else
+    bad "dry-run existing jobs message: ${out}"
+  fi
+fi
+
+if out="$(run_jobs stale-only 2>&1)"; then
+  bad "an existing stale job alone must refuse"
+else
+  if printf '%s' "$out" | grep -F 'already exist: veto-watcher-stale' >/dev/null; then
+    pass "an existing stale job alone refuses"
+  else
+    bad "stale-only refusal message: ${out}"
+  fi
+fi
+
+if out="$(run_jobs exists --dry-run --replace-env 2>&1)"; then
+  if printf '%s' "$out" | grep -F 'run jobs deploy veto-watcher ' >/dev/null \
+    && printf '%s' "$out" | grep -F 'run jobs deploy veto-watcher-stale ' >/dev/null; then
+    pass "--replace-env updates existing jobs"
+  else
+    bad "--replace-env dry-run missing job deploys: ${out}"
+  fi
+else
+  bad "--replace-env against existing jobs should succeed: ${out}"
+fi
+
+if out="$(run_jobs missing --dry-run 2>&1)"; then
+  if printf '%s' "$out" | grep -F 'run jobs deploy veto-watcher ' >/dev/null; then
+    pass "a first deploy with no jobs needs no --replace-env"
+  else
+    bad "first deploy dry-run missing job deploy: ${out}"
+  fi
+else
+  bad "first deploy with no jobs should succeed: ${out}"
+fi
+
+if out="$(run_jobs denied --dry-run 2>&1)"; then
+  bad "a job lookup that fails for another reason must refuse"
+else
+  if printf '%s' "$out" | grep -F 'could not look up Cloud Run job veto-watcher' >/dev/null \
+    && ! printf '%s' "$out" | grep -F 'run jobs deploy' >/dev/null; then
+    pass "a job lookup that is denied refuses instead of treating the job as absent"
+  else
+    bad "denied job lookup message: ${out}"
+  fi
+fi
+
 rm -rf "$DIR"
 
 if [[ "$fail" -ne 0 ]]; then

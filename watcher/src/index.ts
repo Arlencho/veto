@@ -7,6 +7,7 @@ import {
   discoverAgentRules,
   quoteSlotAmount,
   retryConfiguredAllowOnce,
+  type ConfiguredRetryMemo,
 } from "./agentRules.js";
 import {
   connect,
@@ -35,7 +36,7 @@ import {
 import { scanHoldVaults } from "./hold.js";
 import { logError, logLine } from "./log.js";
 import { nonceFromSlot } from "./nonce.js";
-import { isRateLimitError, redactRpcUrl, redactRpcUrlsInText } from "./rpc.js";
+import { isRateLimitError, isTransientRpcError, redactRpcUrl, redactRpcUrlsInText } from "./rpc.js";
 import { processWindow, sleep, withRpcBackoff, type ProcessResult } from "./run.js";
 import { isJournalStale, lastDecisionAt } from "./stale.js";
 import { PublicKey } from "@solana/web3.js";
@@ -176,6 +177,7 @@ async function chargeOtherAgentRules(
       merchant: new PublicKey(cfg.merchant),
       configured: mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId),
       max: cfg.agentRulesMax,
+      budgetMs: cfg.agentPassBudgetMs,
       log: logLine,
       logError,
       deps: {
@@ -218,14 +220,24 @@ async function chargeOtherAgentRules(
           }),
       },
     });
-    // A feed or FX outage stays open so a later loop can still charge the slot.
+    // A feed or FX outage, or a transient ledger read failure, stays open so
+    // a later loop can still charge the slot.
     if (agentRulesSlotSettled(summary)) agentRulesDoneNonce = nonce;
   } catch (err) {
-    agentRulesDoneNonce = nonce;
+    // A failure a later read could get past (discovery timed out, the
+    // endpoint dropped) leaves the slot open; any other failure would repeat.
+    if (!isTransientRpcError(err)) agentRulesDoneNonce = nonce;
     const message = redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
     logError(`agent rules: pass failed, the configured rule is not affected: ${message}`);
   }
 }
+
+// The lowest owed nonce whose configured-rule retry check this process already
+// ran (configuredRetryDoneNonce). `run` loops every 30 seconds, and while a
+// feed or rate-limit gap keeps that slot owed, each loop would otherwise read
+// the mandate and ledger again. retryConfiguredAllowOnce sets it only after
+// the read answered and no send failed.
+const configuredRetryMemo: ConfiguredRetryMemo = { doneNonce: null };
 
 /** Retry the configured rule's allowed-once request before its slot charge.
  *
@@ -243,6 +255,7 @@ async function retryConfiguredAllowed(
   lowestOwed: bigint,
 ): Promise<void> {
   if (cfg.agentRulesMax === 0) return;
+  if (configuredRetryMemo.doneNonce === lowestOwed) return;
   try {
     const { connection, program, programId } = connect(cfg, agent);
     const mandate = mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId);
@@ -252,6 +265,7 @@ async function retryConfiguredAllowed(
       mandate,
       ledger: ledgerPda(programId, mandate),
       coder: program.coder.accounts,
+      memo: configuredRetryMemo,
       readAccounts: async (addresses) => {
         const infos = await connection.getMultipleAccountsInfo(addresses, "confirmed");
         return infos.map((info) => (info === null ? null : info.data));

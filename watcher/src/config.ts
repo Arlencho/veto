@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { parseGsUri } from "./journalStore.js";
 import { DEFAULT_KWH_MILLI, DEFAULT_MINT_DECIMALS, type SpotQuoteCurrency } from "./money.js";
 import { loadCalibration, type DemoCalibration } from "./calibration.js";
-import { parseRpcList } from "./rpc.js";
-import { parseAgentRulesMax } from "./agentRules.js";
+import { parseRpcList, parseRpcTimeoutMs } from "./rpc.js";
+import { parseAgentPassBudgetMs, parseAgentRulesMax } from "./agentRules.js";
 
 export const WATCHER_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const REPO_DIR = join(WATCHER_DIR, "..");
@@ -52,6 +52,10 @@ export type WatcherConfig = {
   quoteCurrency: SpotQuoteCurrency;
   /** VETO_AGENT_RULES_MAX: other open rules naming this agent charged per run. 0 turns that off. */
   agentRulesMax: number;
+  /** VETO_AGENT_PASS_BUDGET_MS: no new charge in the pass over other rules starts after this long. */
+  agentPassBudgetMs: number;
+  /** VETO_RPC_TIMEOUT_MS: bound on one RPC request to one endpoint, the same for every caller. */
+  rpcTimeoutMs: number;
 };
 
 /** Unset, empty, and SEK keep today's arithmetic. Only USD turns conversion on. */
@@ -206,6 +210,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts?: LoadConf
     calibration: loadCalibration(key => lookupFrom(env, files, key)),
     quoteCurrency: parseQuoteCurrency(lookupFrom(env, files, "VETO_QUOTE_CURRENCY")),
     agentRulesMax: parseAgentRulesMax(lookupFrom(env, files, "VETO_AGENT_RULES_MAX")),
+    agentPassBudgetMs: parseAgentPassBudgetMs(lookupFrom(env, files, "VETO_AGENT_PASS_BUDGET_MS")),
+    rpcTimeoutMs: parseRpcTimeoutMs(lookupFrom(env, files, "VETO_RPC_TIMEOUT_MS")),
   };
 }
 

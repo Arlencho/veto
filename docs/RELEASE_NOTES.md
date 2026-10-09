@@ -1,4 +1,4 @@
-# Veto APK v1.0.0-devnet.4: devnet
+# Veto APK v1.0.0-devnet.5: devnet
 
 Veto is an Android app for setting rules on what an agent can spend or trade
 on Solana. You approve the rule with your wallet. The program checks requests
@@ -8,16 +8,20 @@ time to stop them.
 
 **This release is devnet only. All money used here is test money with no value.**
 
-## Changed since v1.0.0-devnet.3
+## Changed since v1.0.0-devnet.4
 
-- **Allowed-once payments say so.** A payment or trade above the rule's
-  per-payment or per-trade limit can only go through after you allow it once.
-  Decisions, the decision screen, notifications, trade rows and the Today card
-  now say the payment was allowed once by you, above your limit, instead of
-  describing it as within the limit. Amounts are rounded so the shown payment
-  never equals the shown limit.
-- **Plain words.** Screens say "request" where they said "nonce". Exported
-  records keep the program's exact reason text, so they still verify.
+- **Counts say when a payment was allowed once.** The Overview paid tile now
+  says how many payments you allowed once, instead of calling every payment
+  "within the rule". When the phone cannot see every payment (the on-chain
+  record keeps the latest 32 entries), it says how many of the last ones were
+  allowed once. The agent record, its request strip, the week in review and
+  the "first payment inside the rule" plaque count the same way.
+
+- **New for testers, outside the app:** our demo charging agent can now
+  charge any rule you open for it, about every six hours, priced from the
+  Swedish SE3 electricity spot price (test payments; no electricity is bought).
+  If you allow one refused request, it retries that request on its next run.
+  See "Get ongoing charges from our demo agent" in the [tester guide](TESTERS.md).
 
 ## What the app does
 

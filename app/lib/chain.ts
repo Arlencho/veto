@@ -834,7 +834,7 @@ export async function grantOverride(
       .at(-1);
   if (!confirmed) {
     throw new Error(
-      'The transaction confirmed, but the ledger does not yet show an override row. Pull to retry. This screen will not invent one.',
+      'The transaction confirmed, but the ledger does not yet show the one-time allowance. Pull to retry. This screen will not invent one.',
     );
   }
   return { signature, mandate: next, row: confirmed };

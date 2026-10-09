@@ -52,7 +52,9 @@ export function DecisionRow({
   const face = decisionFace(row, decimals, perTxMax, nowMs, { payee, mint });
   const tone = TONE[face.tone];
   const id = encodeDecisionId(mandateAddress, row);
-  const amount = formatTokenDisplay(row.amount, decimals, mint);
+  const aboveLimit = paidAboveLimit(row.amount, perTxMax);
+  // Round up above the limit so the spoken amount never reads as at or under it.
+  const amount = formatTokenDisplay(row.amount, decimals, mint, aboveLimit ? 'ceil' : 'nearest');
 
   const openDetail = () => {
     router.push(`/decision/${encodeURIComponent(id)}`);
@@ -65,7 +67,7 @@ export function DecisionRow({
     void RN.Linking.openURL(explorerTxUrl(row.signature, cluster, rpcUrl));
   };
 
-  let accessibilityLabel = paidAboveLimit(row.amount, perTxMax)
+  let accessibilityLabel = aboveLimit
     ? `Paid, allowed once by you ${amount}`
     : `Paid within rule ${amount}`;
   if (row.kind === KIND_ADVISORY_DECLINE) {

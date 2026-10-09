@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 
-export const SAFE_WALLET_GUIDANCE = 'The safe address must be a wallet the guardian does not control, for example a cold wallet or an exchange deposit address you own.';
+export const SAFE_WALLET_GUIDANCE = 'The safe address must be a wallet the guardian does not control and that you could not be forced to hand over, for example a cold wallet kept elsewhere or an exchange deposit address you own.';
 export const OWNER_SAFE_REASON = 'Your safe address must be a different wallet from the one you sign with.';
 export const GUARDIAN_SAFE_REASON = 'Your safe address must be a different wallet from the guardian wallet.';
 export const GUARDIAN_RECOVERY_COPY = 'The guardian can stop a waiting withdrawal, freeze the vault, or immediately recover the entire balance to the configured safe address. Acting alone, it cannot choose another destination. Anyone controlling the safe wallet can spend money recovered there.';

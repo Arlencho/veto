@@ -194,7 +194,7 @@ test('the grant copy says this override allows this one payment, used once, neve
   const text = copy.paragraphs.join(' ');
   assert.match(
     text,
-    /allows this one payment of 14, used once, never above the remaining cap/,
+    /covers this one payment of 14, used once, never above the remaining cap/,
   );
   assert.match(text, /per-payment maximum on this rule is 10/);
   assert.match(text, /does not change/);

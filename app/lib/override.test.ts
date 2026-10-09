@@ -110,7 +110,7 @@ test('only a per-payment refusal with a suggested override offers a grant', () =
         } else {
           assert.equal(
             withSuggestion.why,
-            `The program records no override for this reason (${ownerReasonText(reason)}).`,
+            `The program records no one-time allowance for this reason (${ownerReasonText(reason)}).`,
           );
         }
       }
@@ -123,7 +123,7 @@ test('an exhausted total cap does not offer an override and says the program wil
   assert.equal(overCap.offer, false);
   if (!overCap.offer) {
     assert.equal(overCap.why, CAP_OVERRIDE_REFUSAL);
-    assert.ok(overCap.why.includes('cannot raise the cap'));
+    assert.ok(overCap.why.includes('cannot raise the total cap'));
     assert.ok(overCap.why.includes('program will not accept one'));
   }
   const overPerAndCap = overrideOfferForReason(REASON_OVER_PER_TX_MAX, 0n);
@@ -137,7 +137,7 @@ test('a revoked rule does not offer an override', () => {
   const guard = overrideGuard(mandate({ status: STATUS_REVOKED }), 7n, 180n);
   assert.equal(guard.ok, false);
   if (!guard.ok) {
-    assert.equal(guard.why, 'This rule is revoked on chain. An override cannot be granted.');
+    assert.equal(guard.why, 'This rule is revoked on chain. A one-time allowance cannot be granted.');
   }
   const assessment = assessOverride({
     row: row(),
@@ -146,7 +146,7 @@ test('a revoked rule does not offer an override', () => {
   });
   assert.equal(assessment.status, 'blocked');
   if (assessment.status === 'blocked') {
-    assert.equal(assessment.why, 'This rule is revoked on chain. An override cannot be granted.');
+    assert.equal(assessment.why, 'This rule is revoked on chain. A one-time allowance cannot be granted.');
   }
 });
 
@@ -154,7 +154,7 @@ test('a settled nonce does not offer an override', () => {
   const atLast = overrideGuard(mandate({ lastNonce: 7n }), 7n, 180n);
   assert.equal(atLast.ok, false);
   if (!atLast.ok) {
-    assert.equal(atLast.why, 'This request is already settled on chain. An override cannot be granted.');
+    assert.equal(atLast.why, 'This request is already settled on chain. A one-time allowance cannot be granted.');
   }
   const beforeLast = overrideGuard(mandate({ lastNonce: 8n }), 7n, 180n);
   assert.equal(beforeLast.ok, false);
@@ -173,7 +173,7 @@ test('an exhausted or expired status is blocked before a grant is offered', () =
   if (!expired.ok) {
     assert.equal(
       expired.why,
-      'This rule is expired on chain. An override cannot be granted.',
+      'This rule is expired on chain. A one-time allowance cannot be granted.',
     );
   }
 });
@@ -281,7 +281,7 @@ test('assessOverride is ready only when the reason offers and the live guards pa
   if (ready.status === 'ready') {
     assert.equal(ready.amount, 180n);
     assert.equal(ready.nonce, 7n);
-    assert.equal(ready.commit.title, 'Grant this override');
+    assert.equal(ready.commit.title, 'Allow this payment once');
     assert.ok(ready.commit.paragraphs[0]?.includes('180'));
     assert.ok(ready.commit.paragraphs.some((p) => p.includes('not a settings change')));
   }
@@ -300,7 +300,7 @@ test('assessOverride is ready only when the reason offers and the live guards pa
   });
   assert.equal(already.status, 'already');
   if (already.status === 'already') {
-    assert.ok(already.why.includes('already has an override of 180'));
+    assert.ok(already.why.includes('already has a one-time allowance of 180'));
   }
 });
 
@@ -315,15 +315,15 @@ test('the commit copy names the amount, the nonce, and that the cap cannot rise'
     pendingOtherNonce: 9n,
   });
   const text = copy.paragraphs.join(' ');
-  assert.ok(text.includes('override of 180 for this request'));
+  assert.ok(text.includes('allow this payment once, for 180'));
   assert.ok(text.includes('per-payment maximum on this rule is 60'));
-  assert.ok(text.includes('allows this one payment of 180, used once, never above the remaining cap'));
+  assert.ok(text.includes('covers this one payment of 180, used once, never above the remaining cap'));
   assert.equal(text.includes('raises it to'), false);
   assert.ok(text.includes('180 remaining of 200'));
   assert.ok(text.includes(CAP_OVERRIDE_REFUSAL));
   assert.ok(text.includes('recorded decision'));
   assert.ok(text.includes('not a settings change'));
-  assert.ok(text.includes('replaces the pending override for request 9'));
+  assert.ok(text.includes('replaces the pending one-time allowance for request 9'));
   assert.ok(text.includes('agent can then retry this request'));
   assert.doesNotMatch(text, /nonce/i);
 });
@@ -385,4 +385,32 @@ test('an override probe key changes when the rule expires by the clock, so a lat
   const before = overrideProbeKey(source, live, 999n);
   const after = overrideProbeKey(source, live, 1_000n);
   assert.equal(overrideProbeIsCurrent(before, after), false);
+});
+
+test('owner-facing allow-once copy says allow once, never override, and keeps the other limits', () => {
+  const copy = overrideCommitCopy({
+    amount: 180n,
+    nonce: 7n,
+    perTxMax: 60n,
+    remaining: 180n,
+    cap: 200n,
+    decimals: 0,
+    pendingOtherNonce: 9n,
+  });
+  assert.equal(copy.title, 'Allow this payment once');
+  const text = copy.paragraphs.join(' ');
+  assert.ok(text.includes('The payee and expiry rules still apply.'));
+  assert.ok(text.includes('cannot raise the total cap'));
+  const whys: string[] = [CAP_OVERRIDE_REFUSAL, copy.title, text];
+  for (const guard of [overrideGuard(mandate(), 0n, 180n), overrideGuard(mandate(), 7n, 0n)]) {
+    assert.equal(guard.ok, false);
+    if (!guard.ok) whys.push(guard.why);
+  }
+  const notOffered = overrideOfferForReason(REASON_STALE_NONCE, 180n);
+  assert.equal(notOffered.offer, false);
+  if (!notOffered.offer) whys.push(notOffered.why);
+  for (const why of whys) {
+    assert.doesNotMatch(why, /override/i, why);
+    assert.doesNotMatch(why, /nonce/i, why);
+  }
 });

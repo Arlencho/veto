@@ -69,7 +69,7 @@ export function useOverrideGrant(args: {
         if (!cancelled) {
           setFailedRead({
             status: 'blocked',
-            why: 'The chain could not be re-read for this rule. This screen will not offer an override from a stale row. Pull to retry.',
+            why: 'The chain could not be re-read for this rule. This screen will not offer a one-time allowance from a stale row. Pull to retry.',
           });
         }
       });
@@ -100,7 +100,7 @@ export function useOverrideGrant(args: {
         setConfirmKey(null);
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? redactRpc(err.message) : 'Override failed');
+        setError(err instanceof Error ? redactRpc(err.message) : 'Could not allow this payment once');
       })
       .finally(() => {
         setSigning(false);

@@ -23,13 +23,13 @@ export function renderReason(
     return {
       reason,
       text,
-      overrideLine: `An override of ${formatTokenAmount(suggestedOverride, decimals, mint)} would have cleared it.`,
+      overrideLine: `A one-time allowance of ${formatTokenAmount(suggestedOverride, decimals, mint)} would have cleared it.`,
     };
   }
   return {
     reason,
     text,
-    overrideLine: 'No override would have cleared this.',
+    overrideLine: 'No one-time allowance would have cleared this.',
   };
 }
 

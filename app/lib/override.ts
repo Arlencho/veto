@@ -14,7 +14,7 @@ import { formatTokenAmount } from './tokens';
 import { isActive, mandateRemaining, type MandateAccount } from './mandate';
 
 export const CAP_OVERRIDE_REFUSAL =
-  'An override cannot raise the cap because the program will not accept one.';
+  'A one-time allowance cannot raise the total cap because the program will not accept one.';
 
 export type OverrideSource = {
   kind: number;
@@ -77,7 +77,7 @@ export function overrideOfferForReason(reason: number, suggestedOverride: bigint
   }
   return {
     offer: false,
-    why: `The program records no override for this reason (${ownerReasonText(reason)}).`,
+    why: `The program records no one-time allowance for this reason (${ownerReasonText(reason)}).`,
   };
 }
 
@@ -88,18 +88,18 @@ export function overrideGuard(
   nowSec?: bigint,
 ): OverrideGuard {
   if (nonce === 0n) {
-    return { ok: false, why: 'This row has no request number. The program will not accept an override.' };
+    return { ok: false, why: 'This row has no request number. The program will not accept a one-time allowance.' };
   }
   if (amount === 0n) {
     return {
       ok: false,
-      why: 'This row has no override amount. The program will not accept an override.',
+      why: 'This row has no allowance amount. The program will not accept a one-time allowance.',
     };
   }
   if (mandate.status === STATUS_REVOKED) {
     return {
       ok: false,
-      why: 'This rule is revoked on chain. An override cannot be granted.',
+      why: 'This rule is revoked on chain. A one-time allowance cannot be granted.',
     };
   }
   if (mandate.status === STATUS_EXHAUSTED) {
@@ -111,19 +111,19 @@ export function overrideGuard(
   if (mandate.status !== STATUS_ACTIVE) {
     return {
       ok: false,
-      why: `This rule is ${statusName(mandate.status)} on chain. An override cannot be granted.`,
+      why: `This rule is ${statusName(mandate.status)} on chain. A one-time allowance cannot be granted.`,
     };
   }
   if (nowSec !== undefined && !isActive(mandate, nowSec)) {
     return {
       ok: false,
-      why: 'This rule is expired on chain. An override cannot be granted.',
+      why: 'This rule is expired on chain. A one-time allowance cannot be granted.',
     };
   }
   if (nonce <= mandate.lastNonce) {
     return {
       ok: false,
-      why: 'This request is already settled on chain. An override cannot be granted.',
+      why: 'This request is already settled on chain. A one-time allowance cannot be granted.',
     };
   }
   const remaining = mandateRemaining(mandate);
@@ -151,20 +151,20 @@ export function overrideCommitCopy(args: {
   const remaining = formatTokenAmount(args.remaining, args.decimals, args.mint);
   const cap = formatTokenAmount(args.cap, args.decimals, args.mint);
   const paragraphs = [
-    `You are about to grant an override of ${amount} for this request.`,
-    `The per-payment maximum on this rule is ${perTxMax}. It does not change. This override allows this one payment of ${amount}, used once, never above the remaining cap (${remaining} remaining of ${cap}). ${CAP_OVERRIDE_REFUSAL}`,
-    'This is written to the ledger as an override, a recorded decision. It is not a settings change.',
+    `You are about to allow this payment once, for ${amount}.`,
+    `The per-payment maximum on this rule is ${perTxMax}. It does not change. This one-time allowance covers this one payment of ${amount}, used once, never above the remaining cap (${remaining} remaining of ${cap}). The payee and expiry rules still apply. ${CAP_OVERRIDE_REFUSAL}`,
+    'This is written to the ledger as a one-time allowance, a recorded decision. It is not a settings change.',
     'The owner signs once. The agent can then retry this request.',
   ];
   if (args.pendingOtherNonce != null && args.pendingOtherNonce !== 0n) {
     paragraphs.splice(
       2,
       0,
-      `This replaces the pending override for request ${args.pendingOtherNonce.toString()}.`,
+      `This replaces the pending one-time allowance for request ${args.pendingOtherNonce.toString()}.`,
     );
   }
   return {
-    title: 'Grant this override',
+    title: 'Allow this payment once',
     amount,
     nonce: args.nonce.toString(),
     paragraphs,
@@ -180,7 +180,7 @@ export function assessOverride(args: {
   if (args.row.kind !== KIND_REFUSED) {
     return {
       status: 'none',
-      why: 'An override is granted from a refused decision, not from this row.',
+      why: 'A one-time allowance is granted from a refused decision, not from this row.',
     };
   }
   const offer = overrideOfferForReason(args.row.reason, args.row.suggestedOverride);
@@ -197,7 +197,7 @@ export function assessOverride(args: {
       status: 'already',
       amount: args.mandate.overrideAmount,
       nonce: args.row.nonce,
-      why: `This request already has an override of ${amount} on chain. The agent can retry it.`,
+      why: `This request already has a one-time allowance of ${amount} on chain. The agent can retry it.`,
     };
   }
   const pending =

@@ -301,7 +301,7 @@ function RefusedBody({
   const needed =
     row.reason === REASON_OVER_PER_TX_MAX && row.suggestedOverride > 0n
       ? formatTokenAmount(row.suggestedOverride, decimals, mint)
-      : 'No override would have cleared this.';
+      : 'No one-time allowance would have cleared this.';
   return (
     <View style={styles.stack}>
       <StatusPill label="Refused" tone="refused" when={when} />

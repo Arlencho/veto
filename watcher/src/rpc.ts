@@ -293,14 +293,36 @@ function redactedError(err: Error): Error {
   return out;
 }
 
-/** Wrap an async call so an Error it rejects with has its RPC URLs redacted.
- * Anything else it rejects with (a JSON-RPC error object) passes through. */
+/** A copy of `value` with every RPC URL in every string cut to scheme and
+ * host: strings, arrays and plain objects are copied and walked, numbers and
+ * other scalars are kept, an Error becomes a redacted Error with no cause.
+ * Anything else (a class instance, a function) is replaced by a placeholder,
+ * so no unsanitized object survives in the copy. */
+export function redactRpcUrlsDeep(value: unknown, depth = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (typeof value === "string") return redactRpcUrlsInText(value);
+  if (value === null || typeof value !== "object") {
+    return typeof value === "function" ? "[function]" : value;
+  }
+  if (value instanceof Error) return redactedError(value);
+  if (seen.has(value) || depth >= 8) return "[redacted]";
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((item) => redactRpcUrlsDeep(item, depth + 1, seen));
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return "[redacted]";
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) out[key] = redactRpcUrlsDeep(item, depth + 1, seen);
+  return out;
+}
+
+/** Wrap an async call so whatever it rejects with has its RPC URLs redacted:
+ * an Error, or a plain JSON-RPC error object ({ code, message, data }) as the
+ * websocket transport rejects server errors, with its code and shape kept. */
 export function redactRejections<A extends unknown[], R>(fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
   return async (...args: A) => {
     try {
       return await fn(...args);
     } catch (err) {
-      throw err instanceof Error ? redactedError(err) : err;
+      throw redactRpcUrlsDeep(err);
     }
   };
 }

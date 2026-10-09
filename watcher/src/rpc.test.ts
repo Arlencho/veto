@@ -13,6 +13,7 @@ import {
   parseRpcTimeoutMs,
   redactRejections,
   redactRpcUrl,
+  redactRpcUrlsDeep,
   redactRpcUrlsInText,
 } from "./rpc.js";
 
@@ -369,8 +370,91 @@ test("pr 395 review: websocket call rejections reach web3.js's subscribe and uns
     redactRejections(async () => {
       throw rpcError;
     })(),
-    (err: unknown) => err === rpcError,
+    (err: unknown) => {
+      assert.deepEqual(err, rpcError, "a JSON-RPC error without a URL keeps its code and message");
+      return true;
+    },
   );
+});
+
+test("pr 395 review: a plain JSON-RPC rejection is redacted in message and nested data, through web3.js's subscription logger", async () => {
+  // The websocket transport rejects a server error with the plain
+  // message.error object, and _updateSubscriptions logs it whole. The
+  // prototype `call` is replaced before the connection is built, so the
+  // connection's wrapper wraps this rejection like the real transport's.
+  const probe = createFailoverConnection(["http://127.0.0.1:1"]);
+  let owner: { call: unknown; connect: unknown } | null = Object.getPrototypeOf(
+    (probe as unknown as { _rpcWebSocket: object })._rpcWebSocket,
+  );
+  while (owner !== null && !Object.prototype.hasOwnProperty.call(owner, "call")) owner = Object.getPrototypeOf(owner);
+  assert.ok(owner !== null, "found the websocket client's call");
+  const connectOwner = (() => {
+    let p: { connect: unknown } | null = Object.getPrototypeOf((probe as unknown as { _rpcWebSocket: object })._rpcWebSocket);
+    while (p !== null && !Object.prototype.hasOwnProperty.call(p, "connect")) p = Object.getPrototypeOf(p);
+    return p!;
+  })();
+  const originalCall = owner.call;
+  const originalConnect = connectOwner.connect;
+  const rpcError = {
+    code: -32000,
+    message: `subscribe refused at ${KEYED_URL_TEXT}`,
+    data: { endpoint: "wss://user:hunter2@rpc.example.com/v2/PATH-TOKEN?api-key=QUERY-TOKEN", nested: { urls: [KEYED_URL_TEXT], slot: 7 } },
+  };
+  let target: { _rpcWebSocketGeneration: number } | null = null;
+  let calls = 0;
+  owner.call = async function () {
+    calls += 1;
+    // Mark the socket generation stale so web3.js logs once and does not resubscribe.
+    if (target !== null) target._rpcWebSocketGeneration += 1;
+    throw rpcError;
+  };
+  connectOwner.connect = function () {};
+  const captured: unknown[][] = [];
+  const originalError = console.error;
+  try {
+    const connection = createFailoverConnection(["http://127.0.0.1:1"]);
+    const internals = connection as unknown as { _rpcWebSocketConnected: boolean; _rpcWebSocketGeneration: number };
+    target = internals;
+    internals._rpcWebSocketConnected = true;
+    console.error = (...args: unknown[]) => {
+      captured.push(args);
+    };
+    connection.onSlotChange(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  } finally {
+    console.error = originalError;
+    owner.call = originalCall;
+    connectOwner.connect = originalConnect;
+  }
+  assert.equal(calls, 1);
+  const line = captured.find((args) => String(args[0]).includes("error calling"));
+  assert.ok(line !== undefined, `the subscription logger ran: ${JSON.stringify(captured)}`);
+  const logged = (line[1] as { error: { code: number; message: string; data: { nested: { slot: number } } } }).error;
+  const text = JSON.stringify(line);
+  for (const token of KEY_TOKENS) assert.equal(text.includes(token), false, text);
+  assert.equal(logged.code, -32000, "the numeric code is kept");
+  assert.equal(logged.data.nested.slot, 7, "the structure and other values are kept");
+  assert.ok(logged.message.includes("https://rpc.example.com"), logged.message);
+  assert.notEqual(logged, rpcError, "the unsanitized object is not what was logged");
+});
+
+test("pr 395 review: deep redaction keeps scalars and shape and drops what it cannot inspect", () => {
+  const err = Object.assign(new Error("boom at https://rpc.example.com/PATH-TOKEN"), { cause: { url: "https://rpc.example.com/PATH-TOKEN" } });
+  const out = redactRpcUrlsDeep({ code: 1, ok: true, none: null, list: ["wss://a.example/QUERY-TOKEN"], err, when: new Date(0) }) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(JSON.stringify(out).includes("TOKEN"), false);
+  assert.equal(out.code, 1);
+  assert.equal(out.ok, true);
+  assert.equal(out.none, null);
+  assert.deepEqual(out.list, ["wss://a.example"]);
+  assert.ok(out.err instanceof Error);
+  assert.equal((out.err as Error).cause, undefined, "no unsanitized cause is kept");
+  assert.equal(out.when, "[redacted]");
+  const cyclic: Record<string, unknown> = { message: "https://rpc.example.com/PATH-TOKEN" };
+  cyclic.self = cyclic;
+  assert.equal(JSON.stringify(redactRpcUrlsDeep(cyclic)).includes("TOKEN"), false);
 });
 
 test("pr 395 review: transient matching is narrow: a stray 500 or the word network is not a server error", () => {

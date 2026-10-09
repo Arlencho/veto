@@ -46,7 +46,8 @@ function pending(id: PlaqueId, title: string, dateLabel: string, detail: string)
 
 function firstPayment(rule: RuleSnapshot): Plaque {
   const title = 'First payment inside the rule';
-  const paid = byTime(rule.rows.filter((row) => row.kind === KIND_PAID));
+  // A payment the owner allowed once above the limit was not inside the rule.
+  const paid = byTime(rule.classified.paidInside);
   const first = paid[0];
   if (!first) {
     return pending(

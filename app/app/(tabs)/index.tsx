@@ -12,7 +12,7 @@ import { DayClock } from '../../components/daily/DayClock';
 import { LatestDecision } from '../../components/daily/LatestDecision';
 import { SpendBoard } from '../../components/daily/SpendBoard';
 import { StreakCall } from '../../components/daily/StreakCall';
-import { barUnits, openedAtSec, refusalStreak, ruleDay } from '../../components/daily/facts';
+import { barUnits, openedAtSec, paidTileCopy, refusalStreak, ruleDay } from '../../components/daily/facts';
 import { HoldEntry } from '../../components/hold/HoldEntry';
 import { HomeStay } from '../../components/renewal/RenewalBanner';
 import { EmptyState } from '../../components/EmptyState';
@@ -57,6 +57,7 @@ export default function OverviewScreen() {
   const streak = refusalStreak(chain.rows);
   const listed = today.filter((row) => isListedDecision(row.kind));
   const live = mandate ? isActive(mandate, nowSec) : false;
+  const paidTile = mandate ? paidTileCopy(mandate.spendCount, chain.rows, mandate.perTxMax) : null;
   const liveCount = liveMandateCount(chain.mandates, chain.nowMs);
   const spentShare = Math.round(ratio * 100);
   const mint = mandate?.mint;
@@ -180,12 +181,12 @@ export default function OverviewScreen() {
                   value={mandate.spendCount}
                   tone="paid"
                   height={48}
-                  accessibilityLabel={`${mandate.spendCount} payments paid by your agent`}
+                  accessibilityLabel={paidTile?.accessibilityLabel}
                 />
                 <View style={styles.paidCopy}>
                   <Text style={styles.kicker}>Paid</Text>
                   <Text style={styles.paidTitle}>by your agent</Text>
-                  <Text style={styles.hint}>all within the rule</Text>
+                  <Text style={styles.hint}>{paidTile?.hint}</Text>
                 </View>
               </View>
             </View>

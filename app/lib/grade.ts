@@ -20,6 +20,7 @@ import {
   REASON_ZERO_AMOUNT,
 } from './constants';
 import { remainingCap } from './format';
+import { paidAboveLimit } from './override';
 import { formatTokenDisplay } from './tokens';
 import { canonicalAddress } from './ruleRequest';
 import { truncateAddress } from './wallet';
@@ -210,19 +211,34 @@ export function openedAtOf(rows: readonly GradeDecision[]): bigint | null {
 
 type CountedRule = ClassifiedRule & { outsideFromMissingRefusal: GradeDecision[] };
 
-function countRule(rows: readonly GradeDecision[]): CountedRule {
+// A paid row above the per-payment limit only went through on the owner's one-time
+// allowance, so it is never counted as paid inside the rule, even when the allowance
+// row has already rotated out of the ledger window.
+function countRule(rows: readonly GradeDecision[], perTxMax?: bigint | null): CountedRule {
   const allowances = rows.filter((row) => row.kind === KIND_OVERRIDE);
   const refused = rows.filter((row) => row.kind === KIND_REFUSED);
   const allowanceNonces = new Set(allowances.map((row) => row.nonce));
   const refusalNonces = new Set(refused.map((row) => row.nonce));
   const paidInside: GradeDecision[] = [];
   const settlements: GradeDecision[] = [];
+  // Allowances with no refusal on the record, plus payments above the limit whose refusal
+  // and allowance have both left the ledger window. One entry per request.
+  const outsideFromMissingRefusal = allowances.filter((row) => !refusalNonces.has(row.nonce));
+  const outsideNonces = new Set(outsideFromMissingRefusal.map((row) => row.nonce));
   for (const row of rows) {
     if (row.kind !== KIND_PAID) {
       continue;
     }
-    if (allowanceNonces.has(row.nonce)) {
+    if (allowanceNonces.has(row.nonce) || paidAboveLimit(row.amount, perTxMax)) {
       settlements.push(row);
+      if (
+        !allowanceNonces.has(row.nonce) &&
+        !refusalNonces.has(row.nonce) &&
+        !outsideNonces.has(row.nonce)
+      ) {
+        outsideNonces.add(row.nonce);
+        outsideFromMissingRefusal.push(row);
+      }
     } else {
       paidInside.push(row);
     }
@@ -234,12 +250,12 @@ function countRule(rows: readonly GradeDecision[]): CountedRule {
     settlements,
     declines: rows.filter((row) => row.kind === KIND_ADVISORY_DECLINE),
     openedAt: openedAtOf(rows),
-    outsideFromMissingRefusal: allowances.filter((row) => !refusalNonces.has(row.nonce)),
+    outsideFromMissingRefusal,
   };
 }
 
-export function classifyRule(rows: readonly GradeDecision[]): ClassifiedRule {
-  const counted = countRule(rows);
+export function classifyRule(rows: readonly GradeDecision[], perTxMax?: bigint | null): ClassifiedRule {
+  const counted = countRule(rows, perTxMax);
   return {
     paidInside: counted.paidInside,
     refused: counted.refused,
@@ -296,13 +312,16 @@ function stepDown(band: GradedBand, allowances: number): { id: GradedBand; stepp
   return { id: next, steppedDown: next !== band };
 }
 
-export function gradeRules(rules: readonly { rows: readonly GradeDecision[] }[], nowSec: bigint): Grade {
+export function gradeRules(
+  rules: readonly { rows: readonly GradeDecision[]; perTxMax?: bigint | null }[],
+  nowSec: bigint,
+): Grade {
   let paid = 0;
   let outside = 0;
   let allowances = 0;
   let declines = 0;
   for (const rule of rules) {
-    const facts = countRule(rule.rows);
+    const facts = countRule(rule.rows, rule.perTxMax);
     paid += facts.paidInside.length;
     outside += facts.refused.length + facts.outsideFromMissingRefusal.length;
     allowances += facts.allowances.length;
@@ -385,8 +404,8 @@ export function gradeRecordLine(grade: Grade): string {
   return `Its rule: ${rule}. This agent: ${grade.outside} of ${grade.requests}${tail}.${step}`;
 }
 
-export function requestTicks(rows: readonly GradeDecision[]): RequestTick[] {
-  const facts = countRule(rows);
+export function requestTicks(rows: readonly GradeDecision[], perTxMax?: bigint | null): RequestTick[] {
+  const facts = countRule(rows, perTxMax);
   const ticks: RequestTick[] = [
     ...facts.paidInside.map((row) => ({ kind: 'paid' as const, ts: row.ts })),
     ...facts.refused.map((row) => ({ kind: 'refused' as const, ts: row.ts })),
@@ -492,7 +511,7 @@ export function snapshotRule(rule: RuleFacts, nowSec: bigint): RuleSnapshot {
   const mint = rule.mint;
   const remainingLabel = formatTokenDisplay(remaining, rule.decimals, mint, 'floor');
   const capLabel = formatTokenDisplay(rule.cap, rule.decimals, mint);
-  const facts = countRule(rule.rows);
+  const facts = countRule(rule.rows, rule.perTxMax);
   const dayLabel =
     day != null && totalDays != null
       ? `Day ${day} of ${totalDays}`
@@ -604,7 +623,7 @@ export function buildAgentRecords(
       .sort((a, b) => (a.purpose < b.purpose ? -1 : a.purpose > b.purpose ? 1 : 0));
     const grade = gradeRules(snapshots, nowSec);
     const ticks = snapshots
-      .flatMap((rule) => requestTicks(rule.rows))
+      .flatMap((rule) => requestTicks(rule.rows, rule.perTxMax))
       .sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
     const nameKey = canonicalAddress(agent);
     const storedName = nameKey ? names[nameKey] : undefined;

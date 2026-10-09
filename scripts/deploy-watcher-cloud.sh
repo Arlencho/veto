@@ -60,7 +60,7 @@ trap cleanup_env_file EXIT
 
 usage() {
   cat <<'EOF'
-usage: ./scripts/deploy-watcher-cloud.sh [--check] [--dry-run]
+usage: ./scripts/deploy-watcher-cloud.sh [--check] [--dry-run] [--replace-env]
 
 Creates the journal bucket (public access prevention enforced), the agent
 key in Secret Manager, the image, the Cloud Run jobs, the Cloud Scheduler
@@ -91,16 +91,23 @@ Optional environment:
   BUCKET             default ${PROJECT}-journal
   ALERT_EMAIL        owner email for the silent-journal alert
   AGENT_KEY_PATH     required, no default
+
+--replace-env is required when either Cloud Run job already exists. The
+deploy rewrites the whole job environment from the exported identities, so
+on a live job it can put the watcher back on an older rule. To change the
+rule of a running job, follow watcher/CLOUD.md "Switching the rule in place".
 EOF
 }
 
 MODE="deploy"
 SKIP_BUILD="${SKIP_BUILD:-0}"
+REPLACE_ENV=0
 for arg in "$@"; do
   case "$arg" in
     --check) MODE="check" ;;
     --dry-run) MODE="dry-run" ;;
     --skip-build) SKIP_BUILD=1 ;;
+    --replace-env) REPLACE_ENV=1 ;;
     --help|-h) usage; exit 0 ;;
     *) die "unknown argument: ${arg} (try --help)" ;;
   esac
@@ -690,6 +697,56 @@ ensure_alert() {
   ensure_one_alert "Veto watcher record too old" "$STALE_ALERT_POLICY_FILE" "$ch"
 }
 
+# Prints the job name when the Cloud Run job exists, nothing when it does not.
+# Any lookup error other than NOT_FOUND stops the deploy: an unreadable job
+# must not be taken as absent and overwritten.
+job_exists_name() {
+  local name="$1"
+  local out err rc=0
+  err="$(mktemp)"
+  out="$(gcloud run jobs describe "$name" --region="$REGION" --project="$PROJECT" --format='value(metadata.name)' 2>"$err")" || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    if grep -qi 'NOT_FOUND\|could not be found\|cannot find' "$err"; then
+      rm -f "$err"
+      return 0
+    fi
+    # A dry-run against a new project runs before the Cloud Run API is
+    # enabled; there can be no job yet. A real deploy has already required
+    # the API to be on, so there this is still an error.
+    if [[ "$MODE" == "dry-run" ]] && grep -qi 'SERVICE_DISABLED\|has not been used in project\|API.* is disabled\|API.* not enabled' "$err"; then
+      rm -f "$err"
+      return 0
+    fi
+    local first
+    first="$(head -1 "$err")"
+    rm -f "$err"
+    die "could not look up Cloud Run job ${name}: ${first}; refusing to deploy"
+  fi
+  rm -f "$err"
+  printf '%s' "$out"
+}
+
+# The deploy replaces each job's whole environment. On a live job that can
+# switch it back to an older rule, so updating an existing job needs
+# --replace-env. Runs before anything is created or changed.
+refuse_existing_jobs_without_replace_env() {
+  [[ "$REPLACE_ENV" == "1" ]] && return 0
+  local name got found=""
+  for name in "$JOB_NAME" "$STALE_JOB_NAME"; do
+    # die inside the command substitution only ends the subshell.
+    got="$(job_exists_name "$name")" || exit 1
+    if [[ -n "$got" ]]; then
+      found="${found:+${found} }${name}"
+    fi
+  done
+  [[ -z "$found" ]] && return 0
+  printf 'error: Cloud Run job(s) already exist: %s\n' "$found" >&2
+  printf '       This deploy replaces the whole job environment and can put the live jobs back on an older rule.\n' >&2
+  printf '       To change the rule in place, follow watcher/CLOUD.md "Switching the rule in place".\n' >&2
+  printf '       To replace the environment anyway, run again with --replace-env.\n' >&2
+  exit 1
+}
+
 deploy() {
   require_local_inputs
   if [[ "$MODE" == "check" ]]; then
@@ -700,6 +757,7 @@ deploy() {
   if [[ "$MODE" != "dry-run" ]]; then
     require_services
   fi
+  refuse_existing_jobs_without_replace_env
 
   local sa_email="${SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
   local image="${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/${IMAGE_NAME}:latest"

@@ -23,7 +23,7 @@ import { fxFixingIsFresh, readFxOrUnreachable, type FxSource } from "./fx.js";
 import { amountBaseUnitsQuoted, sekPerKwhToScaled, type SpotQuoteCurrency } from "./money.js";
 import type { Veto } from "./idl.js";
 import { nonceFromSlot, nonceFromWindowStart } from "./nonce.js";
-import { isRateLimitError, redactRpcUrlsInText } from "./rpc.js";
+import { isRateLimitError, isTransientRpcError, redactRpcUrlsInText } from "./rpc.js";
 
 /** Discriminator (8) then owner (32). Same value as MANDATE_AGENT_OFFSET in sdk/src/layout.ts. */
 export const MANDATE_AGENT_OFFSET = 8 + 32;
@@ -31,6 +31,19 @@ export const DEFAULT_AGENT_RULES_MAX = 25;
 /** getMultipleAccountsInfo reads at most 100 accounts per call. */
 export const AGENT_RULES_MAX_LIMIT = 100;
 export const AGENT_RULE_DELAY_MS = 1_500;
+/** No new charge starts after this long into one pass. A Cloud Run task ends
+ * at 15 minutes, and one charge can wait up to 90 s for confirmation, so the
+ * default leaves room for the charge in flight and everything else the task runs. */
+export const DEFAULT_AGENT_PASS_BUDGET_MS = 8 * 60_000;
+/** In a `once` run the pass comes after the configured rule and the hold scan,
+ * which can take minutes, so its deadline counts from process start. */
+export const ONCE_PASS_DEADLINE_MS = 12 * 60_000;
+
+/** The pass budget for a `once` run: the configured budget, cut so no new
+ * charge starts later than ONCE_PASS_DEADLINE_MS after the process started. */
+export function oncePassBudgetMs(configuredMs: number, uptimeMs: number): number {
+  return Math.max(0, Math.min(configuredMs, ONCE_PASS_DEADLINE_MS - Math.ceil(uptimeMs)));
+}
 const STATUS_ACTIVE = 0;
 const SLOT_SECONDS = 6n * 60n * 60n;
 
@@ -169,14 +182,29 @@ export function selectAgentRules(
     if (reason === null) eligible.push(rule);
     else skipped.push({ rule, reason });
   }
-  eligible.sort((a, b) => cmp(a.address.toBase58(), b.address.toBase58()));
-  if (eligible.length <= opts.max) return { selected: eligible, skipped };
-  const n = eligible.length;
-  const turn = Number((opts.nonce / SLOT_SECONDS) % BigInt(n));
-  const start = (turn * opts.max) % n;
-  const rotated = [...eligible.slice(start), ...eligible.slice(0, start)];
-  for (const rule of rotated.slice(opts.max)) skipped.push({ rule, reason: "over the per-run cap" });
-  return { selected: rotated.slice(0, opts.max), skipped };
+  const { selected, over } = rotateBySlot(eligible, opts.nonce, opts.max);
+  for (const rule of over) skipped.push({ rule, reason: "over the per-run cap" });
+  return { selected, skipped };
+}
+
+/** At most `max` rules in address order, starting `max` further on each slot.
+ *
+ * Sorted by address so the order does not depend on RPC row order. When there
+ * are more rules than `max`, the start moves by `max` each slot, so every rule
+ * gets a turn instead of the same first `max` every time.
+ */
+function rotateBySlot(
+  rules: readonly AgentRule[],
+  nonce: bigint,
+  max: number,
+): { selected: AgentRule[]; over: AgentRule[] } {
+  const sorted = [...rules].sort((a, b) => cmp(a.address.toBase58(), b.address.toBase58()));
+  if (sorted.length <= max) return { selected: sorted, over: [] };
+  const n = sorted.length;
+  const turn = Number((nonce / SLOT_SECONDS) % BigInt(n));
+  const start = (turn * max) % n;
+  const rotated = [...sorted.slice(start), ...sorted.slice(0, start)];
+  return { selected: rotated.slice(0, max), over: rotated.slice(max) };
 }
 
 function cmp(a: string, b: string): number {
@@ -263,6 +291,10 @@ export type AllowOnceOutcome = "paid" | "refused" | "failed" | "skipped";
  * One read of the mandate and its ledger. Nothing is logged when no allow is
  * pending. The journal is not touched: it records slot decisions, and the
  * retry is on the chain ledger. Never throws.
+ *
+ * It is not memoised: an owner can grant an allow while a feed or FX gap
+ * keeps the slot owed, and a cached "nothing pending" would let the slot
+ * charge strand it when the price returns.
  */
 export async function retryConfiguredAllowOnce(args: {
   mandate: PublicKey;
@@ -304,11 +336,12 @@ export async function retryAllowOnce(args: {
   ledger: Uint8Array | null;
   opts: AllowOnceOpts;
   submit: (rule: AgentRule, amount: bigint, nonce: bigint) => Promise<ChargeReceipt>;
-  /** Runs just before the charge is sent, so the pause between charges happens only for a real send. */
-  beforeSend?: () => Promise<void>;
+  /** Runs just before the charge is sent, so the pause between charges happens
+   * only for a real send. False means the pass is out of time: nothing is sent. */
+  beforeSend?: () => Promise<boolean>;
   log: (line: string) => void;
   logError: (line: string) => void;
-}): Promise<{ outcome: AllowOnceOutcome; rateLimited: boolean }> {
+}): Promise<{ outcome: AllowOnceOutcome; rateLimited: boolean; stopped?: boolean }> {
   const id = args.rule.address.toBase58();
   const plan = allowOnceRetry(args.rule, args.ledger, args.opts);
   if ("skip" in plan) {
@@ -316,8 +349,10 @@ export async function retryAllowOnce(args: {
     return { outcome: "skipped", rateLimited: false };
   }
   const detail = `amount=${plan.amount.toString()} nonce=${plan.nonce.toString()}`;
+  if (args.beforeSend !== undefined && !(await args.beforeSend())) {
+    return { outcome: "skipped", rateLimited: false, stopped: true };
+  }
   try {
-    await args.beforeSend?.();
     const receipt = await args.submit(args.rule, plan.amount, plan.nonce);
     if (receipt.decision === "paid") {
       args.log(`agent rule ${id} allow-one retry paid ${detail} sig=${receipt.signature || "-"}`);
@@ -391,8 +426,12 @@ export async function quoteSlotAmount(args: {
 const SETTLED_QUOTE_REASONS = new Set(["negative price", "zero amount", "window start does not match slot"]);
 
 /** True when this slot's pass is over for this process: it was quoted, or the
- * price gap is one a retry would only repeat. Feed and FX outages stay open. */
-export function agentRulesSlotSettled(summary: Pick<AgentRulesSummary, "quoted" | "quoteReason">): boolean {
+ * price gap is one a retry would only repeat. Feed and FX outages stay open,
+ * and so does a pass that a transient ledger read failure ended before any charge. */
+export function agentRulesSlotSettled(
+  summary: Pick<AgentRulesSummary, "quoted" | "quoteReason"> & Partial<Pick<AgentRulesSummary, "unfinished">>,
+): boolean {
+  if (summary.unfinished === true) return false;
   if (summary.quoted) return true;
   return summary.quoteReason !== null && SETTLED_QUOTE_REASONS.has(summary.quoteReason);
 }
@@ -421,6 +460,10 @@ export type AgentRulesSummary = {
   skipped: number;
   /** True when a rate limit ended the pass before every selected rule was tried. */
   rateLimited: boolean;
+  /** True when the pass time budget ended it before every selected rule was tried. */
+  outOfTime: boolean;
+  /** True when a transient read failure left rules uncharged; the `run` loop tries the slot again. */
+  unfinished: boolean;
 };
 
 /** One pass: quote the slot, discover, retry what owners allowed once, then
@@ -439,6 +482,15 @@ export type AgentRulesSummary = {
  *
  * Without a price the pass makes no RPC request at all, retries included, so
  * an idle or outage cycle stays free; the retries wait for the priced pass.
+ *
+ * No new charge starts once `budgetMs` has passed since the pass began; the
+ * rules left over are charged on the next slot.
+ *
+ * When the ledger read for the retries fails, the rules with a pending allow
+ * sit out this pass and every other rule is charged. When the read for the
+ * slot charges fails, the pass ends. Either way the summary line is written,
+ * and a transient failure marks the pass unfinished: the `run` loop tries the
+ * slot again, while a `once` run leaves it to the next slot.
  */
 export async function chargeAgentRules(args: {
   slot: Date;
@@ -451,9 +503,16 @@ export async function chargeAgentRules(args: {
   deps: AgentRulesDeps;
   delayMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  /** VETO_AGENT_PASS_BUDGET_MS. */
+  budgetMs?: number;
+  /** Milliseconds now. Tests pass a fake clock. */
+  clock?: () => number;
   log: (line: string) => void;
   logError: (line: string) => void;
 }): Promise<AgentRulesSummary> {
+  const clock = args.clock ?? Date.now;
+  const startedAt = clock();
+  const budgetMs = args.budgetMs ?? DEFAULT_AGENT_PASS_BUDGET_MS;
   const summary: AgentRulesSummary = {
     quoted: false,
     quoteReason: null,
@@ -465,6 +524,8 @@ export async function chargeAgentRules(args: {
     failed: 0,
     skipped: 0,
     rateLimited: false,
+    outOfTime: false,
+    unfinished: false,
   };
   const nonce = nonceFromSlot(args.slot);
   const nowUnix = BigInt(Math.floor(args.now.getTime() / 1000));
@@ -482,9 +543,24 @@ export async function chargeAgentRules(args: {
   const delayMs = args.delayMs ?? AGENT_RULE_DELAY_MS;
   const pause = args.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   let sent = 0;
-  const beforeSend = async (): Promise<void> => {
+  /** The pause between charges, then the budget again: the pause itself can
+   * run past the deadline. False means stop without sending. */
+  const beforeSend = async (): Promise<boolean> => {
     if (sent > 0) await pause(delayMs);
+    if (outOfTime()) return false;
     sent += 1;
+    return true;
+  };
+  /** True once the budget is spent. Logs one line the first time. */
+  const outOfTime = (): boolean => {
+    if (summary.outOfTime) return true;
+    const elapsed = clock() - startedAt;
+    if (elapsed < budgetMs) return false;
+    summary.outOfTime = true;
+    args.logError(
+      `agent rules: pass time budget of ${budgetMs} ms reached after ${elapsed} ms, the rest wait for the next slot nonce=${nonce.toString()}`,
+    );
+    return true;
   };
   const finish = (): AgentRulesSummary => {
     args.log(
@@ -493,57 +569,82 @@ export async function chargeAgentRules(args: {
     return summary;
   };
 
-  // Allow-one retries first, in address order, at most `max` of them.
+  // Allow-one retries first, at most `max` of them, rotated by slot like the
+  // slot charges. Only an allow this agent could send now takes a place: a
+  // rule it cannot charge, or one whose allowed request is later than this
+  // slot, would otherwise hold a place every slot and keep a real retry out.
+  const opts = { agent: args.agent, mint: args.mint, merchant: args.merchant, nowUnix, nonce };
   const seen = new Set<string>();
   const pending: AgentRule[] = [];
   for (const rule of rules) {
     const id = rule.address.toBase58();
     if (seen.has(id)) continue;
     seen.add(id);
-    if (!rule.address.equals(args.configured) && hasPendingAllowOnce(rule)) pending.push(rule);
+    if (rule.address.equals(args.configured) || !hasPendingAllowOnce(rule)) continue;
+    if (unusableReason(rule, opts) !== null || rule.overrideNonce > nonce) continue;
+    pending.push(rule);
   }
-  pending.sort((a, b) => cmp(a.address.toBase58(), b.address.toBase58()));
-  for (const rule of pending.slice(args.max)) {
+  const { selected: retryRules, over } = rotateBySlot(pending, nonce, args.max);
+  for (const rule of over) {
     args.log(`agent rule ${rule.address.toBase58()} allow-one retry skipped: over the per-run cap`);
   }
-  const retryRules = pending.slice(0, args.max);
+  // Rules left out of the slot charges because their allow could not be read.
+  const heldBack = new Set<string>();
+  let retryLedgers: (Uint8Array | null)[] | null = null;
   if (retryRules.length > 0) {
-    let ledgers: (Uint8Array | null)[] | null = null;
     try {
-      ledgers = await args.deps.readLedgers(retryRules);
+      retryLedgers = await args.deps.readLedgers(retryRules);
     } catch (err) {
-      args.logError(`agent rules: ledger read for allow-one retries failed: ${describe(err)}`);
       if (isRateLimitError(err)) {
+        args.logError(`agent rules: ledger read for allow-one retries rate limited, the rest wait for the next slot: ${describe(err)}`);
         summary.rateLimited = true;
+        summary.unfinished = true;
         return finish();
       }
+      // A slot charge on a rule with an unread allow would move last_nonce
+      // past the allowed request and strand it, so those rules sit out this
+      // pass. Every other rule is still charged: in a once run this pass is
+      // the slot's only chance.
+      args.logError(
+        `agent rules: ledger read for allow-one retries failed, rules with a pending allow sit out this pass: ${describe(err)}`,
+      );
+      summary.unfinished = isTransientRpcError(err);
+      for (const rule of pending) heldBack.add(rule.address.toBase58());
     }
-    if (ledgers !== null) {
-      const opts = { agent: args.agent, mint: args.mint, merchant: args.merchant, nowUnix, nonce };
-      for (let i = 0; i < retryRules.length; i += 1) {
-        const result = await retryAllowOnce({
-          rule: retryRules[i]!,
-          ledger: ledgers[i] ?? null,
-          opts,
-          submit: args.deps.submit,
-          beforeSend,
-          log: args.log,
-          logError: args.logError,
-        });
-        if (result.outcome === "skipped") continue;
-        summary.charged += 1;
-        summary.retried += 1;
-        summary[result.outcome] += 1;
-        if (result.rateLimited) {
-          summary.rateLimited = true;
-          args.logError("agent rules: rpc rate limited, the rest wait for the next slot");
-          return finish();
-        }
+  }
+  if (retryLedgers !== null) {
+    for (let i = 0; i < retryRules.length; i += 1) {
+      if (outOfTime()) return finish();
+      const result = await retryAllowOnce({
+        rule: retryRules[i]!,
+        ledger: retryLedgers[i] ?? null,
+        opts,
+        submit: args.deps.submit,
+        beforeSend,
+        log: args.log,
+        logError: args.logError,
+      });
+      if (result.stopped === true) return finish();
+      if (result.outcome === "skipped") continue;
+      summary.charged += 1;
+      summary.retried += 1;
+      summary[result.outcome] += 1;
+      if (result.rateLimited) {
+        summary.rateLimited = true;
+        args.logError("agent rules: rpc rate limited, the rest wait for the next slot");
+        return finish();
       }
     }
   }
 
-  const { selected, skipped } = selectAgentRules(rules, {
+  for (const rule of pending) {
+    if (heldBack.has(rule.address.toBase58())) {
+      args.log(`agent rule ${rule.address.toBase58()} skipped: allow-one pending and its ledger did not read`);
+      summary.skipped += 1;
+    }
+  }
+  const chargeable = heldBack.size === 0 ? rules : rules.filter((rule) => !heldBack.has(rule.address.toBase58()));
+  const { selected, skipped } = selectAgentRules(chargeable, {
     agent: args.agent,
     mint: args.mint,
     merchant: args.merchant,
@@ -555,7 +656,7 @@ export async function chargeAgentRules(args: {
   for (const { rule, reason } of skipped) {
     args.log(`agent rule ${rule.address.toBase58()} skipped: ${reason}`);
   }
-  summary.skipped = skipped.length;
+  summary.skipped += skipped.length;
 
   // A refusal does not move last_nonce, so a second run in the same slot
   // reads the ledger ring and leaves a rule alone once it has any row for
@@ -567,7 +668,8 @@ export async function chargeAgentRules(args: {
     } catch (err) {
       args.logError(`agent rules: ledger read failed, no rule charged this pass: ${describe(err)}`);
       summary.rateLimited = isRateLimitError(err);
-      return summary;
+      summary.unfinished = isTransientRpcError(err);
+      return finish();
     }
   }
 
@@ -580,7 +682,8 @@ export async function chargeAgentRules(args: {
       summary.skipped += 1;
       continue;
     }
-    await beforeSend();
+    if (outOfTime()) break;
+    if (!(await beforeSend())) break;
     summary.charged += 1;
     try {
       const receipt = await args.deps.submit(rule, quote.amount, nonce);
@@ -611,6 +714,16 @@ export async function chargeAgentRules(args: {
 
 function describe(err: unknown): string {
   return redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
+}
+
+/** VETO_AGENT_PASS_BUDGET_MS. Unset is the default; the value is a positive whole number of milliseconds. */
+export function parseAgentPassBudgetMs(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === "") return DEFAULT_AGENT_PASS_BUDGET_MS;
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed) || Number.parseInt(trimmed, 10) === 0) {
+    throw new Error(`config.loadConfig: VETO_AGENT_PASS_BUDGET_MS must be a positive whole number, got ${trimmed}`);
+  }
+  return Number.parseInt(trimmed, 10);
 }
 
 /** VETO_AGENT_RULES_MAX. Unset is the default; 0 turns the pass off. */

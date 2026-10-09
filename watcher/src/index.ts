@@ -7,6 +7,7 @@ import {
   discoverAgentRules,
   quoteSlotAmount,
   retryConfiguredAllowOnce,
+  oncePassBudgetMs,
 } from "./agentRules.js";
 import {
   connect,
@@ -35,7 +36,7 @@ import {
 import { scanHoldVaults } from "./hold.js";
 import { logError, logLine } from "./log.js";
 import { nonceFromSlot } from "./nonce.js";
-import { isRateLimitError, redactRpcUrl, redactRpcUrlsInText } from "./rpc.js";
+import { isRateLimitError, isTransientRpcError, redactRpcUrl, redactRpcUrlsInText } from "./rpc.js";
 import { processWindow, sleep, withRpcBackoff, type ProcessResult } from "./run.js";
 import { isJournalStale, lastDecisionAt } from "./stale.js";
 import { PublicKey } from "@solana/web3.js";
@@ -156,6 +157,7 @@ let agentRulesDoneNonce: bigint | null = null;
 async function chargeOtherAgentRules(
   now: Date,
   ctx: AgentRulesCtx,
+  budgetMs: number = ctx.cfg.agentPassBudgetMs,
 ): Promise<void> {
   const { cfg, agent, feed, fx } = ctx;
   if (cfg.agentRulesMax === 0) return;
@@ -176,6 +178,7 @@ async function chargeOtherAgentRules(
       merchant: new PublicKey(cfg.merchant),
       configured: mandatePda(programId, new PublicKey(cfg.owner), cfg.mandateId),
       max: cfg.agentRulesMax,
+      budgetMs,
       log: logLine,
       logError,
       deps: {
@@ -218,10 +221,13 @@ async function chargeOtherAgentRules(
           }),
       },
     });
-    // A feed or FX outage stays open so a later loop can still charge the slot.
+    // A feed or FX outage, or a transient ledger read failure, stays open so
+    // a later loop can still charge the slot.
     if (agentRulesSlotSettled(summary)) agentRulesDoneNonce = nonce;
   } catch (err) {
-    agentRulesDoneNonce = nonce;
+    // A failure a later read could get past (discovery timed out, the
+    // endpoint dropped) leaves the slot open; any other failure would repeat.
+    if (!isTransientRpcError(err)) agentRulesDoneNonce = nonce;
     const message = redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
     logError(`agent rules: pass failed, the configured rule is not affected: ${message}`);
   }
@@ -364,8 +370,14 @@ async function cmdOnce(): Promise<void> {
     process.exitCode = 1;
   }
   await scanHolds(new Date());
-  // Last, so a slow pass over other rules cannot delay the configured rule or hold alerts.
-  await chargeOtherAgentRules(now, agentRulesCtx);
+  // Last, so a slow pass over other rules cannot delay the configured rule or
+  // hold alerts. Its deadline counts from process start: the work above can
+  // take minutes of the 15 minute task limit.
+  await chargeOtherAgentRules(
+    now,
+    agentRulesCtx,
+    oncePassBudgetMs(agentRulesCtx.cfg.agentPassBudgetMs, process.uptime() * 1000),
+  );
 }
 
 async function cmdRun(): Promise<void> {

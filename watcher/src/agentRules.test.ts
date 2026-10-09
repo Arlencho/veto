@@ -10,10 +10,14 @@ import {
   allowOnceRetry,
   chargeAgentRules,
   decodeAgentRule,
+  DEFAULT_AGENT_PASS_BUDGET_MS,
   DEFAULT_AGENT_RULES_MAX,
   discoverAgentRules,
   MANDATE_ACCOUNT,
   MANDATE_AGENT_OFFSET,
+  ONCE_PASS_DEADLINE_MS,
+  oncePassBudgetMs,
+  parseAgentPassBudgetMs,
   parseAgentRulesMax,
   quoteSlotAmount,
   retryConfiguredAllowOnce,
@@ -962,4 +966,336 @@ test("a mandate's override fields decode through the running coder", async () =>
   const decoded = decodeAgentRule(coder, r.address, await encodeRule(r));
   assert.equal(decoded.overrideNonce, PREV);
   assert.equal(decoded.overrideAmount, 1_200_000n);
+});
+
+/** n rules whose addresses come out in ascending order. */
+function sortedRules(n: number, over: Partial<AgentRule> = {}): AgentRule[] {
+  return Array.from({ length: n }, () => rule(over)).sort((a, b) => (a.address.toBase58() < b.address.toBase58() ? -1 : 1));
+}
+
+test("final audit M1: rules holding far-future allows do not take the retry places from a real pending retry", async () => {
+  // 31 addresses in order; the real allow gets the highest, so a list cut in
+  // address order after 25 would leave it out.
+  const addresses = sortedRules(31).map((r) => r.address);
+  const crafted = addresses.slice(0, 30).map((address, i) =>
+    rule({ address, perTxMax: 1_000_000n, overrideAmount: 1_200_000n, overrideNonce: NONCE + 21_600n * BigInt(i + 1) }),
+  );
+  const real = allowedRule({ address: addresses[30]! });
+  const ring = new Map<string, Row[]>([[real.rule.address.toBase58(), real.rows]]);
+  for (const r of crafted) {
+    ring.set(r.address.toBase58(), [
+      { kind: 2, nonce: r.overrideNonce, amount: 1_200_000n, reason: OVER_MAX },
+      { kind: 3, nonce: r.overrideNonce, amount: 1_200_000n },
+    ]);
+  }
+  const { deps, sent } = simulateChain([...crafted, real.rule], ring);
+  const lines: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), lines, []));
+  const id = real.rule.address.toBase58();
+  assert.equal(summary.retried, 1);
+  assert.deepEqual(sent[0], { id, amount: 1_200_000n, nonce: PREV, decision: "paid" });
+  assert.ok(!sent.some((s) => s.nonce > NONCE), "no future nonce is sent");
+  assert.ok(!lines.some((l) => l.includes("allow-one retry skipped: over the per-run cap")));
+});
+
+test("final audit M1: unusable rules with a pending allow do not take retry places", async () => {
+  const addresses = sortedRules(3).map((r) => r.address);
+  const closed = allowedRule({ address: addresses[0]!, status: 1 });
+  const otherPayee = allowedRule({ address: addresses[1]!, merchant: key() });
+  const real = allowedRule({ address: addresses[2]! });
+  const ring = new Map<string, Row[]>([
+    [closed.rule.address.toBase58(), closed.rows],
+    [otherPayee.rule.address.toBase58(), otherPayee.rows],
+    [real.rule.address.toBase58(), real.rows],
+  ]);
+  const { deps, sent } = simulateChain([closed.rule, otherPayee.rule, real.rule], ring);
+  const summary = await chargeAgentRules(runArgs(deps, key(), [], [], 1));
+  assert.equal(summary.retried, 1);
+  assert.deepEqual(
+    sent.map((s) => [s.id, s.nonce]),
+    [[real.rule.address.toBase58(), PREV]],
+  );
+});
+
+test("final audit M1: retry places rotate by slot, so a pending allow is not shut out by one that never sends", async () => {
+  // `stuck` keeps a pending allow it cannot send (over its remaining cap) and
+  // sorts first. With one place, an address-order cut gives it the place every slot.
+  const [first, second] = sortedRules(2).map((r) => r.address);
+  const stuck = allowedRule({ address: first!, spent: 20_000_000n });
+  const real = allowedRule({ address: second! });
+  const retriedIn: number[] = [];
+  for (let k = 0; k < 2; k += 1) {
+    const slot = new Date(SLOT.getTime() + k * 21_600_000);
+    const sent: { id: string; nonce: bigint }[] = [];
+    const deps: AgentRulesDeps = {
+      quote: async () => ({
+        ok: true,
+        amount: 300_000n,
+        window: { timeStart: slot.toISOString(), timeEnd: slot.toISOString(), sekPerKwh: "0.5" },
+      }),
+      discover: async () => [{ ...stuck.rule }, { ...real.rule }],
+      readLedgers: async (rs) => rs.map((r) => ledgerRows(r.address.equals(stuck.rule.address) ? stuck.rows : real.rows)),
+      submit: async (r, _amount, nonce) => {
+        sent.push({ id: r.address.toBase58(), nonce });
+        return paid();
+      },
+    };
+    await chargeAgentRules({ ...runArgs(deps, key(), [], [], 1), slot, now: new Date(slot.getTime() + 60_000) });
+    if (sent.some((s) => s.id === real.rule.address.toBase58() && s.nonce === PREV)) retriedIn.push(k);
+  }
+  assert.equal(retriedIn.length, 1, "the real allow gets the place in one of two slots");
+});
+
+test("final audit M2: no new charge starts after the pass budget, with one log line, and the slot is settled", async () => {
+  const rules = sortedRules(5);
+  let now = 1_000_000;
+  const tried: string[] = [];
+  const deps: AgentRulesDeps = {
+    quote: quoteOk(),
+    discover: async () => rules,
+    readLedgers: async (rs) => rs.map(() => null),
+    submit: async (r) => {
+      tried.push(r.address.toBase58());
+      now += 400;
+      return paid();
+    },
+  };
+  const lines: string[] = [];
+  const errs: string[] = [];
+  const summary = await chargeAgentRules({
+    ...runArgs(deps, key(), lines, errs),
+    budgetMs: 1_000,
+    clock: () => now,
+  });
+  assert.equal(tried.length, 3, "charges started at 0, 400 and 800 ms; the one at 1200 ms waits");
+  assert.equal(summary.charged, 3);
+  assert.equal(summary.outOfTime, true);
+  const budgetLines = errs.filter((l) => l.includes("time budget"));
+  assert.equal(budgetLines.length, 1);
+  assert.ok(budgetLines[0]!.includes("the rest wait for the next slot"));
+  assert.ok(lines.some((l) => l.startsWith("agent rules: found=5 charged=3")));
+  assert.equal(agentRulesSlotSettled(summary), true);
+});
+
+test("final audit M2: the budget also stops allow-one retries", async () => {
+  const a = allowedRule();
+  const b = allowedRule();
+  const ring = new Map([
+    [a.rule.address.toBase58(), a.rows],
+    [b.rule.address.toBase58(), b.rows],
+  ]);
+  const { deps, sent } = simulateChain([a.rule, b.rule], ring);
+  let now = 0;
+  const inner = deps.submit;
+  deps.submit = async (r, amount, nonce) => {
+    now += 2_000;
+    return inner(r, amount, nonce);
+  };
+  const summary = await chargeAgentRules({ ...runArgs(deps, key(), [], []), budgetMs: 1_000, clock: () => now });
+  assert.equal(sent.length, 1);
+  assert.equal(summary.retried, 1);
+  assert.equal(summary.outOfTime, true);
+});
+
+test("final audit M2: VETO_AGENT_PASS_BUDGET_MS defaults to 8 minutes and refuses junk", () => {
+  assert.equal(DEFAULT_AGENT_PASS_BUDGET_MS, 480_000);
+  assert.equal(parseAgentPassBudgetMs(undefined), 480_000);
+  assert.equal(parseAgentPassBudgetMs(" "), 480_000);
+  assert.equal(parseAgentPassBudgetMs("60000"), 60_000);
+  assert.throws(() => parseAgentPassBudgetMs("0"));
+  assert.throws(() => parseAgentPassBudgetMs("-5"));
+  assert.throws(() => parseAgentPassBudgetMs("1.5"));
+});
+
+test("final audit L3: a transient ledger read failure logs the summary and leaves the slot open", async () => {
+  const deps: AgentRulesDeps = {
+    quote: quoteOk(),
+    discover: async () => [rule(), rule()],
+    readLedgers: async () => {
+      throw new Error("failed to get info about accounts: TypeError: fetch failed at https://rpc.example.com/secret-key");
+    },
+    submit: async () => {
+      throw new Error("must not send");
+    },
+  };
+  const lines: string[] = [];
+  const errs: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), lines, errs));
+  assert.equal(summary.charged, 0);
+  assert.equal(summary.unfinished, true);
+  assert.equal(agentRulesSlotSettled(summary), false);
+  assert.ok(lines.some((l) => l.startsWith("agent rules: found=2 charged=0")));
+  assert.ok(errs.every((l) => !l.includes("secret-key")));
+});
+
+test("final audit L3: a deterministic ledger read failure logs the summary and settles the slot", async () => {
+  const deps: AgentRulesDeps = {
+    quote: quoteOk(),
+    discover: async () => [rule()],
+    readLedgers: async () => {
+      throw new Error("failed to get info about accounts: Invalid param: WrongSize");
+    },
+    submit: async () => paid(),
+  };
+  const lines: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), lines, []));
+  assert.equal(summary.unfinished, false);
+  assert.equal(agentRulesSlotSettled(summary), true);
+  assert.ok(lines.some((l) => l.startsWith("agent rules: found=1 charged=0")));
+});
+
+test("pr 395 review: a failed ledger read for the retries holds back only the rules with a pending allow", async () => {
+  const { rule: allowed, rows } = allowedRule();
+  const plainA = rule();
+  const plainB = rule();
+  const { deps, sent } = simulateChain([allowed, plainA, plainB], new Map([[allowed.address.toBase58(), rows]]));
+  const inner = deps.readLedgers;
+  let reads = 0;
+  deps.readLedgers = async (rs) => {
+    reads += 1;
+    if (reads === 1) throw new Error("socket hang up");
+    return inner(rs);
+  };
+  const lines: string[] = [];
+  const errs: string[] = [];
+  const summary = await chargeAgentRules(runArgs(deps, key(), lines, errs));
+  assert.deepEqual(
+    sent.map((s) => s.id).sort(),
+    [plainA, plainB].map((r) => r.address.toBase58()).sort(),
+    "the other testers are still charged",
+  );
+  assert.ok(sent.every((s) => s.nonce === NONCE));
+  assert.equal(allowed.lastNonce, 0n, "the rule with the unread allow is not charged, so the allow is not stranded");
+  assert.equal(summary.charged, 2);
+  assert.equal(summary.unfinished, true);
+  assert.equal(agentRulesSlotSettled(summary), false);
+  assert.ok(lines.some((l) => l.includes(`agent rule ${allowed.address.toBase58()} skipped: allow-one pending`)));
+  assert.ok(errs.some((l) => l.includes("rules with a pending allow sit out this pass")));
+  assert.ok(lines.some((l) => l.startsWith("agent rules: found=3 charged=2")));
+});
+
+test("pr 395 review: a rate-limited ledger read for the retries still ends the pass", async () => {
+  const { rule: allowed, rows } = allowedRule();
+  const { deps, sent } = simulateChain([allowed, rule()], new Map([[allowed.address.toBase58(), rows]]));
+  deps.readLedgers = async () => {
+    throw new RateLimitedError("429");
+  };
+  const summary = await chargeAgentRules(runArgs(deps, key(), [], []));
+  assert.deepEqual(sent, []);
+  assert.equal(summary.rateLimited, true);
+});
+
+test("pr 395 review: an allow granted during a feed gap is retried before the slot charge when the price returns", async () => {
+  // The configured rule's path in processDue: the retry check, then the slot
+  // charge. During the gap the check finds nothing; the owner then allows the
+  // refused request P; when the price returns the check must read again.
+  const live = rule({ perTxMax: 1_000_000n });
+  const ring = new Map<string, Row[]>([[live.address.toBase58(), [{ kind: 2, nonce: PREV, amount: 1_200_000n, reason: OVER_MAX }]]]);
+  const { deps, sent } = simulateChain([live], ring);
+  let reads = 0;
+  const check = () =>
+    retryConfiguredAllowOnce({
+      mandate: live.address,
+      ledger: ledgerPda(PROGRAM, live.address),
+      coder,
+      readAccounts: async () => {
+        reads += 1;
+        return [await encodeRule(live), ledgerRows(ring.get(live.address.toBase58()) ?? [])];
+      },
+      opts: { agent: AGENT, mint: MINT, merchant: MERCHANT, nowUnix: NOW_UNIX, nonce: NONCE },
+      submit: deps.submit,
+      log: () => {},
+      logError: () => {},
+    });
+  assert.equal(await check(), "none", "gap loop: nothing allowed yet, and the slot charge is not sent");
+  // The owner taps Allow one for P while the feed is still down.
+  live.overrideNonce = PREV;
+  live.overrideAmount = 1_200_000n;
+  ring.get(live.address.toBase58())!.push({ kind: 3, nonce: PREV, amount: 1_200_000n });
+  // The price is back: the loop checks again, then charges N.
+  assert.equal(await check(), "paid");
+  await deps.submit(live, 300_000n, NONCE);
+  assert.equal(reads, 2, "the second check read the chain again");
+  assert.deepEqual(
+    sent.map((s) => [s.nonce, s.decision]),
+    [
+      [PREV, "paid"],
+      [NONCE, "paid"],
+    ],
+  );
+  assert.equal(live.overrideNonce, 0n);
+});
+
+test("pr 395 review: a slot charge does not start when the pacing pause crosses the budget", async () => {
+  const rules = sortedRules(3);
+  let now = 0;
+  const tried: number[] = [];
+  const deps: AgentRulesDeps = {
+    quote: quoteOk(),
+    discover: async () => rules,
+    readLedgers: async (rs) => rs.map(() => null),
+    submit: async () => {
+      tried.push(now);
+      now += 900;
+      return paid();
+    },
+  };
+  const errs: string[] = [];
+  const lines: string[] = [];
+  const summary = await chargeAgentRules({
+    ...runArgs(deps, key(), lines, errs),
+    budgetMs: 1_000,
+    clock: () => now,
+    sleep: async (ms: number) => {
+      now += ms;
+    },
+    delayMs: 1_500,
+  });
+  assert.deepEqual(tried, [0], "the second charge would have started at 2400 ms");
+  assert.equal(summary.charged, 1);
+  assert.equal(summary.outOfTime, true);
+  assert.equal(errs.filter((l) => l.includes("time budget")).length, 1);
+  assert.ok(lines.some((l) => l.startsWith("agent rules: found=3 charged=1")));
+});
+
+test("pr 395 review: an allow-one retry does not start when the pacing pause crosses the budget", async () => {
+  const a = allowedRule();
+  const b = allowedRule();
+  const { deps, sent } = simulateChain(
+    [a.rule, b.rule],
+    new Map([
+      [a.rule.address.toBase58(), a.rows],
+      [b.rule.address.toBase58(), b.rows],
+    ]),
+  );
+  let now = 0;
+  const inner = deps.submit;
+  deps.submit = async (r, amount, nonce) => {
+    now += 900;
+    return inner(r, amount, nonce);
+  };
+  const errs: string[] = [];
+  const summary = await chargeAgentRules({
+    ...runArgs(deps, key(), [], errs),
+    budgetMs: 1_000,
+    clock: () => now,
+    sleep: async (ms: number) => {
+      now += ms;
+    },
+    delayMs: 1_500,
+  });
+  assert.equal(sent.length, 1);
+  assert.equal(summary.retried, 1);
+  assert.equal(summary.charged, 1, "the stopped retry is not counted");
+  assert.equal(summary.failed, 0);
+  assert.equal(errs.filter((l) => l.includes("time budget")).length, 1);
+  assert.ok(!errs.some((l) => l.includes("allow-one retry failed")));
+});
+
+test("pr 395 review: a once run's pass budget counts from process start", () => {
+  assert.equal(ONCE_PASS_DEADLINE_MS, 720_000);
+  assert.equal(oncePassBudgetMs(480_000, 10_000), 480_000, "a quick start keeps the configured budget");
+  assert.equal(oncePassBudgetMs(480_000, 300_000), 420_000, "five minutes of configured-rule work leave seven");
+  assert.equal(oncePassBudgetMs(480_000, 800_000), 0, "past the deadline no charge starts");
+  assert.equal(oncePassBudgetMs(60_000, 100_000), 60_000);
 });

@@ -60,7 +60,7 @@ export function connect(cfg: WatcherConfig, payer: Keypair): {
   program: Program<Veto>;
   programId: PublicKey;
 } {
-  const connection = createFailoverConnection(cfg.rpcs, logLine);
+  const connection = createFailoverConnection(cfg.rpcs, logLine, { timeoutMs: cfg.rpcTimeoutMs });
   const program = programFromIdl(connection, payer, cfg.idlPath, cfg.programId);
   return { connection, program, programId: new PublicKey(cfg.programId) };
 }

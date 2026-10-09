@@ -1,6 +1,6 @@
 import { Connection, Transaction, type Finality, type Keypair, type TransactionSignature } from "@solana/web3.js";
 import { logError } from "./log.js";
-import { sleep } from "./rpc.js";
+import { redactRpcUrlsInText, sleep } from "./rpc.js";
 
 const POLL_MS = 1_000;
 
@@ -11,7 +11,8 @@ function meetsCommitment(status: string | null | undefined, commitment: Finality
 }
 
 function leftoverLine(signature: string, err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err);
+  // The poll error can carry the RPC URL, and providers put the key in its path.
+  const message = redactRpcUrlsInText(err instanceof Error ? err.message : String(err));
   return `confirm: leftover status poll after ${signature} was already confirmed: ${message}`;
 }
 

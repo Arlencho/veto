@@ -88,7 +88,7 @@ per-payment maximum 10, remaining 292 of a 300 cap, override 16.659625. The 12.5
 > The transaction succeeded at deciding no. The payment did not happen. The balance is unchanged,
 > and neither party can edit the confirmed transaction.
 >
-> The last field is the override that would have cleared the charge.
+> The last field is the suggested one-time allowance for this charge. Other checks can still stop the payment.
 
 ---
 
@@ -125,9 +125,9 @@ mints further supply of that same mint. Addresses are in [DEVNET.md](DEVNET.md).
 ## 9. The exhaust
 
 > A worst case fixed in advance by the rule. A complete record of every payment made against it.
-> Every refusal the agent surfaced.
+> Every refusal recorded by a charge transaction that succeeds.
 >
-> AP2 specified the record of a yes. This is the missing half.
+> AP2 provides signed authorization mandates; Veto adds a structured refusal record on chain.
 
 **Thirty seconds.**
 

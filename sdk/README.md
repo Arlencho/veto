@@ -238,7 +238,7 @@ A trade rule is a permission to swap. The owner pins one input token account, on
 
 The call returns `kind: "traded"` or `kind: "refused"`, with `amountIn`, `amountOut`, `reasonCode`, `reasonText`, `suggestedOverride`, `signature`, and `slot`. It reads the one Veto trade decision in that transaction, the same way `charge` reads the one payment decision. On a refusal, `amountOut` is zero. On `kind: "traded"`, the returned `amountIn` is the settled input, which can be below the requested amount.
 
-`tradeStatus()` reports the cap, what has been spent, what remains, the per-trade maximum, the daily limit, what remains today, the floor as `{ num, den }`, expiry, status, any override, the last nonce, and the pinned destination. A 24 hour window that has already ended counts as unused, so `remainingToday` is the full daily limit until the next trade opens a new window. `nextTradeNonce()` is `last_nonce` plus one, or `overrideNonce` when an override is pending above `last_nonce`. A refusal does not advance `last_nonce`.
+`tradeStatus()` reports the cap, what has been spent, what remains, the per-trade maximum, the daily limit, what remains today, the floor as `{ num, den }`, expiry, status, any override, the last nonce, and the pinned destination. `remainingToday` is the daily limit minus the sum of buckets whose hour is at least the local current hour minus 24, clamped to zero. This includes the current hour, the preceding 24 hours and any buckets ahead of the local clock. With an advancing clock aligned to the chain, allowance can take up to 25 hours to return; clock skew or a rewind can retain spend longer. The program uses the chain clock for enforcement. `nextTradeNonce()` is `last_nonce` plus one, or `overrideNonce` when an override is pending above `last_nonce`. A refusal does not advance `last_nonce`.
 
 `tradeRulesForAgent(connection, agent)` reads the trade rules whose agent field is that key. It is `getProgramAccounts` with the TradeRule discriminator and a memcmp at `TRADE_RULE_AGENT_OFFSET`. Newest `ruleId` comes first.
 
@@ -294,11 +294,13 @@ veto://rule-request?v=2&kind=trade&agent=<base58>&inMint=<base58>&outMint=<base5
 
 The daily limit uses the same conservative rolling day as trade rules: 25 hourly
 buckets retain the current hour and the preceding 24 hours. Allowance can take
-up to 25 hours to return. `dailyBuckets` contains this accounting; `windowSpent`
-and `windowStart` remain only for the separate big-door share calculation.
-The client requires the new 1691-byte layout. Retire the old devnet demo vault
-and reopen it using the recovery procedure in [docs/DEVNET.md](../docs/DEVNET.md)
-before using this client against the upgraded program.
+up to 25 hours to return. `dailyBuckets` supplies the rolling total for both the
+daily limit and the share cap. `windowSpent` and `windowStart` are legacy fields
+retained in the account layout; they do not determine the current share allowance.
+Normal vault reads require the 1691-byte layout. For a legacy 1291-byte vault, the
+owner can call `HoldVault.migrateHoldVault({ owner, vaultId })` to migrate it in
+place, then read it again. See [Hold layout migrations](../docs/HOLD_MIGRATIONS.md)
+for preserved state, rent requirements and safe-address repairs.
 
 
 The vault PDA is `["hold", owner, vault_id]` with `vault_id` as a little-endian u64. The known-destination list holds 16 addresses. The hold ledger is a 32-entry ring. The instructions and the account fields are in `programs/veto/src/hold.rs`.

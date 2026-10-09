@@ -14,22 +14,24 @@ export function renderReason(
   suggestedOverride: bigint,
   decimals: number,
   mint?: string | null,
+  unit: 'payment' | 'trade' = 'payment',
 ): ReasonView {
   const text = ownerReasonText(reason);
   if (reason !== REASON_OVER_PER_TX_MAX) {
     return { reason, text, overrideLine: null };
   }
   if (suggestedOverride > 0n) {
+    const limit = unit === 'trade' ? 'per-trade' : 'per-payment';
     return {
       reason,
       text,
-      overrideLine: `An override of ${formatTokenAmount(suggestedOverride, decimals, mint)} would have cleared it.`,
+      overrideLine: `A one-time allowance of ${formatTokenAmount(suggestedOverride, decimals, mint)} would have cleared the ${limit} limit. All other checks still apply.`,
     };
   }
   return {
     reason,
     text,
-    overrideLine: 'No override would have cleared this.',
+    overrideLine: 'No one-time allowance would have cleared this.',
   };
 }
 
@@ -42,7 +44,7 @@ export function refusalWhyLine(args: {
   mint?: string | null;
   unit?: 'payment' | 'trade';
 }): string {
-  const view = renderReason(args.reason, args.suggestedOverride, args.decimals, args.mint);
+  const view = renderReason(args.reason, args.suggestedOverride, args.decimals, args.mint, args.unit);
   if (args.reason === REASON_OVER_PER_TX_MAX && args.perTxMax != null) {
     const amount = formatTokenAmount(args.amount, args.decimals, args.mint);
     const limit = formatTokenAmount(args.perTxMax, args.decimals, args.mint);

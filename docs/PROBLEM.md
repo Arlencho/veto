@@ -27,7 +27,7 @@ burner is free, instant, and needs no program.
 | Expiry | None. It is live until you empty it | A timestamp the program checks |
 | Revocation | Move the funds out | One signature |
 | Stops an overspend | Only by running out of money | Yes, on chain, before any transfer executes |
-| Record of a decline | None. A refused attempt is a silent bot error in a log file nobody keeps | A confirmed transaction with a reason code and the override that would have cleared it |
+| Record of a decline | None. A refused attempt is a silent bot error in a log file nobody keeps | A confirmed transaction with a reason code and a suggested one-time allowance when one applies |
 | Third party can verify | Only that transfers happened | The limits agreed in advance, and every payment made against them |
 
 A third party can check the limits that were agreed in advance, and every payment made against
@@ -46,8 +46,8 @@ the expiry, or move funds outside the mandate.
 
 When a charge is inside the limits, the program pays the merchant and writes the payment. When
 a charge breaks a limit, the transfer instruction is not executed, no tokens move, and the
-program writes a refusal: a reason code, and the override that would have cleared that one
-payment. The instruction returns success, so the write is kept. The owner can allow that one
+program writes a refusal: a reason code, and a suggested one-time allowance when one applies;
+other checks can still stop the payment. The instruction returns success; the write is kept only if the entire transaction succeeds. The owner can allow that one
 payment with an override. The override is a ledger entry, it applies to one nonce, and it
 cannot raise the total cap. The owner can revoke the mandate in one signature, or revoke the
 SPL delegation directly.
@@ -57,8 +57,9 @@ A decision can be exported and checked against the chain from another machine. T
 
 ## What this does not claim
 
-The record is every payment made under the mandate, and every refusal the agent submitted. A
-charge the agent never submitted leaves no program ledger entry. When the operator supplies a
+The record covers payments and refusals produced by charge transactions that succeed. A failed
+charge transaction leaves no decision record, and a charge the agent never submits leaves no
+program ledger entry. When the operator supplies a
 purpose check and it declines, the agent records a memo shown as Agent declined (advisory). The
 program still enforces every number, whoever runs the agent can skip the check, and verify does
 not treat that memo as a program refusal. A refusal is one declined attempt against the mandate.

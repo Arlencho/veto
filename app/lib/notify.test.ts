@@ -71,7 +71,7 @@ test('a refusal notification repeats the decision screen reason line', () => {
   const line = refusalWhyLine(refusalArgs);
   assert.equal(
     line,
-    'Asked for 6.2325 VTEST, over the 0.5 VTEST per-payment maximum. An override of 6.2325 VTEST would have cleared it.',
+    'Asked for 6.2325 VTEST, over the 0.5 VTEST per-payment maximum. A one-time allowance of 6.2325 VTEST would have cleared the per-payment limit. All other checks still apply.',
   );
   const plan = planDecisionNotices([ledger(MANDATE_A, [refusalRow()])], new Map());
   assert.equal(plan.notices.length, 1);
@@ -79,6 +79,19 @@ test('a refusal notification repeats the decision screen reason line', () => {
   assert.ok(notice);
   assert.equal(notice.title, 'Refused');
   assert.equal(notice.body, line);
+});
+
+test('a trade refusal notification names the per-trade limit, never the per-payment one', () => {
+  const plan = planDecisionNotices([{ ...ledger(MANDATE_A, [refusalRow()]), family: 'trade' }], new Map());
+  assert.equal(plan.notices.length, 1);
+  const notice = plan.notices[0];
+  assert.ok(notice);
+  assert.equal(notice.title, 'Refused');
+  assert.equal(
+    notice.body,
+    'Asked for 6.2325 VTEST, over the 0.5 VTEST per-trade maximum. A one-time allowance of 6.2325 VTEST would have cleared the per-trade limit. All other checks still apply.',
+  );
+  assert.doesNotMatch(notice.body, /per-payment/);
 });
 
 test('a refusal for another reason uses that reason line and not the per-payment sentence', () => {

@@ -1,18 +1,18 @@
 # Pitch
 
-The claim is the recorded refusal. When a rule fails, the transfer is never executed and no tokens move. The decline is a record, with a reason and the override that would clear it, on a phone, with the key in Seed Vault. The prior art is the table in [PLAN.md](PLAN.md).
+The claim is the recorded refusal. When a rule fails, the transfer is never executed and no tokens move. The decline is a record, with a reason and a suggested one-time allowance when one applies; other checks can still stop the payment. The phone reaches the owner's signing wallet through Mobile Wallet Adapter. The prior art is the table in [PLAN.md](PLAN.md).
 
 ## Sixty seconds
 
-> The agent tries to pay. The amount is over the ceiling you set. It does not pay. The chain records why, in one line, with the override that would clear it.
+> The agent tries to pay. The amount is over the ceiling you set. It does not pay. The chain records why, with a suggested one-time allowance when one applies. Other checks can still stop the payment.
 >
 > The decline is a record. A blocked overspend elsewhere is a failed transaction: logs and an error code, but nothing in program state. Here the refusal is a successful transaction that records a structured reason and moves no payment tokens.
 >
 > A rule opened in the app keeps its budget in its own token account, derived from the owner. The mandate is the delegate on that account. The key never leaves Seed Vault. One human, several agents, one rule each. A ruleset is written once and reused on the next agent. This one is on a phone.
 >
-> The demo pays a bill repriced by a public index, on Solana devnet, in our token, to our counterparty. It buys no electricity. On the rule the video quotes (cap 300, at most 10 per payment, 90 days, purpose "Charging top-ups at the SE3 spot rate", payee 6i99...PdCG, mandate `3hgrSbPX2VTrfnVekoL2qi2qDWNGBhWP3QgADAWz6X6N`) the 12:00 Swedish slot on 2026-09-25 asked 16.659625, over that ceiling. Nothing moved. An override of 16.659625 would have cleared it. That refusal is taken off the phone and verified against the chain from somewhere else.
+> The submitted take uses devnet USDC with no value and our own test payee. It buys no electricity. The rule is `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, with 20 USDC total and 5 per payment. The recorded sequence is 4.20 paid, 12.90 refused, an owner allowance, then 12.90 paid, leaving 2.90. [VIDEO.md](VIDEO.md#submitted-take) lists the transaction signatures. The refusal can be exported and checked against the chain.
 >
-> That record is the point. A worst case fixed in advance, every payment made against it, and every refusal the agent submitted. AP2 specified the record of a yes. This is the missing half.
+> That record is the point: limits fixed in advance, and payments and refusals recorded by charge transactions that succeed. Failed transactions and requests the agent never submits leave no program decision record. AP2 provides signed authorization mandates; Veto adds a structured refusal record on chain.
 
 ## Position
 
@@ -22,7 +22,7 @@ The names are the table in [PLAN.md](PLAN.md): Squads v4 spending limits, SPL `a
 
 On a Veto spending rule the funds stay in an account the owner controls, under a delegate, and the decline is recorded. Hold is a separate vault in the same program, for money the owner deposits and cannot move with a raw transfer. Hold is merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet.
 
-AP2 mandates are the record of a yes, held off chain as the merchant's evidence. The word mandate, in this repository, is the on-chain rule. Oculus reimburses a breach from a USDC reserve after the fact. This declines before money moves, and the decline is recorded.
+AP2 provides signed authorization mandates shared among payment participants; x402 provides payment settlement over HTTP. The word mandate, in this repository, is the on-chain rule. Oculus reimburses a breach from a USDC reserve after the fact. This declines before money moves, and the decline is recorded.
 
 A burner wallet is simple. It has no payee restriction and no expiry, and revocation means moving the funds. A refused attempt is a silent error in a log. A third party cannot check the limits that were agreed in advance and every payment made against them. The comparison is in [PROBLEM.md](PROBLEM.md).
 
@@ -69,17 +69,17 @@ The SPL delegated amount is the ceiling underneath the rule. The rule narrows it
 
 On a rule opened in the app, that delegation sits on the rule's own token account. Revoking one rule does not clear another rule's account. On a shared source, SPL allows one delegate, and revoke clears that delegate.
 
-Every decision is a confirmed transaction anyone can look up by its signature. The rule's on-chain ledger is a copy that keeps the latest 32 decisions and is deleted when the owner closes the rule. There is no program ledger entry for a charge the agent never submits. The record is every decision the agent submits. No payment happens without a record, and no submitted attempt is judged by the agent instead of by the chain. The terminal shows payments that arrived. It has no view of a charge the agent never submitted.
+Every decision is a confirmed transaction anyone can look up by its signature. The rule's on-chain ledger is a copy that keeps the latest 32 decisions and is deleted when the owner closes the rule. There is no program ledger entry for a charge the agent never submits. The record is every decision the program reaches in a charge transaction that succeeds; a charge transaction that fails (for example on invalid accounts) leaves no decision record. No payment happens without a record, and no submitted attempt is judged by the agent instead of by the chain. The terminal shows payments that arrived. It has no view of a charge the agent never submitted.
 
 No model is involved. The numbers are typed or taken from a template, and the why is a fixed sentence per reason code. The program stores the purpose string as written and does not evaluate it. The agent operator can supply a model-agnostic purpose check of a charge against that on-chain purpose: on a decline the agent submits no charge and records a memo the app and the SDK show as Agent declined (advisory), the program still enforces every number, whoever runs the agent can skip the check, and verify does not treat that memo as a program refusal.
 
-A complete record of every payment made under this authority, a worst case fixed in advance by the rule, and every refusal the agent surfaced. The rule is the prior claim. The decisions are the evidence. Neither is worth anything alone.
+A complete record of every payment made under this authority, a worst case fixed in advance by the rule, and every refusal recorded by a charge transaction that succeeds. The rule is the prior claim. The decisions are the evidence. Neither is worth anything alone.
 
 ## Where this goes
 
 Software is starting to spend money on its own. Every control built so far answers one question: can this agent pay? The record answers the next one: should anyone let it?
 
-A payment ledger shows that an agent had money. The decisions under a rule show what it did at the edge: the limit agreed in advance, every payment made against it, and every refusal it submitted, each one checkable against the chain by someone who trusts neither the owner nor us. That is the history a merchant, an auditor or a counterparty needs before letting software spend unattended. The other designs stop the overspend and keep no such history.
+A payment ledger shows that an agent had money. The decisions under a rule show what it did at the edge: the limit agreed in advance, every payment made against it, and every refusal recorded by a charge transaction that succeeds, each one checkable against the chain by someone who trusts neither the owner nor us. That is the history a merchant, an auditor or a counterparty needs before letting software spend unattended. The other designs stop the overspend and keep no such history.
 
 The purpose check is the first step past the numbers. The chain enforces amount, payee and time. The agent can already record why it declined a charge that fits the numbers but not the purpose. The direction is a mandate that governs what the money is for, with the chain keeping the evidence either way.
 

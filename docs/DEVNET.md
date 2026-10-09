@@ -4,6 +4,8 @@ Recorded by `scripts/devnet-setup.sh` at 2026-09-20T20:57:14Z UTC.
 
 This file lists **public addresses only**. Keypairs live under gitignored `keys/` and must never be committed.
 
+To read the program without any key, start at [Public addresses](#public-addresses) and [Program account (verification)](#program-account-verification). The export and verify commands are in the README section [See it on devnet](../README.md#see-it-on-devnet).
+
 ## Cluster
 
 - Name: `devnet`
@@ -671,6 +673,8 @@ Devnet USDC is Circle's test token. It has no value.
 The founder gets it from https://faucet.circle.com by pasting the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` and the deployer `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`. We cannot mint it; Circle's faucet does. Its mint authority is `GrNg1XM2ctzeE2mXxXCfhcTUbejM8Z4z4wNVTy2FjMEz`, not a key in this repository. `scripts/devnet-usdc.sh` creates the merchant and deployer accounts when they are absent, and re-running it is a no-op.
 
 ## Indexed USDC demo calibration (issue 105)
+
+Historical (issue 105). The current recorded demo rule is in [docs/VIDEO.md](VIDEO.md).
 
 This is an opt-in request-sizing mode for the existing spending rule
 `UsRHyKtm41XMpQUcFGevYKgdWJEHQUf44QDCxLjEGWh`: 20 USDC total,

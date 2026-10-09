@@ -67,7 +67,7 @@ export default function HelpRuleScreen() {
         inside that rule with nobody present.
       </Text>
       <Text style={styles.body}>
-        The numbers are fixed once the rule is opened. They cannot be edited afterwards. An override
+        The numbers are fixed once the rule is opened. They cannot be edited afterwards. A one-time allowance
         does not change those numbers. It allows one payment, used once, never above the remaining cap.
         Revoke ends authority for the agent. It does not move anything already paid, and the
         decisions stay readable.

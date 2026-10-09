@@ -2,7 +2,7 @@
 
 ## Judges start here
 
-**Give your AI agent a spending rule. Keep your wallet key.** Approve in Seed Vault; the agent uses its own key. Requests reaching the program's decision logic are paid or recorded as refused. From your phone, allow one payment over the per-payment limit or stop the rule.
+**Give your AI agent a spending rule. Keep your wallet key.** Approve in Seed Vault; the agent uses its own key. Every charge transaction that succeeds records a payment or a refusal with its reason; a charge transaction that fails (for example on invalid accounts) leaves no decision record. From your phone, allow one payment over the per-payment limit or stop the rule.
 
 - **Recorded example:** [12.90 USDC refused](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) against a 5 USDC limit; [paid after owner approval](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
 - **Try it:** [Android APK](https://github.com/Arlencho/veto/releases/latest) and [setup guide](https://veto-hq.github.io/try/). Fund a test-agent rule, then tap **Send two test requests**.
@@ -20,19 +20,19 @@ spending on chain.
 The difference is what the stop leaves behind. Elsewhere a blocked overspend is usually a failed
 transaction: Solana keeps its logs and error code, but no program state changes. Here a refusal is a
 successful transaction that moves no payment tokens and writes a structured reason to program
-state, with the override that would have cleared it. On a phone, with the key in Seed Vault.
+state, with a suggested one-time allowance when one applies; other checks can still stop the payment. On a phone, with the key in Seed Vault.
 
 Every decision is a confirmed transaction that anyone can look up by its signature. The copy in
 program state is the rule's on-chain ledger. It keeps the latest 32 decisions, and it is deleted
 when the owner closes the rule.
 
-AP2 specified the record of a yes. This is the missing half.
+AP2 provides signed authorization mandates; Veto adds a structured refusal record on chain.
 
 > Status: built for the Solana Mobile "Clock In" hackathon
 > ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 > See [docs/PLAN.md](docs/PLAN.md) for the build plan,
 > [docs/PITCH.md](docs/PITCH.md) for the positioning, and
-> [docs/internal/DECISIONS.md](docs/internal/DECISIONS.md) for why each choice was made and what would reverse it.
+> [docs/PROBLEM.md](docs/PROBLEM.md) for the problem and who has it.
 
 ## Prior art
 
@@ -44,7 +44,7 @@ Capped agent spending on Solana is not new, and this project does not claim it.
 | SPL `approve` / delegate | Caps what a delegate may pull | Cap only. No purpose, no expiry, no reason, no record |
 | [LazorKit](https://github.com/lazor-kit/lazor-kit) | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
 | [Oculus](https://github.com/useoculusagent/useoculusagent) | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves, and the decline is a record |
-| [x402](https://metamask.io/news/what-is-x402) / [AP2](https://ap2-protocol.org/) | HTTP 402 settlement; signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | The record of a yes, held off chain as the merchant's evidence |
+| [x402](https://metamask.io/news/what-is-x402) / [AP2](https://ap2-protocol.org/) | HTTP 402 settlement; signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | AP2 provides signed authorization mandates; x402 settles payments over HTTP. Veto adds a structured refusal record on chain |
 
 SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28, and no archived copy was found, so its row and quote were removed.
 
@@ -58,7 +58,7 @@ delegation on the source token account is a second ceiling the program itself ca
 
 When `charge` declines it does not return an error. An error would roll back every account write,
 and the refusal would leave nothing in program state, only the failed transaction's logs. The instruction transfers nothing, writes a refusal to an
-on-chain ledger with a reason code and the override that would have cleared it, logs a readable
+on-chain ledger with a reason code and a suggested one-time allowance when one applies (other checks can still stop the payment), logs a readable
 line, and returns `Ok`.
 
 A refusal has a signature you can open in an explorer. This refusal is for the 18:00 Stockholm
@@ -76,7 +76,7 @@ is not permanent: the ledger is a 32-entry ring, so every later decision the age
 refused, can overwrite the oldest entry, and the owner can delete the ledger with
 `close_mandate` once the rule is no longer active.
 
-The last field is the override that would have cleared the charge.
+The last field is the suggested one-time allowance for this charge. Other checks can still stop the payment.
 
 ## See it on devnet
 
@@ -94,8 +94,8 @@ Program log: VETO REFUSED reason=5 (over per-payment maximum)
 
 The bill was 6.2325 tokens because 50 kWh was repriced at 0.12465 SEK/kWh. That price is the
 only input we do not control. The
-mandate allows 0.5 per payment. It did not pay, it said why, and it said what would have cleared
-it. That transaction is the record. Solana devnet, our token, our counterparty: when a rule
+mandate allows 0.5 per payment. It did not pay, it said why, and it suggested a one-time
+allowance. Other checks can still stop the payment. That transaction is the record. Solana devnet, our token, our counterparty: when a rule
 allows a bill, the program executes an SPL transfer of that token to a token account we created.
 
 Five later decisions on the same mandate confirmed on the six-hour cadence. Each was refused.
@@ -120,25 +120,67 @@ log on each transaction is `reason=5 (over
 per-payment maximum)` with `per_tx_max=500000` and these base-unit amounts: 8163000, 21542500,
 7903500, 63938500, 64852000.
 
-To take one off chain and check it independently:
+To take one off chain and check it independently, start with the refusal from
+[Judges start here](#judges-start-here), the 12.90 USDC request against a 5 USDC limit:
 
 ```bash
 cd indexer && npm ci
 cd ../tools && npm ci
-VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --signature 3rTpyrHEScEPhjHL3cUDYSGwGAxU6JVzbdWVZbr4YMHt3wAM7ad9JGPC26R8aQMH9aqYVzrFqbEogX1CquNcWqib --out refusal.json
+VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --signature 26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC --out refusal.json
 VETO_RPC=https://api.devnet.solana.com npx tsx verify.ts refusal.json
-# checked against program 3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV (idl)
-# Mandate limits, ledger entry, and charge transaction agree.
 ```
 
-Change the amount in that file to 1 and run verify again. While the ring still holds this row:
+Verify prints, checked against public devnet on 2026-10-09:
+
+```
+VERDICT: CONFIRMED
+
+rpc                 https://api.devnet.solana.com
+cluster             devnet
+genesis_hash        EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG
+program_id          3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV
+checked against program 3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV (idl)
+mandate             EWz9bHJVySsdqMSsLp7nsp7T4FheUkdE6pY8MgomYa4v
+signature           26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC
+kind                refused
+amount              12900000
+counterparty        GDb2L2oQc6LP4nii8ahUX3pqDUNVUn36nPNVafhhtZ7i
+timestamp           1790680742
+nonce               2
+reason              5 (over per-payment maximum)
+suggested_override  12900000
+limits              cap=20000000 per_tx_max=5000000 expires_at=1794133794
+merchant            6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG
+purpose             Charging top-ups at the SE3 spot rate
+
+Mandate limits, ledger entry, and charge transaction agree.
+```
+
+Change `amount` in that file to 1 and run verify again. While the ring still holds this row:
 
 ```
 VERDICT: REJECTED
 
-- amount (instruction): record has 1, chain has 6232500
-- amount (ledger): record has 1, chain has 6232500
+- amount (instruction): record has 1, chain has 12900000
+- amount (ledger): record has 1, chain has 12900000
 ```
+
+The older refusal above (3rTpy, on mandate `CZw2prUtN6Kb5kmiGKYDk4zaVmFxdJ2RPj4MTujgR39g`)
+checks the same way:
+
+```bash
+VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --signature 3rTpyrHEScEPhjHL3cUDYSGwGAxU6JVzbdWVZbr4YMHt3wAM7ad9JGPC26R8aQMH9aqYVzrFqbEogX1CquNcWqib --out refusal-3rtpy.json
+VETO_RPC=https://api.devnet.solana.com npx tsx verify.ts refusal-3rtpy.json
+# VERDICT: CONFIRMED
+# checked against program 3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV (idl)
+# Mandate limits, ledger entry, and charge transaction agree.
+```
+
+With its amount changed to 1, verify prints `VERDICT: REJECTED` with
+`record has 1, chain has 6232500` for the instruction and the ledger.
+
+The public RPC rate-limits. If verify prints `rpc rate limited`, wait and run it again, or pass
+`--rpc <your devnet URL>`.
 
 ## Why Solana Mobile
 
@@ -151,7 +193,7 @@ it rather than a copy of the key.
 
 | | Owner key | Agent key |
 |---|---|---|
-| Lives in | Seed Vault, reached through Mobile Wallet Adapter | on the agent's machine (for example `keys/agent.json` or the CLI's `~/.veto/agent.json`), or app secure storage for the phone's test agent |
+| Lives in | your connected Mobile Wallet Adapter wallet (Seed Vault on a Seeker) | on the agent's machine (for example `keys/agent.json` or the CLI's `~/.veto/agent.json`), or app secure storage for the phone's test agent |
 | Can | open a mandate, override one payment, revoke, close | submit a charge |
 | Cannot | be impersonated by the agent | change any limit, change the merchant, extend the expiry, or move funds outside the mandate |
 
@@ -169,8 +211,8 @@ Revoke clears the delegate on that account only. Another rule's token account is
 
 SPL allows one delegate per token account. A later `open_mandate` on the same source replaces
 that delegate. Rules opened before the app grew a per-rule account can still share the owner's
-associated token account. On the demo owner token account
-`FbhygYPyFk5PeiFppCezmMkqPqywTdAZxhkqxw79FBBE` the delegate, read 2026-09-24, is mandate
+associated token account. As of 2026-09-24, on the demo owner token account
+`FbhygYPyFk5PeiFppCezmMkqPqywTdAZxhkqxw79FBBE` the delegate is mandate
 `GVwLhzvRNqa5PnKcLakdocC3czQfYrBXGpbHb7HLPEjG` (id 3, cap 300) for 300 tokens. Mandate
 `CZw2prUtN6Kb5kmiGKYDk4zaVmFxdJ2RPj4MTujgR39g` (id 1) is still active, its source is that same
 account, spent 0.666, and it is not the delegate. A charge against id 1 is reason 5 when the bill is over the per-payment limit and reason 7 when it is inside the limits once the delegation is withdrawn. Closing a rule whose source is still that associated account returns the mandate
@@ -245,6 +287,8 @@ Trade rules add four reasons, from `programs/veto/src/trade_state.rs`:
 | 12 | pool not allowed |
 | 13 | over rolling daily limit |
 | 14 | below price floor |
+
+The price floor is the worst price the rule accepts: an agent can trade at exactly the floor, so set it at a price you are willing to get.
 
 ## Advisory purpose check
 
@@ -329,6 +373,8 @@ Every amount comes from the same chain reads as the app. If there is no signed-i
 ## Hold
 
 Hold is a vault in the same program as a spending rule. A rule still does not escrow: the mandate is a delegate. Hold is for a balance the owner deposits and cannot move with a raw transfer. The vault PDA (`["hold", owner, vault_id]`, `vault_id` as a little-endian u64) is the authority of its token account. It holds SPL tokens. Native SOL goes in as wrapped SOL.
+
+Choose a safe address that the guardian does not control and that you could not be forced to hand over, for example a cold wallet kept elsewhere: recovery sends everything there.
 
 Hold is merged and tested, and live on devnet. The 2026-09-25 upgrade added Hold. The live binary is the 2026-09-28 upgrade built from commit `74c9e99`, SHA-256 `31dd22337359e3c31951e312b130b6de71b244d884e2530140182d5ee9529bd2` ("Hold guardian and safe-address upgrade, 2026-09-28" in [docs/DEVNET.md](docs/DEVNET.md)). The app screens exist. A written device check of Hold with a real vault is not recorded in this repository yet. The guardian rules below (any guardian change waits, and neither key alone can recover or close to itself when it is also the safe address) are deployed on devnet in that upgrade.
 
@@ -434,6 +480,9 @@ docs/PLAN.md              build plan, milestones, and prior art
 docs/PITCH.md             the pitch: position and the sixty seconds
 docs/DECK.md              the deck, slide by slide
 docs/DEVNET.md            public devnet addresses, and every recorded upgrade (live: 2026-09-28, 74c9e99)
+docs/MAINNET.md           not deployed on mainnet: the plan and an address template
+docs/HOLD_MIGRATIONS.md   repairing and migrating older Hold vaults
+docs/PUBLISH.md           maintainer steps for publishing the SDK and CLI to npm
 docs/VIDEO.md             the three-minute shot list
 docs/TESTERS.md           how a Seeker owner installs and tries the devnet APK
 docs/RELEASE_NOTES.md     release notes for the tester APK
@@ -488,12 +537,14 @@ To take a decision off the phone and check it from a laptop:
 ```bash
 cd indexer && npm ci
 cd ../tools && npm ci
-VETO_RPC=https://api.devnet.solana.com npx tsx produce.ts
+# maintainer only: npx tsx produce.ts (needs the gitignored keypairs under keys/)
 VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --signature <tx> --out refused.json
 VETO_RPC=https://api.devnet.solana.com npx tsx verify.ts refused.json
 VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --mandate <mandate> --format csv --out rule.csv
 VETO_RPC=https://api.devnet.solana.com npx tsx verify.ts rule.csv
 ```
+
+The public RPC rate-limits. If verify prints `rpc rate limited`, wait and run it again, or pass `--rpc <your devnet URL>`. A `--mandate` export walks the program's history and can take many minutes on the public endpoint.
 
 The JSON schema, the bulk envelope, and the CSV columns are in
 [docs/DECISION_RECORD.md](docs/DECISION_RECORD.md). Verify re-reads the cluster; it does
@@ -509,15 +560,18 @@ What a key can do under a mandate.
   maximum, up to the remaining cap, until the expiry. That is the blast radius, and it is the point:
   the mandate is what the owner agreed to lose in the worst case. The owner revokes in one signature.
 - **A compromised agent key cannot** widen any field of the mandate, name a different merchant,
-  extend the expiry, grant itself an override, or touch any other mandate. Every widening
-  instruction requires the owner's signature, and `charge` requires `has_one = agent`.
+  extend the expiry, grant itself an override, or charge a rule naming another agent. A stolen
+  agent key can use every rule that names it, including a pending allow-once, within each rule's
+  limits. Every widening instruction requires the owner's signature, and `charge` and `trade`
+  require `has_one = agent`.
 - **Outside Hold, the program moves only what the owner delegated.** For a spending rule or a
   trade rule, the SPL delegation is the hard ceiling underneath the program's own accounting.
 - **Hold balances are held by the program.** A Hold vault is custody, not a delegation: the vault
   PDA is the authority of the vault's token account, and the program moves a deposited balance
   under the Hold rules above.
-- **A malicious merchant** can only receive what the mandate allows. A merchant cannot submit a
-  charge at all; only the named agent signs `charge`.
+- **A malicious merchant** can receive only what the mandate allows through `charge`. Being the
+  merchant grants no signing authority: submitting a charge requires the named agent's key. If
+  the merchant also controls that key, the compromised-agent bounds above apply.
 - **A forged mandate account cannot be substituted.** `charge` re-derives the mandate address from
   the fields stored inside it and rejects a mismatch, and the CPI signs as that PDA.
 - **Hold is live on devnet.** The vault instructions are in this repository and tested. The
@@ -537,7 +591,7 @@ What a key can do under a mandate.
   people who can replace the program and would still leave that replacement possible. A fix
   after the authority is set to none is a new program id and a new mandate. Devnet stays
   upgradeable under the single deployer key so findings can be fixed in place.
-- **Known limit.** The ledger records every decision this program reaches. A frozen source or
+- **Known limit.** The ledger records decisions reached in charge transactions that succeed; a failed transaction rolls back every ledger write, including a refusal reached before a later instruction fails. A frozen source or
   destination is inspected in `evaluate` and recorded as a refusal. Anchor account validation
   failures (wrong mint, wrong source, wrong ledger) and token-program declines this program does
   not inspect are errors with no entry. The program ledger has no entry for a charge the agent

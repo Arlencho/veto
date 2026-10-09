@@ -67,7 +67,7 @@ const READY: OverrideAssessment = {
   status: 'ready',
   amount: 180n,
   nonce: 7n,
-  commit: { title: 'Grant this override', amount: '180', nonce: '7', paragraphs: [] },
+  commit: { title: 'Allow this payment once', amount: '180', nonce: '7', paragraphs: [] },
 };
 
 function probeStub(results: Array<'reject' | OverrideAssessment>) {

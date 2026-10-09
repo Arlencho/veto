@@ -103,16 +103,21 @@ that names it. Approve one rule for it to get paid and refused notifications for
 4. Expect a request every six hours, at 00:00, 06:00, 12:00 and 18:00 Stockholm
    time. The amount follows the Swedish electricity spot price for a 6 kWh top-up.
 
-The request follows the spot price, not your per-payment limit. With 1 USDC
-per payment, cheaper hours are paid and pricier hours are refused, so on most
-days you see both. A refusal moves no money. Use **Stop the rule** on the
+The request follows the spot price, not your per-payment limit. Requests above
+1 USDC are refused; requests at or below it can pay if the other rule checks
+pass. Tester rules do not use demo calibration, so you may see only payments or
+only refusals. A refusal moves no payment tokens. Use **Stop the rule** on the
 rule's screen to stop the requests.
 
 When a request is refused as over your per-payment limit, open that decision
-and press and hold **allow this one payment**. The demo agent sends that same
-request again, same amount, on its next run: the next of 00:00, 06:00, 12:00
-or 18:00 Stockholm time, so within six hours. It is paid once and your limit
-stays as it was. The new request for that run follows right after it.
+and press and hold **allow this one payment**. The demo agent normally checks
+for the retry on its next scheduled run (00:00, 06:00, 12:00 or 18:00 Stockholm
+time). It retries the same nonce and amount only while the rule and allowance
+remain usable, the refusal and allowance are still in the ledger ring, and the
+amount fits the allowance and remaining budget. Other program checks can still
+refuse it, and service or RPC problems can delay or prevent it. A successful
+retry consumes the allowance without changing your normal per-payment limit.
+The agent then processes the scheduled request if it remains eligible.
 
 ## Tell us
 

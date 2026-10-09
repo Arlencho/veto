@@ -2,12 +2,12 @@
 
 These are drafts for the founder to send personally. The Try page at
 <https://veto-hq.github.io> is a placeholder. Confirm it and the APK download
-before posting. Each tester-guide link below points to [docs/TESTERS.md](TESTERS.md);
+before posting. Each tester-guide link below points to [docs/TESTERS.md](../TESTERS.md);
 use the guide's shareable repository URL when posting outside this repository.
 
 ## X
 
-I'm looking for 15 to 25 Seeker owners to test Veto's agent spending rules and Hold. Devnet only, test money. Feedback welcome. Try: https://veto-hq.github.io Guide: [docs/TESTERS.md](TESTERS.md)
+I'm looking for 15 to 25 Seeker owners to test Veto's agent spending rules and Hold. Devnet only, test money. Feedback welcome. Try: https://veto-hq.github.io Guide: [docs/TESTERS.md](../TESTERS.md)
 
 ## Discord: Solana Mobile or Superteam
 
@@ -22,7 +22,7 @@ Please send feedback through the tester issue form linked in the guide.
 
 Try: https://veto-hq.github.io
 
-Setup and feedback: [docs/TESTERS.md](TESTERS.md)
+Setup and feedback: [docs/TESTERS.md](../TESTERS.md)
 
 ## Forum
 
@@ -50,4 +50,4 @@ stuck. Do not post private keys or recovery phrases.
 
 Try: https://veto-hq.github.io
 
-Setup, known limits and feedback: [docs/TESTERS.md](TESTERS.md)
+Setup, known limits and feedback: [docs/TESTERS.md](../TESTERS.md)

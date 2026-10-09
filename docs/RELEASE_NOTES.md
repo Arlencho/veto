@@ -10,18 +10,27 @@ time to stop them.
 
 ## Changed since v1.0.0-devnet.4
 
-- **Counts say when a payment was allowed once.** The Overview paid tile now
-  says how many payments you allowed once, instead of calling every payment
-  "within the rule". When the phone cannot see every payment (the on-chain
-  record keeps the latest 32 entries), it says how many of the last ones were
-  allowed once. The agent record, its request strip, the week in review and
-  the "first payment inside the rule" plaque count the same way.
-
+- **Counts distinguish payments allowed once above your limit.** The Overview
+  paid tile identifies payments above the per-payment limit as allowed once
+  by you. If older payments are outside the latest 32 ledger entries, a
+  visible allowed-once count is labelled as a count of recent payments;
+  if none are visible, the tile says "each checked against the rule".
+  It says "all within the rule" only when every payment is visible and
+  none is above the limit. The agent record, its request strip and the
+  week in review no longer count above-limit payments as inside the rule,
+  even if their allowance entries have left the ledger. The "first payment
+  inside the rule" plaque also skips those payments.
 - **New for testers, outside the app:** our demo charging agent can now
-  charge any rule you open for it, about every six hours, priced from the
+  send requests to active, unexpired devnet USDC payment rules that name
+  it and the demo payee, while budget remains. Runs are scheduled for
+  00:00, 06:00, 12:00 and 18:00 Stockholm time, with amounts based on the
   Swedish SE3 electricity spot price (test payments; no electricity is bought).
-  If you allow one refused request, it retries that request on its next run.
-  See "Get ongoing charges from our demo agent" in the [tester guide](TESTERS.md).
+  If you allow a refused request once, the agent can retry the same request
+  and amount on a later run, before that rule's new request. The retry must
+  still be eligible, recorded in the recent ledger and within the allowed
+  amount and remaining budget. Feed or network failures and per-run limits
+  can delay requests. See "Get ongoing charges from our demo agent" in the
+  [tester guide](TESTERS.md).
 
 ## What the app does
 

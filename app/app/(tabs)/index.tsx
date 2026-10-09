@@ -204,7 +204,7 @@ export default function OverviewScreen() {
             </View>
             {listed.length === 0 ? (
               <EmptyState>
-                No payments, refusals, or overrides on this rule today. This screen never invents
+                No payments, refusals, or one-time allowances on this rule today. This screen never invents
                 rows.
               </EmptyState>
             ) : (

@@ -364,7 +364,10 @@ test('CRITIC: a rule past its expiry by the clock is not offered an override, be
   const past = overrideGuard(mandate({ status: STATUS_ACTIVE, expiresAt: 1_000n }), 7n, 180n, 1_500n);
   assert.equal(past.ok, false, 'expired by the clock must be blocked');
   if (!past.ok) {
-    assert.ok(/expir/i.test(past.why), `why must name expiry, got: ${past.why}`);
+    assert.equal(
+      past.why,
+      'This rule has passed its expiry. This app will not offer a one-time allowance because it cannot make an expired payment valid.',
+    );
   }
   const future = overrideGuard(mandate({ status: STATUS_ACTIVE, expiresAt: 2_000n }), 7n, 180n, 1_500n);
   assert.equal(future.ok, true);

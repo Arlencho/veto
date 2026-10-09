@@ -19,7 +19,9 @@ export default function HelpRefusalScreen() {
       </BrassWell>
       <Text style={styles.body}>
         When a payment would break the rule, the program does not pay. It records the refusal on
-        chain with the reason and the one-time allowance that would have cleared it. Elsewhere the same
+        chain with the reason. If the payment exceeds the per-payment limit but fits within the
+        remaining cap, it also records the one-time allowance needed to clear that limit. All other
+        checks still apply. Elsewhere the same
         block is a failed transaction that leaves no trace. Here the no is the product.
       </Text>
       <Text style={styles.body}>

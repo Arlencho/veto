@@ -38,7 +38,7 @@ test('reason text matches the indexer table', () => {
 test('a refusal shows the override that would have cleared it', () => {
   const view = renderReason(REASON_OVER_PER_TX_MAX, 519500n, 6);
   assert.equal(view.text, 'over per-payment maximum');
-  assert.equal(view.overrideLine, 'A one-time allowance of 0.5195 would have cleared it.');
+  assert.equal(view.overrideLine, 'A one-time allowance of 0.5195 would have cleared the per-payment limit. All other checks still apply.');
 });
 
 test('a 180-over-60 per-payment refusal still has an override that would have cleared it', () => {
@@ -50,7 +50,7 @@ test('a 180-over-60 per-payment refusal still has an override that would have cl
       decimals: 6,
       perTxMax: 60_000_000n,
     }),
-    'Asked for 180, over the 60 per-payment maximum. A one-time allowance of 180 would have cleared it.',
+    'Asked for 180, over the 60 per-payment maximum. A one-time allowance of 180 would have cleared the per-payment limit. All other checks still apply.',
   );
 });
 
@@ -70,7 +70,7 @@ test('a 6232500-over-500000 per-payment refusal still has an override that would
       decimals,
       perTxMax,
     }),
-    `Asked for ${formatBaseUnits(amount, decimals)}, over the ${formatBaseUnits(perTxMax, decimals)} per-payment maximum. A one-time allowance of ${formatBaseUnits(suggestedOverride, decimals)} would have cleared it.`,
+    `Asked for ${formatBaseUnits(amount, decimals)}, over the ${formatBaseUnits(perTxMax, decimals)} per-payment maximum. A one-time allowance of ${formatBaseUnits(suggestedOverride, decimals)} would have cleared the per-payment limit. All other checks still apply.`,
   );
 });
 
@@ -85,7 +85,7 @@ test('a trade over the per-trade maximum names the trade, not a payment', () => 
       mint: 'So11111111111111111111111111111111111111112',
       unit: 'trade',
     }),
-    'Asked for 0.002 wrapped SOL, over the 0.001 wrapped SOL per-trade maximum. A one-time allowance of 0.002 wrapped SOL would have cleared it.',
+    'Asked for 0.002 wrapped SOL, over the 0.001 wrapped SOL per-trade maximum. A one-time allowance of 0.002 wrapped SOL would have cleared the per-payment limit. All other checks still apply.',
   );
 });
 
@@ -101,7 +101,7 @@ test('an override line appears only for the per-payment reason', () => {
   const notActive = renderReason(REASON_NOT_ACTIVE, 519500n, 6);
   assert.equal(notActive.overrideLine, null);
   const overPer = renderReason(REASON_OVER_PER_TX_MAX, 519500n, 6);
-  assert.equal(overPer.overrideLine, 'A one-time allowance of 0.5195 would have cleared it.');
+  assert.equal(overPer.overrideLine, 'A one-time allowance of 0.5195 would have cleared the per-payment limit. All other checks still apply.');
 });
 
 test('refusal copy follows the recorded reason even when a per-payment limit is in hand', () => {

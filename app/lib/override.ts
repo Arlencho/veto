@@ -117,7 +117,7 @@ export function overrideGuard(
   if (nowSec !== undefined && !isActive(mandate, nowSec)) {
     return {
       ok: false,
-      why: 'This rule is expired on chain. A one-time allowance cannot be granted.',
+      why: 'This rule has passed its expiry. This app will not offer a one-time allowance because it cannot make an expired payment valid.',
     };
   }
   if (nonce <= mandate.lastNonce) {

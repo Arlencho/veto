@@ -23,7 +23,7 @@ export function renderReason(
     return {
       reason,
       text,
-      overrideLine: `A one-time allowance of ${formatTokenAmount(suggestedOverride, decimals, mint)} would have cleared it.`,
+      overrideLine: `A one-time allowance of ${formatTokenAmount(suggestedOverride, decimals, mint)} would have cleared the per-payment limit. All other checks still apply.`,
     };
   }
   return {

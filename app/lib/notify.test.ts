@@ -71,7 +71,7 @@ test('a refusal notification repeats the decision screen reason line', () => {
   const line = refusalWhyLine(refusalArgs);
   assert.equal(
     line,
-    'Asked for 6.2325 VTEST, over the 0.5 VTEST per-payment maximum. A one-time allowance of 6.2325 VTEST would have cleared it.',
+    'Asked for 6.2325 VTEST, over the 0.5 VTEST per-payment maximum. A one-time allowance of 6.2325 VTEST would have cleared the per-payment limit. All other checks still apply.',
   );
   const plan = planDecisionNotices([ledger(MANDATE_A, [refusalRow()])], new Map());
   assert.equal(plan.notices.length, 1);

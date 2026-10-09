@@ -173,7 +173,7 @@ export default function ShareScreen() {
 
   const decisionHint = face
     ? `${face.title}. ${row ? decisionWhen(row.ts, chain.nowMs) : ''}`
-    : 'Export is complete over paid and refused charges. An override is listed in the app and is not this file.';
+    : 'Export is complete over paid and refused charges. A one-time allowance is listed in the app and is not this file.';
 
   return (
     <Screen>

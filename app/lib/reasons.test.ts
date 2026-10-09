@@ -85,7 +85,7 @@ test('a trade over the per-trade maximum names the trade, not a payment', () => 
       mint: 'So11111111111111111111111111111111111111112',
       unit: 'trade',
     }),
-    'Asked for 0.002 wrapped SOL, over the 0.001 wrapped SOL per-trade maximum. A one-time allowance of 0.002 wrapped SOL would have cleared the per-payment limit. All other checks still apply.',
+    'Asked for 0.002 wrapped SOL, over the 0.001 wrapped SOL per-trade maximum. A one-time allowance of 0.002 wrapped SOL would have cleared the per-trade limit. All other checks still apply.',
   );
 });
 

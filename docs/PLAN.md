@@ -173,9 +173,9 @@ On 2026-09-24 the spending-rule program is on devnet. Mandate `CZw2prUtN6Kb5kmiG
 
 ## Risks
 
-Snapshot as of 2026-09-24; see [docs/VIDEO.md](VIDEO.md) for the 2026-09-29 device run.
+Snapshot as of 2026-09-24; see [docs/VIDEO.md](VIDEO.md) for the 2026-09-29 and 2026-10-09 device runs.
 
-1. **Done: Mobile Wallet Adapter and Seed Vault on a Seeker.** On 2026-09-24 this was open: the unit tests do not cover `authorize` or the Seed Vault signatures. The 2026-09-29 run in [VIDEO.md](VIDEO.md) records the rule open and the allow-once signed by the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` ([DEVNET.md](DEVNET.md)).
+1. **Done: Mobile Wallet Adapter and Seed Vault on a Seeker.** On 2026-09-24 this was open: the unit tests do not cover `authorize` or the Seed Vault signatures. The 2026-09-29 and 2026-10-09 runs in [VIDEO.md](VIDEO.md) record the rule open and the allow-once signed by the Seeker owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq` ([DEVNET.md](DEVNET.md)); the 2026-10-09 take was recorded on a Seeker with release build 29.
 2. **The quoted rule's history is the span above.** A later charge on that mandate does not turn the existing rows into a week.
 3. **A refusal has to confirm.** The balance is unchanged and the ledger entry exists in the same confirmed transaction. That is what the refusal test asserts.
 4. **A charge the agent never submits has no record.** Nothing on chain can provide one. The record is every decision the program reaches in a charge transaction that succeeds; a charge transaction that fails leaves no decision record. [PROBLEM.md](PROBLEM.md) states that limit.

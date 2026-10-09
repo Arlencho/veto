@@ -92,8 +92,12 @@ test("R6: every charge sentence that names reason 7 also pairs it with reason 5,
   assert.ok(body.indexOf("REASON_OVER_CAP") < body.indexOf("REASON_DELEGATE_MISSING"));
 });
 
-test("R7: VIDEO.md tells the EWz9 rule story, and the app lists paid, refused and override only", () => {
+test("R7: VIDEO.md tells the submitted r4D5 take and the earlier EWz9 run, and the app lists paid, refused and override only", () => {
   const video = read("docs/VIDEO.md");
+  assert.match(video, /## Submitted take/);
+  assert.match(video, /r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV/);
+  assert.match(video, /4sAUJSy5wyfwQJ9PYgeC58uwBxx5S9TAZgnKjfCQmYoaUtheBVWN3kguSMa1A34Kf6hJ4MwRtp6PDnhcb9KEn7Ek/);
+  assert.ok(video.indexOf("## Submitted take") < video.indexOf("## Earlier recorded run"), "submitted take comes first");
   assert.match(video, /EWz9bHJVySsdqMSsLp7nsp7T4FheUkdE6pY8MgomYa4v/);
   assert.match(video, /2\.90/);
   assert.match(video, /reason=5 \(over per-payment maximum\) amount=12900000/);

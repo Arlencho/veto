@@ -4,7 +4,25 @@ This is the current shot list. Maximum running time is 03:00 including the last 
 
 All transactions are on Solana devnet. USDC means Circle's devnet test token, with no value. The charging agent pays our own test payee for a bill priced from a public electricity index. It buys no electricity.
 
-## The story on chain
+## Submitted take
+
+Submitted take, recorded 2026-10-09 on a Seeker with release build 29: rule `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, agent `G1UKSxWvNRNep6Ec6yD67iKEkmDNRZP3pPcHDHa6QMDU`, owner `GtA2Vxhomfm2WGaBcvz5oCBrqkAecKHMAL3UTn4HVFzq`, 5 USDC per payment, 20 total, until 18 Nov 2026.
+
+The table lists every transaction on the rule, read with getSignaturesForAddress and getTransaction on https://api.devnet.solana.com on 2026-10-09. Each is finalized with no error.
+
+| Step (2026-10-09, UTC) | Signed by | What happened | Transaction |
+|---|---|---|---|
+| 19:52:47 | owner | Owner opens the rule: 20 total, 5 per payment | [3zhuZEKM](https://explorer.solana.com/tx/3zhuZEKMMoq4Q2j6iYYSULr2ZL6rJWtDg5pPecZxkP9Si2rQgDSicuh9JWemAzgqrXXh2ffg4VmaFCv2R9LGEjB1?cluster=devnet) |
+| 19:53:50 | agent | Agent asks for 4.20, paid. 15.80 left | [4uaBTgZ4](https://explorer.solana.com/tx/4uaBTgZ4z95HXjsD8EB5wFhdMDRyxXKZ1eY5mMHFp5y2ibmxiNJUzWQitp411YdFEmsUkPKrZeLR1oUE8WBjU39T?cluster=devnet) |
+| 19:54:13 | agent | Agent asks for 12.90, refused as over the per-payment limit (reason 5). No USDC moves | [4sAUJSy5](https://explorer.solana.com/tx/4sAUJSy5wyfwQJ9PYgeC58uwBxx5S9TAZgnKjfCQmYoaUtheBVWN3kguSMa1A34Kf6hJ4MwRtp6PDnhcb9KEn7Ek?cluster=devnet) |
+| 19:58:55 | owner | Owner allows that one payment of 12.90 | [48HSvVEi](https://explorer.solana.com/tx/48HSvVEiq43D2QpHMrW69T9mGq8U4bo3vmn7fat5GqQA9xph1ecr8FNArYDj5Ap1bthfhDZUq4PqhZSP9rDns4Aj?cluster=devnet) |
+| 19:59:39 | agent | Agent retries 12.90, paid after the owner allowed it once. 2.90 of 20 left | [4m3PHGqp](https://explorer.solana.com/tx/4m3PHGqp9yjpiPkjUuhhg6LTRkGffVWCz34vu1KRiVCP2CPTGUQV24RrraKBUuTDTyoVU5rnhkUbKMBuZA1FvPst?cluster=devnet) |
+
+The refusal's program log is `VETO REFUSED reason=5 (over per-payment maximum) amount=12900000 per_tx_max=5000000 remaining=15800000 override_to_clear=12900000`. The open logs `expires_at=1795031382`, which is 2026-11-18 19:49:42 UTC.
+
+## Earlier recorded run
+
+The shot list below was written against this 2026-09-29 run. The amounts and limits are the same as in the submitted take.
 
 One rule carries the opening payment, refusal and owner-approved retry. The later MCP, phone test-agent and ongoing demo-agent examples use separate rules for their respective agent keys. Before recording, verify each transaction below with getTransaction on https://api.devnet.solana.com and confirm that the corresponding history is visible on the phone.
 

@@ -92,10 +92,11 @@ test("R6: every charge sentence that names reason 7 also pairs it with reason 5,
   assert.ok(body.indexOf("REASON_OVER_CAP") < body.indexOf("REASON_DELEGATE_MISSING"));
 });
 
-test("R7: VIDEO.md says the open is not a Decisions row, and the app lists paid, refused and override only", () => {
+test("R7: VIDEO.md tells the EWz9 rule story, and the app lists paid, refused and override only", () => {
   const video = read("docs/VIDEO.md");
-  assert.match(video, /The open is not listed on Decisions\./);
-  assert.match(video, /16\.659625/);
+  assert.match(video, /EWz9bHJVySsdqMSsLp7nsp7T4FheUkdE6pY8MgomYa4v/);
+  assert.match(video, /2\.90/);
+  assert.match(video, /reason=5 \(over per-payment maximum\) amount=12900000/);
   assert.doesNotMatch(video, /6\.2325/);
   assert.doesNotMatch(read("docs/DECK.md"), /6\.2325/);
   const format = read("app/lib/format.ts");

@@ -1,6 +1,15 @@
 # Veto
 
-Seeker owner? [Try Veto on devnet before October 8](docs/TESTERS.md).
+## Judges start here
+
+**Give your AI agent a spending rule. Keep your wallet key.** Approve in Seed Vault; the agent uses its own key. Requests reaching the program's decision logic are paid or recorded as refused. From your phone, allow one payment over the per-payment limit or stop the rule.
+
+- **Recorded example:** [12.90 USDC refused](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) against a 5 USDC limit; [paid after owner approval](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
+- **Try it:** [Android APK](https://github.com/Arlencho/veto/releases/latest) and [setup guide](https://veto-hq.github.io/try/). Fund a test-agent rule, then tap **Send two test requests**.
+- **Verify:** [Export and verification commands](#see-it-on-devnet) with the refusal signature `26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC`.
+- **Scope:** devnet test money only. Not externally audited. [One deployer key can upgrade the program](#threat-model).
+
+## What Veto is
 
 **Everyone stops the overspend. Veto also records why it stopped.**
 
@@ -19,8 +28,8 @@ when the owner closes the rule.
 
 AP2 specified the record of a yes. This is the missing half.
 
-> Status: in development for the Solana Mobile "Clock In" hackathon. Submissions close
-> October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
+> Status: built for the Solana Mobile "Clock In" hackathon
+> ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 > See [docs/PLAN.md](docs/PLAN.md) for the build plan,
 > [docs/PITCH.md](docs/PITCH.md) for the positioning, and
 > [docs/internal/DECISIONS.md](docs/internal/DECISIONS.md) for why each choice was made and what would reverse it.

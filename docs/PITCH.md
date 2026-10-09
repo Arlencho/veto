@@ -85,9 +85,9 @@ The purpose check is the first step past the numbers. The chain enforces amount,
 
 People built trust with a payment history. Agents will build it with a history of refusals, and that history starts on chain.
 
-## Scope through the deadline
+## Scope
 
-Submissions close October 8, 2026 ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
+Built for the Solana Mobile "Clock In" hackathon ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 
 One spending-rule type. A delegate on a token account the owner controls. Several rules, one agent each. A ruleset written once and applied to the next agent. One pay path. One refusal path with a reason and an override hint. Four tabs: Overview, Rules, Agents, and Decisions. Connect your agent on an active rule. Grades, plaques, a week in review, a track record card, renewal, and a quiet note. An export anyone can re-read from the chain, including after the mandate account is closed. The quoted rule's history is the span above. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. No DeFi zoo, no marketplace, no W3C verifiable credential, no signing ceremony, no verifier service.
 

@@ -67,6 +67,8 @@ export VETO_AGENT='AGENT'
 ./scripts/deploy-watcher-cloud.sh
 ```
 
+The script refuses to update `veto-watcher` or `veto-watcher-stale` when either job already exists, because it replaces the whole job environment. Pass `--replace-env` only when that is what you want; for an ordinary rule or image change, follow "Switching the rule in place" below.
+
 `--check` validates local inputs only. The deploy path then, in order:
 
 1. Creates the service account `veto-watcher@veto-watcher-260921.iam.gserviceaccount.com` if missing.

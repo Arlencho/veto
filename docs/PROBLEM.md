@@ -47,7 +47,7 @@ the expiry, or move funds outside the mandate.
 When a charge is inside the limits, the program pays the merchant and writes the payment. When
 a charge breaks a limit, the transfer instruction is not executed, no tokens move, and the
 program writes a refusal: a reason code, and a suggested one-time allowance when one applies;
-other checks can still stop the payment. The instruction returns success, so the write is kept. The owner can allow that one
+other checks can still stop the payment. The instruction returns success; the write is kept only if the entire transaction succeeds. The owner can allow that one
 payment with an override. The override is a ledger entry, it applies to one nonce, and it
 cannot raise the total cap. The owner can revoke the mandate in one signature, or revoke the
 SPL delegation directly.

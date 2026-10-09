@@ -110,8 +110,9 @@ rule's screen to stop the requests.
 
 When a request is refused as over your per-payment limit, open that decision
 and press and hold **allow this one payment**. The demo agent sends that same
-request again, same amount, on its next run: the next of 00:00, 06:00, 12:00
-or 18:00 Stockholm time, so within six hours. It is paid once and your limit
+request again, same amount, normally on the next scheduled run (00:00, 06:00,
+12:00 or 18:00 Stockholm time), if the allowance and remaining budget still
+cover it. It is paid once and your limit
 stays as it was. The new request for that run follows right after it.
 
 ## Tell us

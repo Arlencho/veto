@@ -7,8 +7,12 @@ not an error.
 
 The price is real, public, and independently verifiable against the same URL. The
 counterparty is a terminal we run, because no charge point operator accepts this
-mint. Refusals happen because the spot crossed the ceiling, not because anyone
-pressed a button.
+mint. Without demo calibration, amounts follow the spot price. Optional
+calibration (watcher/src/calibration.ts) deliberately sizes some scheduled
+requests above the limit for the configured demo rule; tester rules bypass it.
+
+The hosted demo agent runs in USDC mode: VETO_QUOTE_CURRENCY=USD,
+VETO_KWH_MILLI=6000 (see Quoting USDC).
 
 ## What it does
 
@@ -63,7 +67,8 @@ configured rule.
   applied: it is sized to the configured rule's cap. No price means no request.
 - At most `VETO_AGENT_RULES_MAX` rules per pass (default 25, at most 100,
   `0` turns this off). When more are eligible, the starting point moves each
-  slot so every rule gets a turn.
+  slot so every rule gets a turn. VETO_AGENT_RULES_MAX=0 also turns off the
+  configured rule's allow-once retry.
 - This pass runs last, after the configured rule and the hold alerts.
   Charges are sequential with a 1.5 second pause. A send that is not
   confirmed within 90 seconds counts as failed. A rule that fails is logged

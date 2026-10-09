@@ -1,5 +1,7 @@
 # Veto on Solana mainnet
 
+Not deployed on mainnet. This is the plan and an address template.
+
 This file lists public addresses only. Keypairs live under gitignored `keys/` and must never be committed.
 
 Do not put funds you cannot lose under this program on mainnet

@@ -69,6 +69,11 @@ configured rule.
   `0` turns this off). When more are eligible, the starting point moves each
   slot so every rule gets a turn. VETO_AGENT_RULES_MAX=0 also turns off the
   configured rule's allow-once retry.
+- No new charge in this pass starts after `VETO_AGENT_PASS_BUDGET_MS`
+  (default 480000, eight minutes). In `once` mode, no new charge in this
+  pass starts after 12 minutes of process uptime. This leaves time before the
+  job's 15 minute limit for a charge already in progress, but does not
+  guarantee that it finishes before that limit. Rules left over wait for the next slot.
 - This pass runs last, after the configured rule and the hold alerts.
   Charges are sequential with a 1.5 second pause. A send that is not
   confirmed within 90 seconds counts as failed. A rule that fails is logged
@@ -161,6 +166,8 @@ Process defaults that cannot select a chain identity (overridable with env):
 | Mandate id | 1 |
 | Purpose | `SE3 home charging` |
 | Other rules per pass | 25 (`VETO_AGENT_RULES_MAX`, `0` turns it off) |
+| Pass time budget | 480000 ms (`VETO_AGENT_PASS_BUDGET_MS`) |
+| RPC response header timeout | 20000 ms per attempt to one endpoint (`VETO_RPC_TIMEOUT_MS`); body reads are outside this timeout. An endpoint that times out is skipped for the rest of that request, and another endpoint is tried if available. |
 
 0.5 tokens per 50 kWh is 0.01 SEK/kWh. On 2026-09-20 that pays the cheapest night
 and midday dips and refuses the evening spike. Raise `VETO_PER_TX_MAX` before

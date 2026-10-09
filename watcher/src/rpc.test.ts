@@ -5,11 +5,13 @@ import {
   DEFAULT_RPC_TIMEOUT_MS,
   RateLimitedError,
   RpcTimeoutError,
+  createFailoverConnection,
   isRateLimitError,
   isTransientRpcError,
   makeFailoverFetch,
   parseRpcList,
   parseRpcTimeoutMs,
+  redactRejections,
   redactRpcUrl,
   redactRpcUrlsInText,
 } from "./rpc.js";
@@ -319,6 +321,56 @@ test("transient RPC errors are told apart from answers a later read would repeat
   const refused = Object.assign(new Error("connect failed"), { code: "ECONNREFUSED" });
   assert.equal(isTransientRpcError(refused), true);
   assert.equal(isTransientRpcError(new Error("failed to get info about accounts: Invalid param: WrongSize")), false);
+});
+
+const KEYED_URL_TEXT =
+  "connect failed for https://user:hunter2@rpc.example.com/v2/PATH-TOKEN?api-key=QUERY-TOKEN then wss://user:hunter2@rpc.example.com/v2/PATH-TOKEN?api-key=QUERY-TOKEN.";
+const KEY_TOKENS = ["PATH-TOKEN", "QUERY-TOKEN", "hunter2", "user:"];
+
+test("pr 395 review: a websocket error on the connection's own emitter is logged without the RPC key", () => {
+  const connection = createFailoverConnection(["http://127.0.0.1:1"]);
+  const internals = connection as unknown as {
+    _rpcWebSocket: { emit(event: string, ...args: unknown[]): boolean };
+    _rpcWebSocketConnected: boolean;
+  };
+  internals._rpcWebSocketConnected = true;
+  const captured: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    captured.push(args.map((a) => (a instanceof Error ? `${a.message} ${a.stack ?? ""}` : String(a))).join(" "));
+  };
+  try {
+    internals._rpcWebSocket.emit("error", new Error(KEYED_URL_TEXT));
+  } finally {
+    console.error = original;
+  }
+  assert.equal(captured.length, 1, captured.join(" | "));
+  assert.ok(captured[0]!.startsWith("ws error:"), captured[0]);
+  assert.ok(captured[0]!.includes("https://rpc.example.com") && captured[0]!.includes("wss://rpc.example.com"), captured[0]);
+  for (const token of KEY_TOKENS) assert.equal(captured[0]!.includes(token), false, captured[0]);
+  assert.equal(internals._rpcWebSocketConnected, false, "the base handler still marks the socket down");
+});
+
+test("pr 395 review: websocket call rejections reach web3.js's subscribe and unsubscribe logs redacted", async () => {
+  const connection = createFailoverConnection(["http://127.0.0.1:1"]);
+  const ws = (connection as unknown as { _rpcWebSocket: { call: unknown; constructor: { prototype: { call: unknown } } } })
+    ._rpcWebSocket;
+  assert.notEqual(ws.call, ws.constructor.prototype.call, "the connection's socket call is wrapped");
+  const wrapped = redactRejections(async () => {
+    throw new Error(KEYED_URL_TEXT);
+  });
+  await assert.rejects(wrapped(), (err: unknown) => {
+    assert.ok(err instanceof Error);
+    for (const token of KEY_TOKENS) assert.equal(`${err.message} ${err.stack ?? ""}`.includes(token), false, err.message);
+    return true;
+  });
+  const rpcError = { code: -32601, message: "Method not found" };
+  await assert.rejects(
+    redactRejections(async () => {
+      throw rpcError;
+    })(),
+    (err: unknown) => err === rpcError,
+  );
 });
 
 test("pr 395 review: transient matching is narrow: a stray 500 or the word network is not a server error", () => {

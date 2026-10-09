@@ -279,6 +279,58 @@ export function makeFailoverFetch(
   };
 }
 
+/** The web3.js internals the redacting subclass touches. They are marked
+ * internal, so they are not in the published types. */
+type ConnectionWsInternals = {
+  _wsOnError(err: Error): void;
+  _rpcWebSocket?: { call?: (...args: unknown[]) => Promise<unknown> };
+};
+
+/** The same error with every RPC URL in its message cut to scheme and host. */
+function redactedError(err: Error): Error {
+  const out = new Error(redactRpcUrlsInText(err.message));
+  out.name = err.name;
+  return out;
+}
+
+/** Wrap an async call so an Error it rejects with has its RPC URLs redacted.
+ * Anything else it rejects with (a JSON-RPC error object) passes through. */
+export function redactRejections<A extends unknown[], R>(fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
+  return async (...args: A) => {
+    try {
+      return await fn(...args);
+    } catch (err) {
+      throw err instanceof Error ? redactedError(err) : err;
+    }
+  };
+}
+
+/** A Connection whose own websocket error logging cannot print a keyed RPC URL.
+ *
+ * web3.js logs websocket errors with console.error from inside Connection:
+ * `_wsOnError` prints err.message, and the subscribe and unsubscribe paths of
+ * `_updateSubscriptions` print the error `_rpcWebSocket.call` rejected with.
+ * `_wsOnError` is overridden here (the base still runs, so its connection
+ * state update is kept) and `call` is wrapped, so both see redacted text.
+ * Scoped to this class; console is not touched.
+ */
+class RedactingConnection extends Connection {
+  constructor(endpoint: string, config: ConstructorParameters<typeof Connection>[1]) {
+    super(endpoint, config);
+    const ws = (this as unknown as ConnectionWsInternals)._rpcWebSocket;
+    if (ws !== undefined && typeof ws.call === "function") {
+      ws.call = redactRejections(ws.call.bind(ws));
+    }
+  }
+
+  // The base constructor binds this._wsOnError to the socket's error event,
+  // and that lookup finds this override on the subclass prototype.
+  _wsOnError(err: Error): void {
+    const base = (Connection.prototype as unknown as ConnectionWsInternals)._wsOnError;
+    base.call(this, redactedError(err instanceof Error ? err : new Error(String(err))));
+  }
+}
+
 export function createFailoverConnection(
   endpoints: readonly string[],
   log: (line: string) => void = () => {},
@@ -288,7 +340,7 @@ export function createFailoverConnection(
   if (list.length === 0) {
     throw new Error("no rpc endpoints configured");
   }
-  return new Connection(list[0]!, {
+  return new RedactingConnection(list[0]!, {
     commitment: "confirmed",
     disableRetryOnRateLimit: true,
     fetch: makeFailoverFetch(list, log, opts),

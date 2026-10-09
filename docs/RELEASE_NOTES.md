@@ -1,4 +1,4 @@
-# Veto APK v1.0.0-devnet.4: devnet
+# Veto APK v1.0.0-devnet.5: devnet
 
 Veto is an Android app for setting rules on what an agent can spend or trade
 on Solana. You approve the rule with your wallet. The program checks requests
@@ -8,16 +8,29 @@ time to stop them.
 
 **This release is devnet only. All money used here is test money with no value.**
 
-## Changed since v1.0.0-devnet.3
+## Changed since v1.0.0-devnet.4
 
-- **Allowed-once payments say so.** A payment or trade above the rule's
-  per-payment or per-trade limit can only go through after you allow it once.
-  Decisions, the decision screen, notifications, trade rows and the Today card
-  now say the payment was allowed once by you, above your limit, instead of
-  describing it as within the limit. Amounts are rounded so the shown payment
-  never equals the shown limit.
-- **Plain words.** Screens say "request" where they said "nonce". Exported
-  records keep the program's exact reason text, so they still verify.
+- **Counts distinguish payments allowed once above your limit.** The Overview
+  paid tile identifies payments above the per-payment limit as allowed once
+  by you. If older payments are outside the latest 32 ledger entries, a
+  visible allowed-once count is labelled as a count of recent payments;
+  if none are visible, the tile says "each checked against the rule".
+  It says "all within the rule" only when every payment is visible and
+  none is above the limit. The agent record, its request strip and the
+  week in review no longer count above-limit payments as inside the rule,
+  even if their allowance entries have left the ledger. The "first payment
+  inside the rule" plaque also skips those payments.
+- **New for testers, outside the app:** our demo charging agent can now
+  send requests to active, unexpired devnet USDC payment rules that name
+  it and the demo payee, while budget remains. Runs are scheduled for
+  00:00, 06:00, 12:00 and 18:00 Stockholm time, with amounts based on the
+  Swedish SE3 electricity spot price (test payments; no electricity is bought).
+  If you allow a refused request once, the agent can retry the same request
+  and amount on a later run, before that rule's new request. The retry must
+  still be eligible, recorded in the recent ledger and within the allowed
+  amount and remaining budget. Feed or network failures and per-run limits
+  can delay requests. See "Get ongoing charges from our demo agent" in the
+  [tester guide](TESTERS.md).
 
 ## What the app does
 

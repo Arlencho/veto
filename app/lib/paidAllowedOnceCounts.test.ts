@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { paidTileCopy } from '../components/daily/facts';
 import { KIND_OPENED, KIND_OVERRIDE, KIND_PAID, KIND_REFUSED, REASON_OVER_PER_TX_MAX, STATUS_ACTIVE } from './constants';
-import { gradeRules, snapshotRule, type GradeDecision, type RuleFacts } from './grade';
+import { buildAgentRecords, gradeRules, requestTicks, snapshotRule, type GradeDecision, type RuleFacts } from './grade';
 import { plaquesForRule } from './plaques';
 import { DEVNET_USDC_MINT } from './tokens';
 import { trackRecordFor, trackRecordLines } from './trackRecord';
@@ -156,4 +156,18 @@ test('the grade counts a payment above the limit as outside the rule once, with 
     assert.equal(grade.outside, 1, name);
     assert.equal(grade.requests, 2, name);
   }
+});
+
+test('the request strip agrees with the grade for a payment above the limit with nothing else in view', () => {
+  const now = START + 2n * DAY;
+  const rows = [row({ nonce: 1n, amount: 1_000_000n }), row({ ts: START + DAY + 180n, nonce: 2n, amount: 12_900_000n })];
+  const ticks = requestTicks(rows, LIMIT);
+  assert.deepEqual(
+    ticks.map((tick) => tick.kind),
+    ['paid', 'refused'],
+  );
+  const [record] = buildAgentRecords([facts(rows)], {}, now);
+  assert.equal(record?.tickLabel, '2 requests, oldest to newest: paid, refused.');
+  assert.equal(record?.grade.paid, 1);
+  assert.equal(record?.grade.outside, 1);
 });

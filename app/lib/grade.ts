@@ -404,8 +404,8 @@ export function gradeRecordLine(grade: Grade): string {
   return `Its rule: ${rule}. This agent: ${grade.outside} of ${grade.requests}${tail}.${step}`;
 }
 
-export function requestTicks(rows: readonly GradeDecision[]): RequestTick[] {
-  const facts = countRule(rows);
+export function requestTicks(rows: readonly GradeDecision[], perTxMax?: bigint | null): RequestTick[] {
+  const facts = countRule(rows, perTxMax);
   const ticks: RequestTick[] = [
     ...facts.paidInside.map((row) => ({ kind: 'paid' as const, ts: row.ts })),
     ...facts.refused.map((row) => ({ kind: 'refused' as const, ts: row.ts })),
@@ -623,7 +623,7 @@ export function buildAgentRecords(
       .sort((a, b) => (a.purpose < b.purpose ? -1 : a.purpose > b.purpose ? 1 : 0));
     const grade = gradeRules(snapshots, nowSec);
     const ticks = snapshots
-      .flatMap((rule) => requestTicks(rule.rows))
+      .flatMap((rule) => requestTicks(rule.rows, rule.perTxMax))
       .sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
     const nameKey = canonicalAddress(agent);
     const storedName = nameKey ? names[nameKey] : undefined;

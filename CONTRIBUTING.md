@@ -5,7 +5,7 @@ Veto runs on devnet and has not been externally audited. Issues and pull request
 ## Toolchain
 
 - Rust 1.89.0, pinned in `rust-toolchain.toml`
-- Solana CLI and Anchor 1.2.0
+- Solana CLI (stable, not pinned) and Anchor 1.2.0, as installed by CI
 - Node 22 for the TypeScript packages
 
 ## Build and test
@@ -24,13 +24,13 @@ Every TypeScript package (`app`, `cli`, `sdk`, `tools`, `indexer`, `terminal`, `
 cd <package> && npm ci && npm run typecheck && npm test
 ```
 
-`app` and `service` typecheck against the SDK, so run `npm ci` in `sdk` first. The `service` tests need a local Postgres. `make test-scripts` runs the script checks that do not need a cluster.
+Some packages typecheck against a sibling, so run `npm ci` there first. `app` needs `sdk`, `terminal` needs `watcher`, `tools` needs `indexer`, and `service` needs `indexer` and `app`. The `service` tests need a local Postgres 16 (`docker compose up -d --wait` in `service`, see [service/README.md](service/README.md)). `make test-scripts` runs the script checks that do not need a cluster.
 
 Reading devnet needs no keys. Deploying needs the maintainer backup of `keys/program.json`, as described under Build and run in the README.
 
 ## Android APK
 
-Setup for the Expo app is in [app/README.md](app/README.md). The public tester build and the RPC key it needs are in [docs/TESTERS.md](docs/TESTERS.md). Add `--local` to the EAS command to build on your own machine.
+Setup for the Expo app is in [app/README.md](app/README.md). The public tester build and the RPC key it needs are in [docs/TESTERS.md](docs/TESTERS.md). Add `--local` to the EAS command to build on your own machine. The `tester` profile still needs `VETO_TESTER_RPC`, which only the maintainer holds.
 
 ## Pull requests
 

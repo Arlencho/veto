@@ -4,7 +4,7 @@
 
 Give your AI agent a spending rule and keep your wallet key. You approve the rule in Seed Vault, and the agent pays with its own key. Every charge transaction that succeeds records a payment, or a refusal with its reason. A charge transaction that fails, for example on invalid accounts, leaves no decision record. From your phone you can allow one payment over the per-payment limit, or stop the rule.
 
-The recorded example is a [12.90 USDC refusal](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) against a 5 USDC limit, then [paid after owner approval](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
+The recorded example is a [12.90 USDC refusal](https://explorer.solana.com/tx/26xUMWrTZhNekv3WMczdeQHd1omrG6MyWrKGbbKfzDi3nRbtmdbQSxCiffu9LtiqS3UTBq2we2Vqmwbfg4pVSXjC?cluster=devnet) against a 5 USDC limit, followed by [the payment after owner approval](https://explorer.solana.com/tx/261ED3JCVMXWxFuRxckJ5ZkxHu9RLLRdNFDxJSdkENw76cmb8t6oGRwF9gWDZQG7J1xwv6uqBFikvLxe1AyVFwQ9?cluster=devnet).
 
 To try it, install the [Android APK](https://github.com/Arlencho/veto/releases/latest) and follow the [setup guide](https://veto-hq.github.io/try/). Fund a test-agent rule, then tap **Send two test requests**.
 
@@ -18,13 +18,29 @@ Everyone stops the overspend. Veto also records why it stopped.
 
 Veto enforces a spending rule on chain. When a charge breaks the rule, the transfer is never executed and no tokens move. That much is table stakes, and most of the prior art below already caps agent spending on chain.
 
-The difference is what the stop leaves behind. Elsewhere a blocked overspend is usually a failed transaction. Solana keeps its logs and error code, but no program state changes. In Veto a refusal is a successful transaction that moves no payment tokens and writes a structured reason to program state, with a suggested one-time allowance when one applies. Other checks can still stop the payment. It all runs on a phone, with the key in Seed Vault.
+The difference is what the stop leaves behind. Elsewhere a blocked overspend is usually a failed transaction. Solana keeps its logs and error code, but no program state changes. In Veto a refusal is a successful transaction that moves no payment tokens and writes a structured reason to program state, with a suggested one-time allowance when one applies. On a phone, with the key in Seed Vault.
 
 Every decision is a confirmed transaction that anyone can look up by its signature. The copy in program state is the rule's on-chain ledger. It keeps the latest 32 decisions and is deleted when the owner closes the rule.
 
 Seed Vault is built so a human approves every signature. That is the right default, and it is exactly why unattended agent spend has nowhere to live on this platform. A mandate is the answer that fits Seed Vault. The key never leaves the vault, and the agent gets bounded authority beside it rather than a copy of the key.
 
 We built Veto for the Solana Mobile "Clock In" hackathon ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)). The build plan is in [docs/PLAN.md](docs/PLAN.md), the positioning in [docs/PITCH.md](docs/PITCH.md), and the problem and who has it in [docs/PROBLEM.md](docs/PROBLEM.md).
+
+## Prior art
+
+Capped agent spending on Solana is not new, and we do not claim it.
+
+| Prior art | What it does | What Veto adds |
+|---|---|---|
+| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway (per the Squads blog, read 2026-09-28) | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
+| SPL `approve` / delegate | Caps what a delegate may pull | Cap only. No purpose, no expiry, no reason, no record |
+| [LazorKit](https://github.com/lazor-kit/lazor-kit) | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
+| [Oculus](https://github.com/useoculusagent/useoculusagent) | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves, and the decline is a record |
+| [x402](https://metamask.io/news/what-is-x402) / [AP2](https://ap2-protocol.org/) | HTTP 402 settlement. Signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | AP2 provides signed authorization mandates, and x402 settles payments over HTTP. Veto adds a structured refusal record on chain |
+
+SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28. No archived copy was found, so we removed its row and quote.
+
+Capped on-chain agent budgets are documented well enough that infrastructure vendors publish tutorials on them. Our claim is narrower. The refusal is an artifact.
 
 ## How a refusal works
 
@@ -45,7 +61,7 @@ VETO_RPC=https://api.devnet.solana.com npx tsx export.ts --signature 26xUMWrTZhN
 VETO_RPC=https://api.devnet.solana.com npx tsx verify.ts refusal.json
 ```
 
-Checked against public devnet on 2026-10-09, verify prints this.
+Checked against public devnet on 2026-10-09, verify prints:
 
 ```
 VERDICT: CONFIRMED
@@ -90,7 +106,7 @@ VETO REFUSED reason=5 (over per-payment maximum) amount=6232500 per_tx_max=50000
 
 This refusal is for the 18:00 Stockholm window. The nonce `1789920000` is 2026-09-20 16:00:00 UTC, which is 18:00 in Stockholm. The transaction confirmed at 2026-09-20 20:58:12 UTC.
 
-The bill was 6.2325 tokens because 50 kWh was repriced at 0.12465 SEK/kWh. That price is the only input we do not control. The mandate allows 0.5 per payment. The program did not pay, it said why, and the last log field is the one-time allowance it suggests for this charge. Other checks can still stop the payment. That transaction is the record.
+The bill was 6.2325 tokens because 50 kWh was repriced at 0.12465 SEK/kWh. That price is the only input we do not control. The mandate allows 0.5 per payment. The program did not pay, it said why, and the last log field is the one-time allowance it suggests for this charge. That transaction is the record.
 
 Five later decisions on the same mandate confirmed on the six-hour cadence. Each charge was over the 0.5 per-payment maximum and was refused, and token balances are unchanged on all five. A fresh export of the mandate prints nine decisions, three paid and six refused. The six are this refusal and the five below.
 
@@ -153,22 +169,6 @@ npx tsx examples/pay-once.ts ../keys/agent.json <config.json> <amount-in-base-un
 
 `watcher/` is the full reference agent. It prices a public electricity spot and submits `charge` on a schedule. This package is the client for one charge and for reading the mandate, the ledger, and the decisions.
 
-## Prior art
-
-Capped agent spending on Solana is not new, and we do not claim it.
-
-| Prior art | What it does | What Veto adds |
-|---|---|---|
-| [Squads v4 spending limits](https://squads.xyz/blog/spending-limits) | Pre-approved allowances, roles, per-member caps. Audited by Neodyme, OtterSec and Trail of Bits, two formal verifications underway (per the Squads blog, read 2026-09-28) | Treasury operations for humans. An overspend stops as a failed transaction, with no refusal written to program state |
-| SPL `approve` / delegate | Caps what a delegate may pull | Cap only. No purpose, no expiry, no reason, no record |
-| [LazorKit](https://github.com/lazor-kit/lazor-kit) | Passkey smart wallet, session keys with slot-height expiry, on-chain RBAC and spending limits | Wallet infrastructure for app developers |
-| [Oculus](https://github.com/useoculusagent/useoculusagent) | On-chain policy check per transaction, a USDC reserve reimburses a breach after the fact | Reimburses a breach after the fact. Veto declines before money moves, and the decline is a record |
-| [x402](https://metamask.io/news/what-is-x402) / [AP2](https://ap2-protocol.org/) | HTTP 402 settlement. Signed Checkout and Payment mandates as verifiable digital credentials (per the AP2 specification, read 2026-09-28) | AP2 provides signed authorization mandates, and x402 settles payments over HTTP. Veto adds a structured refusal record on chain |
-
-SolAgent Pay was compared here earlier. Its repository, `github.com/altaranexus-ship-it/solagent-pay`, returned HTTP 404 when checked on 2026-09-28. No archived copy was found, so we removed its row and quote.
-
-Capped on-chain agent budgets are documented well enough that infrastructure vendors publish tutorials on them. Our claim is narrower. The refusal is an artifact.
-
 ## How authority is split
 
 | | Owner key | Agent key |
@@ -187,7 +187,7 @@ The owner can revoke in one signature, and can also revoke the SPL delegation di
 
 ## Limits
 
-Every charge is checked on chain against four limits. They are the cap, the per-payment maximum, the expiry, and a single allowed merchant. The nonce adds replay protection. Only a paid charge advances it, so a settled payment cannot be replayed, while a refused one can still be retried after an override.
+Four limits are checked on chain on every charge: the cap, the per-payment maximum, the expiry, and a single allowed merchant. The nonce adds replay protection. Only a paid charge advances it, so a settled payment cannot be replayed, while a refused one can still be retried after an override.
 
 The human-readable purpose is stored on chain as written and cannot be edited afterwards. The chain does not understand the word "groceries". The purpose is an immutable statement of intent, bound to a merchant the chain does enforce.
 
@@ -243,7 +243,7 @@ PURPOSE_CHECK_URL=<endpoint> npx tsx examples/purpose-check.ts <agent-key.json> 
 
 The Android app uses the Backglass look, with the Catch mark, Fraunces and Manrope, and the cabinet colors. The approved screens are in [docs/design/backglass/README.md](docs/design/backglass/README.md), and screen-by-screen notes are in [app/README.md](app/README.md).
 
-A fresh install walks five stages, named on the progress strip. They are Learn, Connect wallet, Add your agent, Approve the rule, and Live. Learn has four steps. Your agent can only ask, you set one rule, a refusal is saved, and you decide. Connect continues through naming the agent, approving the rule in Seed Vault, and the live rule. After Live, the same run hands the agent its setup and offers alerts, and those two screens stay on the Live stage of the strip. Skip stores the seen flag, so a later launch does not start at Learn again. Help can open How Veto works without clearing that flag.
+A fresh install walks five stages, named on the progress strip: Learn, Connect wallet, Add your agent, Approve the rule, and Live. Learn has four steps. Your agent can only ask, you set one rule, a refusal is saved, and you decide. Connect continues through naming the agent, approving the rule in Seed Vault, and the live rule. After Live, the same run hands the agent its setup and offers alerts, and those two screens stay on the Live stage of the strip. Skip stores the seen flag, so a later launch does not start at Learn again. Help can open How Veto works without clearing that flag.
 
 The four tabs are Overview, Rules, Agents, and Decisions. Overview is the home screen. It shows what the selected agent can still spend, the day of the rule, the paid count, refusals in a row, and today's latest decisions. Rules lists the owner's rules. Agents groups every rule by agent. Decisions filters All, Paid, Refused, Allowed once, and Agent's own declines.
 
@@ -276,7 +276,7 @@ The track record card is an image whose QR is the rule address. On devnet the ca
 
 During the last seven days before an active rule ends, a banner on Overview and on the rule page opens renewal. It shows what happened, the highest amount asked against the highest amount paid, and the next rule filled from this one (payee, most per payment, total set aside, how long it runs, and purpose). Change edits a field before signing. Let this one end writes nothing and costs nothing. Set up the next rule opens the existing rule flow, and the owner signs it in Seed Vault. The agent stays the one on this rule.
 
-The quiet note is off until you turn it on. You pick a time and one of three sends, which are Every evening, Only on days something moved, or Never. It is one local notification, computed from that day's decisions. Refusals still arrive when they happen. The phone checks about every 15 minutes in the background, and battery saving can delay a check, so the note says when it last looked.
+The quiet note is off until you turn it on. You pick a time and one of three sends: Every evening, Only on days something moved, or Never. It is one local notification, computed from that day's decisions. Refusals still arrive when they happen. The phone checks about every 15 minutes in the background, and battery saving can delay a check, so the note says when it last looked.
 
 ### Widgets
 
@@ -337,7 +337,7 @@ The program does not do the following.
 - A guardian on the same phone as the owner key is not a second factor. Keep the guardian on a second device kept somewhere else.
 - The vault's settings, including the safe address, are public on chain. Anyone can read them.
 
-A vault can be created without a guardian. Before the 2026-09-28 upgrade, the deployed program treated adding a guardian to such a vault as a tightening and applied it at once. Whoever held the owner key could add a guardian key and then use `skip` with both keys to pay a held withdrawal without waiting out the delay. That upgrade, recorded in [docs/DEVNET.md](docs/DEVNET.md), fixed this on devnet on 2026-09-28 by making any guardian change wait out the vault's delay. Vaults created before the 2026-09-26 safe-address upgrade may have a safe address equal to the guardian and should be repaired ([docs/HOLD_MIGRATIONS.md](docs/HOLD_MIGRATIONS.md)).
+A vault can be created without a guardian. Before the 2026-09-28 upgrade, the deployed program treated adding a guardian to such a vault as a tightening and applied it at once. Whoever held the owner key could add a guardian key and then use `skip` with both keys to pay a held withdrawal without waiting out the delay. That upgrade, recorded in [docs/DEVNET.md](docs/DEVNET.md), fixed this by making any guardian change wait out the vault's delay. Vaults created before the 2026-09-26 safe-address upgrade may have a safe address equal to the guardian and should be repaired ([docs/HOLD_MIGRATIONS.md](docs/HOLD_MIGRATIONS.md)).
 
 ## The demo
 
@@ -388,7 +388,7 @@ docs/internal/            working notes: decisions, self-review, design brief, d
 
 ## Build and run
 
-Building requires Rust, the Solana CLI and Anchor. From a fresh clone, run this.
+Building requires Rust, the Solana CLI and Anchor. From a fresh clone:
 
 ```bash
 make test
@@ -406,7 +406,7 @@ The history indexer lives in `indexer/`. It walks program logs rather than trust
 
 `make indexer-test` typechecks and tests the indexer. `make indexer-seed` opens a mandate and submits one paid charge and several refused ones, so the CLI can be compared against the ring. The target passes `VETO_RPC` (default `https://api.devnet.solana.com`) and `VETO_PROGRAM_ID` (default `3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV`). It still needs `keys/devnet-addresses.env` plus `keys/owner.json` and `keys/agent.json`. `make setup` writes those files, and setup refuses without the maintainer backup of `keys/program.json`. Without the address file the seed stops on `missing MINT`.
 
-To take a decision off the phone and check it from a laptop, run these.
+To take a decision off the phone and check it from a laptop:
 
 ```bash
 cd indexer && npm ci
@@ -424,7 +424,7 @@ The JSON schema, the bulk envelope, and the CSV columns are in [docs/DECISION_RE
 
 ## Threat model
 
-This section covers what each key can do under a mandate.
+What a compromised key can and cannot do under a mandate, and the limits the deployment itself sets.
 
 A compromised agent key can submit charges to the named merchant, up to the per-payment maximum, up to the remaining cap, until the expiry. That is the blast radius, and it is deliberate. The mandate is what the owner agreed to lose in the worst case, and the owner revokes in one signature.
 
@@ -442,7 +442,7 @@ Hold is live on devnet. The vault instructions are in this repository and tested
 
 The devnet program is owned by the upgradeable loader. Its upgrade authority is the deployer key listed in [docs/DEVNET.md](docs/DEVNET.md), confirmed on chain. On devnet that is one key, `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`, held by the maintainer, with no multisig and no timelock. Whoever holds that key can replace the program logic and, through it, move anything still delegated to a mandate or trade-rule PDA and every Hold vault balance. Every bound in this section is a bound on the program as deployed, and every devnet record verified by `tools/verify.ts` rests on that. For mainnet, where this program is not deployed, the intent is to set the upgrade authority to none after an external audit and before the first mandate is opened. A multisig would shrink the set of people who can replace the program and would still leave that replacement possible. After the authority is set to none, a fix means a new program id and a new mandate. Devnet stays upgradeable under the single deployer key so findings can be fixed in place.
 
-There is one known limit. The ledger records decisions reached in charge transactions that succeed. A failed transaction rolls back every ledger write, including a refusal reached before a later instruction fails. A frozen source or destination is inspected in `evaluate` and recorded as a refusal. Anchor account validation failures (wrong mint, wrong source, wrong ledger) and token-program declines this program does not inspect are errors with no entry. The program ledger has no entry for a charge the agent never submitted. A purpose decline is the memo described in [Advisory purpose check](#advisory-purpose-check), and verify does not treat it as a program decision. No payment happens without a record, and no submitted attempt is judged by the agent instead of by the chain.
+A known limit concerns which decisions the ledger records. The ledger records decisions reached in charge transactions that succeed. A failed transaction rolls back every ledger write, including a refusal reached before a later instruction fails. A frozen source or destination is inspected in `evaluate` and recorded as a refusal. Anchor account validation failures (wrong mint, wrong source, wrong ledger) and token-program declines this program does not inspect are errors with no entry. The program ledger has no entry for a charge the agent never submitted. A purpose decline is the memo described in [Advisory purpose check](#advisory-purpose-check), and verify does not treat it as a program decision. No payment happens without a record, and no submitted attempt is judged by the agent instead of by the chain.
 
 ## License
 

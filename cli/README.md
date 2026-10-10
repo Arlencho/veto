@@ -30,7 +30,7 @@ That creates a key on your machine if you do not already have one. The file is `
 
 On devnet, a key that holds less than 20 base fees of SOL gets a 1 SOL airdrop, and the terminal says so. Mainnet does not airdrop.
 
-The command then asks for anything it does not already have. That is who is paid, the most per payment, the total, how many days, and the purpose. Amounts you type are integer base units. On devnet the mint defaults to devnet USDC `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. On mainnet you give the mint.
+The command then asks for anything it does not already have: who is paid, the most per payment, the total, how many days, and the purpose. Amounts you type are integer base units. On devnet the mint defaults to devnet USDC `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. On mainnet you give the mint.
 
 It prints a `veto://rule-request` link and a QR of that link. Scan the QR with the Veto app and hold to approve.
 
@@ -38,7 +38,7 @@ The terminal waits until a rule that answers this request is on chain. The rule 
 
 Anyone who sees the agent address can open a rule for it, so the newest rule for the key is not trusted. The terminal prints the rule address and its owner. Check that they match what your phone shows, because someone who copies the request from the QR could open a matching rule first. When more than one rule matches, it picks none and tells you to pass `--rule` with the address your phone shows.
 
-It then prints the terms in the token's name. Half a USDC, which is 500000 base units, reads as 0.50 USDC. It also prints one MCP config line. Your agent can pay with `veto pay <amount>`, or you paste that line into the agent's MCP config. The veto server in that line is this.
+It then prints the terms in the token's name. Half a USDC, which is 500000 base units, reads as 0.50 USDC. It also prints one MCP config line. Your agent can pay with `veto pay <amount>`, or you paste that line into the agent's MCP config. The veto server in that line is:
 
 ```json
 "veto": { "command": "npx", "args": ["-y", "@veto-hq/veto", "mcp"] }

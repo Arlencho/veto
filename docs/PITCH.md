@@ -1,10 +1,10 @@
 # Pitch
 
-The claim is the recorded refusal. When a rule fails, the transfer is never executed and no tokens move. The decline is a record, with a reason and a suggested one-time allowance when one applies. Other checks can still stop the payment. The phone reaches the owner's signing wallet through Mobile Wallet Adapter. The prior art is the table in [PLAN.md](PLAN.md).
+The claim is the recorded refusal. When a rule fails, the transfer is never executed and no tokens move. The decline is a record, with a reason and a suggested one-time allowance when one applies. The phone reaches the owner's signing wallet through Mobile Wallet Adapter. The prior art is the table in [PLAN.md](PLAN.md).
 
 ## Sixty seconds
 
-> The agent tries to pay. The amount is over the ceiling you set. It does not pay. The chain records why, with a suggested one-time allowance when one applies. Other checks can still stop the payment.
+> The agent tries to pay. The amount is over the ceiling you set. It does not pay. The chain records why, with a suggested one-time allowance when one applies.
 >
 > The decline is a record. Elsewhere a blocked overspend is a failed transaction, with logs and an error code but nothing in program state. Here the refusal is a successful transaction that records a structured reason and moves no payment tokens.
 >
@@ -12,7 +12,7 @@ The claim is the recorded refusal. When a rule fails, the transfer is never exec
 >
 > The submitted take uses devnet USDC with no value and our own test payee. It buys no electricity. The rule is `r4D5pvcVsGhmBwwd3bSJfnXP1m5Qu1dDTvEpn6J7PWV`, with 20 USDC total and 5 per payment. The recorded sequence is 4.20 paid, 12.90 refused, an owner allowance, then 12.90 paid, leaving 2.90. [VIDEO.md](VIDEO.md#submitted-take) lists the transaction signatures. The refusal can be exported and checked against the chain.
 >
-> That record is the point. It holds the limits fixed in advance, and the payments and refusals recorded by charge transactions that succeed. Failed transactions and requests the agent never submits leave no program decision record. AP2 provides signed authorization mandates. Veto adds a structured refusal record on chain.
+> That record is the point: the limits fixed in advance, and the payments and refusals recorded by charge transactions that succeed. Failed transactions and requests the agent never submits leave no program decision record. AP2 provides signed authorization mandates. Veto adds a structured refusal record on chain.
 
 ## Position
 
@@ -79,7 +79,7 @@ The result is a complete record of every payment made under this authority, a wo
 
 Software is starting to spend money on its own. Every control built so far answers one question, whether this agent can pay. The record answers the next one, whether anyone should let it.
 
-A payment ledger shows that an agent had money. The decisions under a rule show what it did at the edge. They hold the limit agreed in advance, every payment made against it, and every refusal recorded by a charge transaction that succeeds, each one checkable against the chain by someone who trusts neither the owner nor us. That is the history a merchant, an auditor or a counterparty needs before letting software spend unattended. The other designs stop the overspend and keep no such history.
+A payment ledger shows that an agent had money. The decisions under a rule show what it did at the edge: the limit agreed in advance, every payment made against it, and every refusal recorded by a charge transaction that succeeds, each one checkable against the chain by someone who trusts neither the owner nor us. That is the history a merchant, an auditor or a counterparty needs before letting software spend unattended. The other designs stop the overspend and keep no such history.
 
 The purpose check is the first step past the numbers. The chain enforces amount, payee and time. The agent can already record why it declined a charge that fits the numbers but not the purpose. The direction is a mandate that governs what the money is for, with the chain keeping the evidence either way.
 
@@ -89,7 +89,7 @@ People built trust with a payment history. Agents will build it with a history o
 
 Built for the Solana Mobile "Clock In" hackathon ([Solana Mobile announcement](https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon)).
 
-The entry has one spending-rule type, a delegate on a token account the owner controls. There can be several rules, each with one agent, and a ruleset written once is applied to the next agent. There is one pay path, and one refusal path with a reason and an override hint. The app has four tabs (Overview, Rules, Agents, and Decisions), Connect your agent on an active rule, grades, plaques, a week in review, a track record card, renewal, and a quiet note. Anyone can re-read an export from the chain, including after the mandate account is closed. The quoted rule's history is the span above. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. The entry has no DeFi zoo, no marketplace, no W3C verifiable credential, no signing ceremony, and no verifier service.
+One spending-rule type. A delegate on a token account the owner controls. Several rules, one agent each. A ruleset written once, applied to the next agent. One pay path. One refusal path, with a reason and an override hint. The app has four tabs (Overview, Rules, Agents, and Decisions), Connect your agent on an active rule, grades, plaques, a week in review, a track record card, renewal, and a quiet note. Anyone can re-read an export from the chain, including after the mandate account is closed. The quoted rule's history is the span above. Hold is a separate vault in the same program, merged and tested, and live on devnet. The app screens exist. A completed device check of Hold with a real vault is not recorded in this repository yet. The entry has no DeFi zoo, no marketplace, no W3C verifiable credential, no signing ceremony, and no verifier service.
 
 ## Words
 

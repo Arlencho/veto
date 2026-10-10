@@ -16,7 +16,7 @@ VETO_KWH_MILLI=6000 (see Quoting USDC).
 
 ## What it does
 
-Four times per Stockholm day (00:00, 06:00, 12:00, 18:00) the process runs these steps.
+Four times per Stockholm day (00:00, 06:00, 12:00, 18:00) the process:
 
 1. Reads `https://www.elprisetjustnu.se/api/v1/prices/YYYY/MM-DD_SE3.json` for the
    15-minute window that starts on that hour.
@@ -261,7 +261,7 @@ SIGTERM finish the current slot and exit.
 
 The process has to outlive a laptop lid, or the slots that pass while it is down are missing from the journal. Pick one.
 
-With tmux, run this on the machine that can reach the RPC.
+With tmux, run this on the machine that can reach the RPC:
 
 ```bash
 tmux new -s veto-watcher 'cd /path/to/veto/watcher && npm start'
@@ -370,12 +370,15 @@ Anchor is not required to read the committed JSON.
 npm test
 ```
 
-The tests check integer money conversion and that no float appears in the money
-or FX source. They check that the nonce is deterministic, that re-running the
-same window does not resubmit, that a refusal is recorded rather than thrown,
-that a down feed writes a gap, and that a 429 is failed over and a rate limited
-slot stays due. An ECB document converts three known rows, a stale fixing and an
-unreachable FX source leave the slot due, and USD off matches today's base
-units. For the other rules naming the agent, they cover the discovery filters,
-the per-pass cap and its rotation, one failing rule not stopping the rest, and
-no second charge for the configured rule or a slot already decided.
+The tests cover:
+
+- Integer money conversion, with no float in the money or FX source
+- A deterministic nonce
+- No resubmit when the same window runs again
+- A refusal recorded rather than thrown
+- A gap written when a feed is down
+- Failover on a 429, with a rate limited slot staying due
+- An ECB document converting three known rows
+- A stale fixing or an unreachable FX source leaving the slot due
+- USD off matching today's base units
+- For the other rules naming the agent: the discovery filters, the per-pass cap and its rotation, one failing rule not stopping the rest, and no second charge for the configured rule or a slot already decided

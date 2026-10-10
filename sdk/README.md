@@ -116,7 +116,7 @@ const veto = await VetoAgent.fromConfig(config, agentKeypair);
 
 In this repo the import is from `../sdk/src/index.js` until the package is built and linked. `main` points at `./dist/src/index.js`, which exists after `npm run build`.
 
-It runs these checks in order.
+`fromConfig` runs these checks in order:
 
 1. The agent key in the file matches `config.agent`.
 2. The program is the id bundled in `sdk/idl/veto.json` (`3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV`). A block whose `programId` differs is refused. A localnet build passes a different program id as `{ programId }` in the options argument. The bundled id is the pin. The option is the only other id accepted.
@@ -147,7 +147,7 @@ if (mine.length === 1) {
 
 In this repo the import is from `../sdk/src/index.js` until the package is built and linked.
 
-`VetoAgent.fromMandate(connection, mandate, keypair)` performs the same checks as `fromConfig`. It reads the program id, the mint and its decimals, the source, the payee token account, the agent, and the cluster from the chain, checking in this order.
+`VetoAgent.fromMandate(connection, mandate, keypair)` performs the same checks as `fromConfig`. It reads the program id, the mint and its decimals, the source, the payee token account, the agent, and the cluster from the chain, in this order:
 
 1. The connection's genesis hash is the one published for devnet, testnet, or mainnet-beta. That match is the cluster.
 2. The mandate account exists. Its owner is the Veto program id bundled in `sdk/idl/veto.json` (`3zNp5EuQ61pR9stq4rzYsRQnjg4AYAgW8nxRje6koQmV`). A mandate owned by another program is refused.

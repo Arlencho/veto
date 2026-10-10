@@ -86,7 +86,7 @@ Once you have a paid or refused payment decision, open it and use **Share** to r
 ## Get ongoing charges from our demo agent
 
 Our demo agent runs all the time and sends a request to every open payment rule
-that names it. Approve one rule for it and you get paid and refused notifications for days.
+that names it. Approve one rule for it to get paid and refused notifications for days.
 
 1. Open **Rules**, tap **Write a rule**, keep **Payment rule** selected and paste
    the agent address `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` in the

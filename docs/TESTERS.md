@@ -20,6 +20,12 @@ The [release notes](RELEASE_NOTES.md) list features and known limits. The Try pa
 Faucets and confirmations can take time. In the steps below, approve in your
 connected wallet. Seed Vault is the Seeker example.
 
+To check your balance on the explorer, open
+`https://explorer.solana.com/address/<your address>?cluster=devnet`. Testnet is
+a different network, so a `cluster=testnet` link shows an empty wallet. Phantom
+may warn that the app's identity could not be verified. That is expected for the
+devnet test build, so tap **Connect**.
+
 ## Three things to try
 
 ### 1. Write a rule and look for a payment and a refusal
@@ -90,7 +96,9 @@ that names it. Approve one rule for it to get paid and refused notifications for
 
 1. Open **Rules**, tap **Write a rule**, keep **Payment rule** selected and paste
    the agent address `6YwqYUj4Kyy8dnPss34jMWgKAtLGAghmA1dRgYUGSV5w` in the
-   **Agent** field (the Agent row in [DEVNET.md](DEVNET.md)).
+   **Agent** field (the Agent row in [DEVNET.md](DEVNET.md)). This is the demo
+   agent, not your own wallet. The app refuses a rule where the agent is the
+   wallet that approves it.
 2. Set **Payee** to the demo payee `6i99pFwsoV9wBWSaNtXxpXgCWjpCkMbZ4UE6T4cSPdCG`.
    A rule with another payee is skipped.
 3. Fund it with devnet USDC and set **Most per payment** to 1 and

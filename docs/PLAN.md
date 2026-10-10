@@ -11,7 +11,7 @@ already exist.
 
 Limits on chain already exist. An overspend that is simply impossible protects the money and
 leaves only a failed transaction's logs, nothing in program state. Veto makes the refusal legible. A
-recorded no, a one-line why, and a suggested one-time allowance when one applies. Other checks can still stop the payment. On a phone, with the key in Seed Vault.
+recorded no, a one-line why, and a suggested one-time allowance when one applies. On a phone, with the key in Seed Vault.
 
 AP2 provides signed authorization mandates; Veto adds a structured refusal record on chain.
 

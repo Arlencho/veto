@@ -88,7 +88,7 @@ per-payment maximum 10, remaining 292 of a 300 cap, override 16.659625. The 12.5
 > The transaction succeeded at deciding no. The payment did not happen. The balance is unchanged,
 > and neither party can edit the confirmed transaction.
 >
-> The last field is the suggested one-time allowance for this charge. Other checks can still stop the payment.
+> The last field is the suggested one-time allowance for this charge.
 
 ---
 

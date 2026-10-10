@@ -261,7 +261,7 @@ SIGTERM finish the current slot and exit.
 
 The process has to outlive a laptop lid, or the slots that pass while it is down are missing from the journal. Pick one.
 
-With tmux, run this on the machine that can reach the RPC:
+With tmux, on the machine that can reach the RPC:
 
 ```bash
 tmux new -s veto-watcher 'cd /path/to/veto/watcher && npm start'

@@ -424,7 +424,7 @@ The JSON schema, the bulk envelope, and the CSV columns are in [docs/DECISION_RE
 
 ## Threat model
 
-What a compromised key can and cannot do under a mandate, and the limits the deployment itself sets.
+What a compromised key can and cannot do under a mandate, and the bounds the deployment itself sets.
 
 A compromised agent key can submit charges to the named merchant, up to the per-payment maximum, up to the remaining cap, until the expiry. That is the blast radius, and it is deliberate. The mandate is what the owner agreed to lose in the worst case, and the owner revokes in one signature.
 
@@ -442,7 +442,7 @@ Hold is live on devnet. The vault instructions are in this repository and tested
 
 The devnet program is owned by the upgradeable loader. Its upgrade authority is the deployer key listed in [docs/DEVNET.md](docs/DEVNET.md), confirmed on chain. On devnet that is one key, `GYus8c91vyc7XDrgqfDaYcmVTERb4hQWcf6fLr2SyR1`, held by the maintainer, with no multisig and no timelock. Whoever holds that key can replace the program logic and, through it, move anything still delegated to a mandate or trade-rule PDA and every Hold vault balance. Every bound in this section is a bound on the program as deployed, and every devnet record verified by `tools/verify.ts` rests on that. For mainnet, where this program is not deployed, the intent is to set the upgrade authority to none after an external audit and before the first mandate is opened. A multisig would shrink the set of people who can replace the program and would still leave that replacement possible. After the authority is set to none, a fix means a new program id and a new mandate. Devnet stays upgradeable under the single deployer key so findings can be fixed in place.
 
-A known limit concerns which decisions the ledger records. The ledger records decisions reached in charge transactions that succeed. A failed transaction rolls back every ledger write, including a refusal reached before a later instruction fails. A frozen source or destination is inspected in `evaluate` and recorded as a refusal. Anchor account validation failures (wrong mint, wrong source, wrong ledger) and token-program declines this program does not inspect are errors with no entry. The program ledger has no entry for a charge the agent never submitted. A purpose decline is the memo described in [Advisory purpose check](#advisory-purpose-check), and verify does not treat it as a program decision. No payment happens without a record, and no submitted attempt is judged by the agent instead of by the chain.
+One known limit. The ledger records only decisions reached in charge transactions that succeed. A failed transaction rolls back every ledger write, including a refusal reached before a later instruction fails. A frozen source or destination is inspected in `evaluate` and recorded as a refusal. Anchor account validation failures (wrong mint, wrong source, wrong ledger) and token-program declines this program does not inspect are errors with no entry. The program ledger has no entry for a charge the agent never submitted. A purpose decline is the memo described in [Advisory purpose check](#advisory-purpose-check), and verify does not treat it as a program decision. No payment happens without a record, and no submitted attempt is judged by the agent instead of by the chain.
 
 ## License
 

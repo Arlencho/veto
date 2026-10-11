@@ -1,6 +1,6 @@
 # Try Veto on your Seeker or Android phone
 
-This guide is for Seeker owners and other Android testers trying the devnet APK.
+This guide is for Seeker owners trying the devnet APK. Other Android phones cannot approve a rule on build 30 yet (see Setup).
 
 Veto lets you set payment and trade rules for an agent and see which requests were paid or refused. Its Hold vault makes withdrawals to new addresses wait, so you can stop them. Everything here is devnet test money with no value.
 
@@ -10,8 +10,11 @@ The [release notes](RELEASE_NOTES.md) list features and known limits. The Try pa
 
 1. Download and install the APK from the [latest release](https://github.com/Arlencho/veto/releases/latest).
    The release page lists the APK's SHA-256 so you can check the download.
-2. Use Seed Vault on Seeker, or a Solana wallet supporting Mobile Wallet Adapter
-   on another Android phone. Set the wallet to devnet and copy your own wallet address.
+2. Use Seed Vault on Seeker. Set the wallet to devnet and copy your own wallet
+   address. On build 30, Phantom and Solflare can connect but cannot approve a
+   rule ([#410](https://github.com/Arlencho/veto/issues/410),
+   [#412](https://github.com/Arlencho/veto/issues/412)), so other Android phones
+   cannot finish these steps yet.
 3. Get free devnet SOL at [Solana Faucet](https://faucet.solana.com) and free devnet USDC at
    [Circle Faucet](https://faucet.circle.com). Choose Solana devnet for USDC.
    Use your own wallet address at both faucets.
@@ -22,9 +25,7 @@ connected wallet. Seed Vault is the Seeker example.
 
 To check your balance on the explorer, open
 `https://explorer.solana.com/address/<your address>?cluster=devnet`. Testnet is
-a different network, so a `cluster=testnet` link shows an empty wallet. Phantom
-may warn that the app's identity could not be verified. That is expected for the
-devnet test build, so tap **Connect**.
+a different network, so a `cluster=testnet` link shows an empty wallet.
 
 ## Three things to try
 

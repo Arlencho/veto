@@ -1,6 +1,6 @@
 # Try Veto on your Seeker or Android phone
 
-This guide is for Seeker owners and other Android testers trying the devnet APK.
+This guide is for Seeker owners trying the devnet APK. Other Android phones cannot approve a rule on build 30 yet (see Setup).
 
 Veto lets you set payment and trade rules for an agent and see which requests were paid or refused. Its Hold vault makes withdrawals to new addresses wait, so you can stop them. Everything here is devnet test money with no value.
 

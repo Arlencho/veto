@@ -10,6 +10,7 @@ import {
   connect,
   disconnect,
   loadSession,
+  readContextSlot,
   signAndSendTransactions,
   signatureConfirmation,
   type MwaWallet,
@@ -18,10 +19,13 @@ import {
 } from './wallet';
 
 process.env.EXPO_PUBLIC_VETO_EXPLORER_CLUSTER = 'devnet';
+// No test here reaches an RPC for the context slot unless it sets one.
+signatureConfirmation.contextSlot = async () => undefined;
 
 const CANCELLED = 'You cancelled the wallet request.';
 const REJECTED = 'The wallet rejected the request.';
 const CLOSED = 'The wallet closed the session without a signature.';
+const NO_ANSWER = 'The wallet closed without signing, so nothing was sent.';
 const NOT_ON_CLUSTER =
   'The wallet did not submit the transaction. This app uses devnet. The wallet must be on devnet.';
 const NOT_YET_VISIBLE =
@@ -161,7 +165,7 @@ function restoreConfirmation(saved: {
   signatureConfirmation.openConnection = saved.openConnection;
 }
 
-test('a cancelled sign tells the person they cancelled', async () => {
+test('a session the adapter tears down is not blamed on the person', async () => {
   const owner = Keypair.generate();
   const transact = recordingTransact(
     walletReturning({
@@ -172,8 +176,85 @@ test('a cancelled sign tells the person they cancelled', async () => {
   );
   await assert.rejects(
     () => sign(transact, memoryStore()),
-    (err: unknown) => err instanceof Error && err.message === CANCELLED,
+    (err: unknown) => err instanceof Error && err.message === NO_ANSWER,
   );
+});
+
+test('a wallet cancel that is not the adapter teardown still reads as cancelled', async () => {
+  assert.equal(explainWalletFailure(new Error('Request cancelled'), 'devnet'), CANCELLED);
+});
+
+test('the sign request carries the current slot as minContextSlot', async () => {
+  const owner = Keypair.generate();
+  const signature = 'sig-slot';
+  const seen: Array<Record<string, unknown>> = [];
+  const wallet = walletReturning({ owner, signatures: [signature] });
+  const inner = wallet.signAndSendTransactions!;
+  wallet.signAndSendTransactions = async (params) => {
+    seen.push(params as unknown as Record<string, unknown>);
+    return inner(params);
+  };
+  const saved = signatureConfirmation.contextSlot;
+  signatureConfirmation.contextSlot = async () => 4242;
+  try {
+    await signAndSendTransactions(recordingTransact(wallet, []), memoryStore(), [new Transaction()], {
+      lookup: async () => 'confirmed',
+    });
+  } finally {
+    signatureConfirmation.contextSlot = saved;
+  }
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]?.minContextSlot, 4242);
+  assert.equal(seen[0]?.commitment, 'confirmed');
+});
+
+test('the sign request leaves minContextSlot out when no slot is known', async () => {
+  const owner = Keypair.generate();
+  const seen: Array<Record<string, unknown>> = [];
+  const wallet = walletReturning({ owner, signatures: ['sig-noslot'] });
+  const inner = wallet.signAndSendTransactions!;
+  wallet.signAndSendTransactions = async (params) => {
+    seen.push(params as unknown as Record<string, unknown>);
+    return inner(params);
+  };
+  await signAndSendTransactions(recordingTransact(wallet, []), memoryStore(), [new Transaction()], {
+    lookup: async () => 'confirmed',
+  });
+  assert.equal(seen.length, 1);
+  assert.equal('minContextSlot' in (seen[0] ?? {}), false);
+});
+
+test('the slot reader asks the RPC at confirmed and survives an RPC failure', async () => {
+  const saved = signatureConfirmation.openConnection;
+  const asked: unknown[] = [];
+  try {
+    signatureConfirmation.openConnection = async () => ({
+      async getSlot(commitment?: 'confirmed') {
+        asked.push(commitment);
+        return 777;
+      },
+      async getSignatureStatuses() {
+        return { value: [] };
+      },
+    });
+    assert.equal(await readContextSlot(), 777);
+    assert.deepEqual(asked, ['confirmed']);
+    signatureConfirmation.openConnection = async () => ({
+      async getSlot() {
+        throw new Error('rpc down');
+      },
+      async getSignatureStatuses() {
+        return { value: [] };
+      },
+    });
+    assert.equal(await readContextSlot(), undefined);
+    signatureConfirmation.openConnection = async () => {
+      throw new Error('no config');
+    };
+    assert.equal(await readContextSlot(), undefined);
+  } finally {
+    signatureConfirmation.openConnection = saved;
+  }
 });
 
 test('a rejected sign tells the person the wallet rejected the request', async () => {

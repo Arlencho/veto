@@ -78,6 +78,7 @@ export const SEEKER_APPROVAL_LINE = 'You will approve with your Seeker ID (Seed 
 export const USER_CANCELLED_MESSAGE = 'You cancelled the wallet request.';
 export const WALLET_REJECTED_MESSAGE = 'The wallet rejected the request.';
 export const SESSION_CLOSED_MESSAGE = 'The wallet closed the session without a signature.';
+export const WALLET_NO_ANSWER_MESSAGE = 'The wallet closed without signing, so nothing was sent.';
 
 export function clusterNotice(cluster: string): string {
   return `This app uses ${cluster}. The wallet must be on ${cluster}.`;
@@ -365,6 +366,7 @@ export function explainWalletFailure(error: unknown, cluster: string): string {
     message === USER_CANCELLED_MESSAGE ||
     message === WALLET_REJECTED_MESSAGE ||
     message === SESSION_CLOSED_MESSAGE ||
+    message === WALLET_NO_ANSWER_MESSAGE ||
     message.startsWith('The wallet did not submit the transaction.') ||
     message.startsWith('The transaction has not appeared on ') ||
     message.startsWith('The transaction was seen on ')
@@ -375,6 +377,12 @@ export function explainWalletFailure(error: unknown, cluster: string): string {
   const lower = message.toLowerCase();
   if (code === -4 || lower.includes('not submitted') || lower.includes('did not submit')) {
     return signatureNotOnClusterMessage(cluster);
+  }
+  // The adapter reports any session the app tears down as a local cancel. That
+  // includes a wallet that never answered (Phantom rejecting a request before
+  // showing it), so it is not proof that the person cancelled.
+  if (lower.includes('local association cancelled')) {
+    return WALLET_NO_ANSWER_MESSAGE;
   }
   if (lower.includes('cancel')) {
     return USER_CANCELLED_MESSAGE;
@@ -426,6 +434,7 @@ type SignatureStatusRow = {
 } | null;
 
 type SignatureStatusConnection = {
+  getSlot?(commitment?: 'confirmed'): Promise<number>;
   getSignatureStatuses(
     signatures: string[],
     config?: { searchTransactionHistory: boolean },
@@ -471,6 +480,22 @@ async function openConfiguredConnection(): Promise<SignatureStatusConnection> {
   return openRpcConnection(config.rpcUrl, config.explorerCluster);
 }
 
+// Phantom refuses sign_and_send_transactions without minContextSlot, although
+// the Mobile Wallet Adapter spec makes it optional. Other wallets accept it.
+// Without a slot the request still goes out, so other wallets keep working.
+export async function readContextSlot(): Promise<number | undefined> {
+  try {
+    const connection = await signatureConfirmation.openConnection();
+    if (!connection.getSlot) {
+      return undefined;
+    }
+    const slot = await connection.getSlot('confirmed');
+    return Number.isSafeInteger(slot) && slot >= 0 ? slot : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const defaultSignatureLookup: SignatureLookup = async (signature) =>
   readSignatureOnConfiguredRpc(signature, await signatureConfirmation.openConnection());
 
@@ -484,6 +509,7 @@ export const signatureConfirmation = {
     }),
   lookup: defaultSignatureLookup,
   openConnection: openConfiguredConnection,
+  contextSlot: readContextSlot,
 };
 
 function lookupOverride(options?: { lookup?: SignatureLookup }): SignatureLookup | undefined {
@@ -686,6 +712,7 @@ export async function signAndSendTransactions(
   }
   const cluster = await clusterForWallet();
   const stored = await loadSession(store);
+  const minContextSlot = await signatureConfirmation.contextSlot();
   try {
     const signatures = await transact(async (wallet) => {
       const session = await authorize(wallet, stored?.authToken, store);
@@ -696,6 +723,7 @@ export async function signAndSendTransactions(
       const signed = await wallet.signAndSendTransactions({
         transactions,
         commitment: 'confirmed',
+        ...(minContextSlot === undefined ? {} : { minContextSlot }),
       });
       return signaturesFromWallet(signed, transactions.length);
     }, associationConfig(stored?.walletUriBase));

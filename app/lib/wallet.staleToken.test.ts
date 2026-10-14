@@ -6,6 +6,9 @@ import * as wallet from './wallet';
 import { SESSION_STORE_KEY, WALLET_REJECTED_MESSAGE } from './wallet';
 import type { AuthorizeParams, MwaWallet, StoredSession, TransactFn, WalletStore } from './wallet';
 
+// No test here reaches an RPC for the context slot.
+wallet.signatureConfirmation.contextSlot = async () => undefined;
+
 // exposedWalletAccounts reads the phone store and opens the real wallet
 // session, so both are replaced with the same in-memory fakes the tests drive.
 const secure: Record<string, string> = {};

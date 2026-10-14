@@ -9,7 +9,7 @@ import { create, type ReactTestRenderer } from 'react-test-renderer';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 process.env.EXPO_PUBLIC_VETO_EXPLORER_CLUSTER = 'devnet';
 
-const CANCELLED = 'You cancelled the wallet request.';
+const NO_ANSWER = 'The wallet closed without signing, so nothing was sent.';
 const REJECTED = 'The wallet rejected the request.';
 const CLOSED = 'The wallet closed the session without a signature.';
 const NOT_YET_VISIBLE =
@@ -96,6 +96,7 @@ test('the screen that asked shows each wallet outcome', async () => {
   const { signatureConfirmation } = await import('./wallet');
   signatureConfirmation.timeoutMs = 0;
   signatureConfirmation.lookup = async () => 'missing';
+  signatureConfirmation.contextSlot = async () => undefined;
 
   function AskingScreen() {
     const wallet = useWallet();
@@ -145,7 +146,7 @@ test('the screen that asked shows each wallet outcome', async () => {
     });
   }
 
-  await shown('cancel', CANCELLED);
+  await shown('cancel', NO_ANSWER);
   await shown('reject', REJECTED);
   await shown('empty', CLOSED);
   await shown('missing', NOT_YET_VISIBLE);
